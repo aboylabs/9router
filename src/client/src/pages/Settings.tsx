@@ -1,26 +1,33 @@
 import { useEffect, useState } from "react";
-import { Eye, EyeOff, RefreshCw, User, Lock, Monitor, Smartphone, LogOut } from "lucide-react";
+import { Eye, EyeOff, RefreshCw, User, Lock, Monitor, Smartphone, LogOut, Plus, Trash2, Edit2, Power } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "../components/ui/Card";
 import { Input } from "../components/ui/Input";
 import { Button } from "../components/ui/Button";
 import { useToast } from "../components/ui/Toast";
 import { api } from "../lib/api";
 
-type UpstreamSettings = {
-  upstream_base_url: string;
-  upstream_api_key_masked: string;
-  upstream_api_key_length: number;
+type Upstream = {
+  id: string;
+  name: string;
+  baseUrl: string;
+  apiKey: string;
+  isActive: boolean;
+  weight: number;
 };
 
 export function Settings() {
   const { toast } = useToast();
 
-  const [baseUrl, setBaseUrl] = useState("");
-  const [apiKey, setApiKey] = useState("");
-  const [maskedKey, setMaskedKey] = useState("");
-  const [showKey, setShowKey] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(true);
+  const [upstreams, setUpstreams] = useState<Upstream[]>([]);
+  const [loadingUpstreams, setLoadingUpstreams] = useState(true);
+
+  // Form state for add/edit
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [formName, setFormName] = useState("");
+  const [formBaseUrl, setFormBaseUrl] = useState("");
+  const [formApiKey, setFormApiKey] = useState("");
+  const [formWeight, setFormWeight] = useState(1);
+  const [formSaving, setFormSaving] = useState(false);
 
   const [adminEmail, setAdminEmail] = useState("");
   const [newEmail, setNewEmail] = useState("");
@@ -46,10 +53,7 @@ export function Settings() {
 
   useEffect(() => {
     Promise.all([
-      api<UpstreamSettings>("/admin/settings/upstream").then((data) => {
-        setBaseUrl(data.upstream_base_url);
-        setMaskedKey(data.upstream_api_key_masked);
-      }),
+      loadUpstreams(),
       api<{ admin: { id: string; email: string } | null }>("/admin/profile").then((data) => {
         if (data.admin) {
           setAdminEmail(data.admin.email);
@@ -63,8 +67,97 @@ export function Settings() {
       }).finally(() => setSessionsLoading(false)),
     ]).catch(() => {
       toast("Failed to load settings", "error");
-    }).finally(() => setInitialLoading(false));
+    });
   }, []);
+
+  async function loadUpstreams() {
+    setLoadingUpstreams(true);
+    try {
+      const data = await api<{ upstreams: Upstream[] }>("/admin/upstreams");
+      setUpstreams(data.upstreams);
+    } catch {
+      toast("Failed to load upstreams", "error");
+    } finally {
+      setLoadingUpstreams(false);
+    }
+  }
+
+  function resetForm() {
+    setEditingId(null);
+    setFormName("");
+    setFormBaseUrl("");
+    setFormApiKey("");
+    setFormWeight(1);
+  }
+
+  function startEdit(up: Upstream) {
+    setEditingId(up.id);
+    setFormName(up.name);
+    setFormBaseUrl(up.baseUrl);
+    setFormApiKey(up.apiKey);
+    setFormWeight(up.weight);
+  }
+
+  async function saveUpstream() {
+    if (!formName.trim()) { toast("Name is required", "error"); return; }
+    if (!formBaseUrl.trim()) { toast("Base URL is required", "error"); return; }
+    try { new URL(formBaseUrl); } catch { toast("Invalid URL format", "error"); return; }
+    if (!formApiKey.trim()) { toast("API Key is required", "error"); return; }
+
+    setFormSaving(true);
+    try {
+      if (editingId) {
+        await api(`/admin/upstreams/${editingId}`, {
+          method: "PUT",
+          body: JSON.stringify({ name: formName, base_url: formBaseUrl, api_key: formApiKey, weight: formWeight })
+        });
+        toast("Upstream updated", "success");
+      } else {
+        await api("/admin/upstreams", {
+          method: "POST",
+          body: JSON.stringify({ name: formName, base_url: formBaseUrl, api_key: formApiKey, is_active: true, weight: formWeight })
+        });
+        toast("Upstream created and synced", "success");
+      }
+      resetForm();
+      await loadUpstreams();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to save upstream", "error");
+    } finally {
+      setFormSaving(false);
+    }
+  }
+
+  async function toggleUpstream(id: string) {
+    try {
+      await api(`/admin/upstreams/${id}/toggle`, { method: "PATCH" });
+      toast("Upstream toggled", "success");
+      await loadUpstreams();
+    } catch {
+      toast("Failed to toggle upstream", "error");
+    }
+  }
+
+  async function deleteUpstream(id: string) {
+    if (!confirm("Delete this upstream? This cannot be undone.")) return;
+    try {
+      await api(`/admin/upstreams/${id}`, { method: "DELETE" });
+      toast("Upstream deleted", "success");
+      if (editingId === id) resetForm();
+      await loadUpstreams();
+    } catch {
+      toast("Failed to delete upstream", "error");
+    }
+  }
+
+  async function syncUpstream(id: string) {
+    try {
+      const res = await api<{ synced: number; message: string }>(`/admin/upstreams/${id}/sync`, { method: "POST" });
+      toast(res.message ?? "Models synced", "success");
+    } catch {
+      toast("Failed to sync models", "error");
+    }
+  }
 
   async function saveEmail() {
     const email = newEmail.trim().toLowerCase();
@@ -109,30 +202,6 @@ export function Settings() {
     }
   }
 
-  async function saveUpstream() {
-    if (!baseUrl.trim()) { toast("Base URL is required", "error"); return; }
-    try { new URL(baseUrl); } catch { toast("Invalid URL format", "error"); return; }
-    setLoading(true);
-    const payload: Record<string, string> = { upstream_base_url: baseUrl.trim() };
-    if (apiKey.trim()) payload.upstream_api_key = apiKey.trim();
-    try {
-      const result = await api<{ saved: boolean; synced: number; message?: string; warning?: string }>("/admin/settings/upstream", {
-        method: "PUT",
-        body: JSON.stringify(payload)
-      });
-      if (result.warning) toast(result.warning, "error");
-      else toast(result.message ?? "Upstream settings saved and models synced", "success");
-      setApiKey("");
-      const data = await api<UpstreamSettings>("/admin/settings/upstream");
-      setBaseUrl(data.upstream_base_url);
-      setMaskedKey(data.upstream_api_key_masked);
-    } catch (err) {
-      toast(err instanceof Error ? err.message : "Failed to save settings", "error");
-    } finally {
-      setLoading(false);
-    }
-  }
-
   async function revokeSessionAction(sessionId: string) {
     setRevokingId(sessionId);
     try {
@@ -149,7 +218,7 @@ export function Settings() {
   async function revokeAllOther() {
     try {
       await api("/admin/sessions", { method: "DELETE" });
-      setSessions((prev) => prev.slice(0, 1)); // Keep only first (current)
+      setSessions((prev) => prev.slice(0, 1));
       toast("All other sessions revoked", "success");
     } catch {
       toast("Failed to revoke sessions", "error");
@@ -185,7 +254,7 @@ export function Settings() {
     return `${days}d ago`;
   }
 
-  if (initialLoading) {
+  if (loadingUpstreams || sessionsLoading) {
     return (
       <div className="flex items-center justify-center py-20">
         <RefreshCw className="h-5 w-5 animate-spin text-text-muted" />
@@ -200,7 +269,7 @@ export function Settings() {
         <p className="text-sm text-text-secondary mt-1">Manage your account and upstream configuration</p>
       </div>
 
-      <Card className="w-full max-w-2xl">
+      <Card className="w-full max-w-4xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><User className="h-4 w-4" /> Admin Account</CardTitle>
         </CardHeader>
@@ -220,7 +289,7 @@ export function Settings() {
         </div>
       </Card>
 
-      <Card className="w-full max-w-2xl">
+      <Card className="w-full max-w-4xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Lock className="h-4 w-4" /> Change Password</CardTitle>
         </CardHeader>
@@ -257,54 +326,103 @@ export function Settings() {
         </div>
       </Card>
 
-      <Card className="w-full max-w-2xl">
+      <Card className="w-full max-w-4xl">
         <CardHeader>
           <CardTitle>Upstream Configuration</CardTitle>
         </CardHeader>
         <p className="text-xs text-text-muted mb-4">
-          Changes here update the proxy backend immediately and auto-refresh the available model list.
+          Multiple upstreams are supported with weighted round-robin load balancing and automatic failover.
         </p>
-        <div className="space-y-4">
-          <Input
-            label="Base URL"
-            type="url"
-            value={baseUrl}
-            onChange={(e) => setBaseUrl(e.target.value)}
-            placeholder="https://example.com/v1"
-          />
-          <div className="grid gap-1.5">
-            <label className="text-sm font-medium text-text-secondary">API Key</label>
-            <div className="relative">
+
+        {/* Form */}
+        <div className="space-y-4 mb-6 p-4 rounded-lg border border-border bg-surface-secondary">
+          <h3 className="text-sm font-semibold text-text-primary">{editingId ? "Edit Upstream" : "Add New Upstream"}</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input label="Name" value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="e.g., Alibaba Primary" />
+            <Input label="Base URL" value={formBaseUrl} onChange={(e) => setFormBaseUrl(e.target.value)} placeholder="https://api.example.com/v1" />
+            <div className="grid gap-1.5">
+              <label className="text-sm font-medium text-text-secondary">API Key</label>
               <input
-                type={showKey ? "text" : "password"}
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder={maskedKey || "Enter to update"}
-                className="h-9 w-full rounded-md border border-border bg-surface px-3 pr-10 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors"
+                type="password"
+                value={formApiKey}
+                onChange={(e) => setFormApiKey(e.target.value)}
+                placeholder="sk-..."
+                className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors"
               />
-              <button
-                type="button"
-                onClick={() => setShowKey((v) => !v)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary cursor-pointer"
-                tabIndex={-1}
-              >
-                {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
             </div>
-            <p className="text-xs text-text-muted">
-              Leave blank to keep the current key.
-            </p>
+            <Input label="Weight (Round-Robin)" type="number" min={1} value={String(formWeight)} onChange={(e) => setFormWeight(Number(e.target.value) || 1)} placeholder="1" />
           </div>
-          <div className="pt-2">
-            <Button onClick={saveUpstream} loading={loading}>
-              Save & Sync Models
+          <div className="flex gap-2 pt-2">
+            <Button onClick={saveUpstream} loading={formSaving}>
+              {editingId ? "Update" : "Add Upstream"}
             </Button>
+            {editingId && (
+              <Button variant="secondary" onClick={resetForm}>
+                Cancel
+              </Button>
+            )}
           </div>
+        </div>
+
+        {/* Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-text-muted text-left">
+                <th className="pb-2 pl-2">Name</th>
+                <th className="pb-2">Base URL</th>
+                <th className="pb-2">API Key</th>
+                <th className="pb-2 text-center">Weight</th>
+                <th className="pb-2 text-center">Status</th>
+                <th className="pb-2 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {upstreams.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-text-muted">No upstreams configured yet.</td>
+                </tr>
+              ) : (
+                upstreams.map((up) => (
+                  <tr key={up.id} className="border-b border-border/50 hover:bg-surface-secondary/50 transition-colors">
+                    <td className="py-3 pl-2 font-medium text-text-primary">{up.name}</td>
+                    <td className="py-3 text-text-secondary truncate max-w-[200px]" title={up.baseUrl}>{up.baseUrl}</td>
+                    <td className="py-3 text-text-muted font-mono text-xs">
+                      {up.apiKey.slice(0, 6)}...{up.apiKey.slice(-4)}
+                    </td>
+                    <td className="py-3 text-center text-text-secondary">{up.weight}</td>
+                    <td className="py-3 text-center">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${up.isActive ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${up.isActive ? "bg-green-400" : "bg-red-400"}`}></span>
+                        {up.isActive ? "Active" : "Off"}
+                      </span>
+                    </td>
+                    <td className="py-3 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => syncUpstream(up.id)} title="Sync Models">
+                          <RefreshCw className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => startEdit(up)} title="Edit">
+                          <Edit2 className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => toggleUpstream(up.id)} title={up.isActive ? "Disable" : "Enable"}>
+                          <Power className={`h-3.5 w-3.5 ${!up.isActive ? "text-red-400" : ""}`} />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => deleteUpstream(up.id)} title="Delete" className="text-red-400 hover:text-red-300 hover:bg-red-500/10">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </Card>
 
       {/* Active Sessions */}
-      <Card className="w-full max-w-2xl">
+      <Card className="w-full max-w-4xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Monitor className="h-4 w-4" />

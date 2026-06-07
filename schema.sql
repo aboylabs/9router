@@ -96,6 +96,17 @@ CREATE INDEX IF NOT EXISTS idx_usage_events_created ON usage_events(created_at);
 CREATE INDEX IF NOT EXISTS idx_usage_events_api_key ON usage_events(api_key_id);
 CREATE INDEX IF NOT EXISTS idx_usage_events_buyer ON usage_events(buyer_id);
 
+CREATE TABLE IF NOT EXISTS upstreams (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(255) NOT NULL,
+  base_url VARCHAR(1024) NOT NULL,
+  api_key TEXT NOT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  weight INTEGER NOT NULL DEFAULT 1,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS usage_rollups (
   day DATE NOT NULL,
   buyer_id UUID REFERENCES buyers(id) ON DELETE SET NULL,

@@ -12,7 +12,7 @@ import {
 import { createSession, clearSession, readSession, requireAdmin, getActiveSessions, revokeSession, revokeAllOtherSessions } from "./session.js";
 import { createApiKeyRecord, createBuyerWithApiKeyRecord, invalidateApiKeyCache } from "./repositories.js";
 import { generateApiKey, apiKeyPrefix, hashApiKey, hashPassword, verifyPassword } from "./security.js";
-import { clearUpstreamCache, fetchUpstreamModels } from "./upstream.js";
+import { clearUpstreamCache, fetchUpstreamModels, getUpstreams } from "./upstream.js";
 import {
   CREATABLE_PACKAGE_IDS,
   DEFAULT_PACKAGE_ID,
@@ -157,7 +157,7 @@ export async function registerAdminRoutes(app: FastifyInstance) {
   app.addHook("preHandler", async (request, reply) => {
     if (!request.url.startsWith("/admin/")) return;
     if (request.url.startsWith("/admin/assets/")) return;
-    if (request.url.startsWith("/admin/auth/") || request.url === "/admin/me") return;
+    if (request.url.startsWith("/admin/auth/") || request.url === "/admin/me" || request.url === "/admin/") return;
     await requireAdmin(request, reply);
   });
 
@@ -868,6 +868,138 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     return { saved: true, synced, message: `Upstream updated and ${synced} models synced` };
   });
 
+  // --- Upstreams Management ---
+  app.get("/admin/upstreams", async () => {
+    const upstreams = await getUpstreams();
+    return { upstreams };
+  });
+
+  app.post("/admin/upstreams", async (request, reply) => {
+    const parsed = z.object({
+      name: z.string().min(1),
+      base_url: z.string().url(),
+      api_key: z.string().min(1),
+      is_active: z.boolean().default(true),
+      weight: z.number().int().min(1).default(1),
+    }).safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "Invalid payload" });
+
+    const result = await query<{ id: string }>(
+      `INSERT INTO upstreams (name, base_url, api_key, is_active, weight)
+       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+      [parsed.data.name, parsed.data.base_url, parsed.data.api_key, parsed.data.is_active, parsed.data.weight]
+    );
+    clearUpstreamCache();
+
+    const upstream = await fetchUpstreamModels(result.rows[0].id);
+    if (upstream.statusCode < 200 || upstream.statusCode >= 400) {
+      return reply.code(502).send({
+        warning: "Upstream created but failed to fetch models",
+        statusCode: upstream.statusCode,
+        upstream: upstream.body,
+      });
+    }
+
+    return { id: result.rows[0].id, message: "Upstream created and models synced" };
+  });
+
+  app.put("/admin/upstreams/:id", async (request, reply) => {
+    const params = z.object({ id: z.string().uuid() }).safeParse(request.params);
+    if (!params.success) return reply.code(400).send({ error: "Invalid upstream ID" });
+
+    const parsed = z.object({
+      name: z.string().min(1).optional(),
+      base_url: z.string().url().optional(),
+      api_key: z.string().min(1).optional(),
+      is_active: z.boolean().optional(),
+      weight: z.number().int().min(1).optional(),
+    }).safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "Invalid payload" });
+
+    const updates: string[] = [];
+    const values: any[] = [];
+    let idx = 1;
+
+    if (parsed.data.name !== undefined) { updates.push(`name = $${idx++}`); values.push(parsed.data.name); }
+    if (parsed.data.base_url !== undefined) { updates.push(`base_url = $${idx++}`); values.push(parsed.data.base_url); }
+    if (parsed.data.api_key !== undefined) { updates.push(`api_key = $${idx++}`); values.push(parsed.data.api_key); }
+    if (parsed.data.is_active !== undefined) { updates.push(`is_active = $${idx++}`); values.push(parsed.data.is_active); }
+    if (parsed.data.weight !== undefined) { updates.push(`weight = $${idx++}`); values.push(parsed.data.weight); }
+
+    if (updates.length === 0) return reply.code(400).send({ error: "No fields to update" });
+
+    updates.push(`updated_at = NOW()`);
+    values.push(params.data.id);
+
+    await query(
+      `UPDATE upstreams SET ${updates.join(", ")} WHERE id = $${idx}`,
+      values
+    );
+    clearUpstreamCache();
+    return { ok: true, message: "Upstream updated" };
+  });
+
+  app.patch("/admin/upstreams/:id/toggle", async (request, reply) => {
+    const params = z.object({ id: z.string().uuid() }).safeParse(request.params);
+    if (!params.success) return reply.code(400).send({ error: "Invalid upstream ID" });
+
+    await query(
+      `UPDATE upstreams SET is_active = NOT is_active, updated_at = NOW() WHERE id = $1`,
+      [params.data.id]
+    );
+    clearUpstreamCache();
+    return { ok: true, message: "Upstream toggled" };
+  });
+
+  app.delete("/admin/upstreams/:id", async (request, reply) => {
+    const params = z.object({ id: z.string().uuid() }).safeParse(request.params);
+    if (!params.success) return reply.code(400).send({ error: "Invalid upstream ID" });
+
+    await query(`DELETE FROM upstreams WHERE id = $1`, [params.data.id]);
+    clearUpstreamCache();
+    return { ok: true, message: "Upstream deleted" };
+  });
+
+  app.post("/admin/upstreams/:id/sync", async (request, reply) => {
+    const params = z.object({ id: z.string().uuid() }).safeParse(request.params);
+    if (!params.success) return reply.code(400).send({ error: "Invalid upstream ID" });
+
+    const upstream = await fetchUpstreamModels(params.data.id);
+    if (upstream.statusCode < 200 || upstream.statusCode >= 400) {
+      return reply.code(502).send({ error: "Failed to fetch models from upstream", statusCode: upstream.statusCode, upstream: upstream.body });
+    }
+
+    const parsedModels = upstreamModelsResponseSchema.safeParse(upstream.body);
+    if (!parsedModels.success) {
+      return reply.code(502).send({ error: "Upstream returned unsupported payload" });
+    }
+
+    let synced = 0;
+    for (const model of parsedModels.data.data) {
+      if (!isAllowedUpstreamModelId(model.id)) continue;
+      const aliasId = aliasForUpstreamModel(model.id);
+      if (!isAllowedPublicModelId(aliasId)) continue;
+      const displayName = displayNameForModel(aliasId);
+      await query(
+        `INSERT INTO models (id, upstream_model, display_name, active)
+         VALUES ($1, $2, $3, true)
+         ON CONFLICT (id) DO UPDATE SET
+          upstream_model = excluded.upstream_model,
+          display_name = excluded.display_name,
+          active = true`,
+        [aliasId, model.id, displayName]
+      );
+      await query(
+        `INSERT INTO buyer_model_access (api_key_id, model_id)
+         SELECT id, $1 FROM api_keys ON CONFLICT DO NOTHING`,
+        [aliasId]
+      );
+      synced++;
+    }
+
+    return { synced, message: `Synced ${synced} models from upstream` };
+  });
+
   // --- Sales ---
   app.get("/admin/sales", async (request, reply) => {
     const params = request.query as { from?: string; to?: string };
@@ -962,6 +1094,39 @@ export async function seedSystemSettings() {
   }
 }
 
+export async function seedUpstreamsTable() {
+  await query(`
+    create table if not exists upstreams (
+      id uuid primary key default gen_random_uuid(),
+      name varchar(255) not null,
+      base_url varchar(1024) not null,
+      api_key text not null,
+      is_active boolean not null default true,
+      weight integer not null default 1,
+      created_at timestamptz default now(),
+      updated_at timestamptz default now()
+    )
+  `);
+
+  // Migrate existing system_settings to upstreams if upstreams is empty
+  const upstreamCount = await query<{ count: string }>(`select count(*) from upstreams`);
+  if (Number(upstreamCount.rows[0].count) === 0) {
+    const legacy = await query<{ key: string; value: string }>(
+      `select key, value from system_settings where key in ('upstream_base_url', 'upstream_api_key')`
+    );
+    const map: Record<string, string> = {};
+    for (const row of legacy.rows) map[row.key] = row.value;
+    const baseUrl = map.upstream_base_url ?? config.UPSTREAM_BASE_URL;
+    const apiKey = map.upstream_api_key ?? config.UPSTREAM_API_KEY;
+
+    await query(
+      `insert into upstreams (name, base_url, api_key, is_active, weight)
+       values ($1, $2, $3, $4, $5)`,
+      ["Default", baseUrl, apiKey, true, 1]
+    );
+  }
+}
+
 export async function seedHiddenKeySchema() {
   await query(`ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS is_hidden BOOLEAN NOT NULL DEFAULT false`);
   await query(`DROP INDEX IF EXISTS api_keys_hidden_unique`);
@@ -1008,6 +1173,7 @@ export async function seedHiddenKey() {
 
 export async function seedInitialAdmin() {
   await seedSystemSettings();
+  await seedUpstreamsTable();
   await seedHiddenKey();
   await seedAlwaysAvailableModels();
 
