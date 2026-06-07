@@ -5,7 +5,6 @@ export type Buyer = {
   id: string;
   name: string;
   email?: string;
-  password_plain?: string;
   notes?: string;
   used_tokens: string;
   total_quota: string;
@@ -29,7 +28,6 @@ export type Key = {
   buyer_id: string;
   buyer_name: string;
   buyer_email?: string;
-  buyer_password?: string;
   label: string;
   key_prefix: string;
   key_plain?: string;

@@ -10,7 +10,35 @@ import { config, isProduction } from "./config.js";
 import { registerAdminRoutes, seedInitialAdmin } from "./admin-routes.js";
 import { registerProxyRoutes } from "./proxy-routes.js";
 import { startDailyResetCron } from "./daily-reset.js";
+import { chatRateLimiter } from "./rate-limiter.js";
 import { CREATABLE_PACKAGE_LABELS } from "../shared/package-catalog.js";
+
+const loginRateLimiter = {
+  windows: new Map<string, { count: number; resetAt: number }>(),
+  check(ip: string, limit: number) {
+    const now = Date.now();
+    const existing = this.windows.get(ip);
+    const resetAt = now + 15 * 60 * 1000;
+    
+    if (!existing || existing.resetAt <= now) {
+      this.windows.set(ip, { count: 1, resetAt });
+      return { allowed: true, remaining: limit - 1, resetAt };
+    }
+    
+    if (existing.count >= limit) {
+      return { 
+        allowed: false, 
+        remaining: 0, 
+        resetAt: existing.resetAt, 
+        retryAfterSeconds: Math.max(1, Math.ceil((existing.resetAt - now) / 1000))
+      };
+    }
+    
+    existing.count += 1;
+    return { allowed: true, remaining: limit - existing.count, resetAt: existing.resetAt };
+  }
+};
+const MAX_LOGIN_ATTEMPTS = 5;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -61,17 +89,27 @@ export async function buildApp() {
 
   // --- Customer Panel API ---
   app.post("/panel/auth/login", async (request, reply) => {
+    // Rate limit: max 5 attempts per IP per 15 minutes
+    const rateResult = loginRateLimiter.check(request.ip, MAX_LOGIN_ATTEMPTS);
+    if (!rateResult.allowed) {
+      return reply.code(429).send({ 
+        error: "Too many login attempts", 
+        retryAfterSeconds: rateResult.retryAfterSeconds 
+      });
+    }
+
     const { query: dbQuery } = await import("./db.js");
+    const { verifyPassword } = await import("./security.js");
     const body = request.body as { email?: string; password?: string };
     if (!body.email || !body.password) return reply.code(400).send({ error: "Email and password required" });
 
-    const result = await dbQuery<{ id: string; name: string; email: string; password_plain: string }>(
-      `SELECT id, name, email, password_plain FROM buyers WHERE email = $1 ORDER BY created_at DESC LIMIT 1`,
+    const result = await dbQuery<{ id: string; name: string; email: string; password_hash: string }>(
+      `SELECT id, name, email, password_hash FROM buyers WHERE email = $1 ORDER BY created_at DESC LIMIT 1`,
       [body.email.trim().toLowerCase()]
     );
     if (!result.rows[0]) return reply.code(401).send({ error: "Invalid email or password" });
     const buyer = result.rows[0];
-    if (buyer.password_plain !== body.password) return reply.code(401).send({ error: "Invalid email or password" });
+    if (!(await verifyPassword(body.password, buyer.password_hash))) return reply.code(401).send({ error: "Invalid email or password" });
 
     // Get all keys for this buyer
     const keys = await dbQuery<{

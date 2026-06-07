@@ -169,7 +169,9 @@ export async function registerProxyRoutes(app: FastifyInstance) {
             costEstimate: 0,
             latencyMs: Date.now() - started,
             errorCode: upstreamErrorCode
-          }).catch(() => {});
+          }).catch((err) => {
+            request.log.error({ err, buyerId: apiKey.buyer_id, apiKeyId: apiKey.id }, "Failed to record usage");
+          });
         }
 
         return reply.code(buyerFailure.statusCode).send(buyerFailure.body);
@@ -274,7 +276,9 @@ export async function registerProxyRoutes(app: FastifyInstance) {
             costEstimate: estimatedCost,
             latencyMs: Date.now() - started,
             errorCode: upstream.status >= 400 ? "upstream_error" : null
-          }).catch(() => {});
+          }).catch((err) => {
+            request.log.error({ err, buyerId: apiKey.buyer_id, apiKeyId: apiKey.id }, "Failed to record usage");
+          });
         }
       }
 
@@ -324,7 +328,9 @@ export async function registerProxyRoutes(app: FastifyInstance) {
         costEstimate: estimatedCost,
         latencyMs: Date.now() - started,
         errorCode: success ? null : upstream.errorCode ?? "upstream_error"
-      }).catch(() => {});
+      }).catch((err) => {
+        request.log.error({ err, buyerId: apiKey.buyer_id, apiKeyId: apiKey.id }, "Failed to record usage");
+      });
     }
 
     if (!success) {

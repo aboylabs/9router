@@ -12,6 +12,35 @@ import {
 import { createSession, clearSession, readSession, requireAdmin, getActiveSessions, revokeSession, revokeAllOtherSessions } from "./session.js";
 import { createApiKeyRecord, createBuyerWithApiKeyRecord, invalidateApiKeyCache } from "./repositories.js";
 import { generateApiKey, apiKeyPrefix, hashApiKey, hashPassword, verifyPassword } from "./security.js";
+import { FixedWindowRateLimiter, chatRateLimiter } from "./rate-limiter.js";
+
+// Login rate limiter: max 5 attempts per IP per 15 minutes
+const MAX_LOGIN_ATTEMPTS = 5;
+const loginRateLimiter = {
+  windows: new Map<string, { count: number; resetAt: number }>(),
+  check(ip: string, limit: number) {
+    const now = Date.now();
+    const existing = this.windows.get(ip);
+    const resetAt = now + 15 * 60 * 1000;
+    
+    if (!existing || existing.resetAt <= now) {
+      this.windows.set(ip, { count: 1, resetAt });
+      return { allowed: true, remaining: limit - 1, resetAt };
+    }
+    
+    if (existing.count >= limit) {
+      return { 
+        allowed: false, 
+        remaining: 0, 
+        resetAt: existing.resetAt, 
+        retryAfterSeconds: Math.max(1, Math.ceil((existing.resetAt - now) / 1000))
+      };
+    }
+    
+    existing.count += 1;
+    return { allowed: true, remaining: limit - existing.count, resetAt: existing.resetAt };
+  }
+};
 import { clearUpstreamCache, fetchUpstreamModels, getUpstreams } from "./upstream.js";
 import {
   CREATABLE_PACKAGE_IDS,
@@ -128,6 +157,15 @@ async function activeAllowedModelIds() {
 
 export async function registerAdminRoutes(app: FastifyInstance) {
   app.post("/admin/auth/login", async (request, reply) => {
+    // Rate limit: max 5 attempts per IP per 15 minutes
+    const rateResult = loginRateLimiter.check(request.ip, MAX_LOGIN_ATTEMPTS);
+    if (!rateResult.allowed) {
+      return reply.code(429).send({ 
+        error: "Too many login attempts", 
+        retryAfterSeconds: rateResult.retryAfterSeconds 
+      });
+    }
+
     const parsed = loginSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: "Invalid login payload" });
 
@@ -166,8 +204,8 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     const parsed = z.object({ email: z.string().email() }).safeParse(request.query);
     if (!parsed.success) return reply.code(400).send({ error: "Invalid email" });
 
-    const result = await query<{ id: string; name: string; email: string; password_plain: string | null }>(
-      `select id, name, email, password_plain from buyers where email = $1 order by created_at desc limit 1`,
+    const result = await query<{ id: string; name: string; email: string }>(
+      `select id, name, email from buyers where email = $1 order by created_at desc limit 1`,
       [parsed.data.email.toLowerCase()]
     );
 
@@ -185,8 +223,8 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     const buyerPassword = generateBuyerPassword();
     const hash = await hashPassword(buyerPassword);
     const buyerResult = await query<{ id: string }>(
-      `insert into buyers (name, email, password_plain, password_hash) values ($1, $2, $3, $4) returning id`,
-      [parsed.data.name, email, buyerPassword, hash]
+      `insert into buyers (name, email, password_hash) values ($1, $2, $3) returning id`,
+      [parsed.data.name, email, hash]
     );
     const buyerId = buyerResult.rows[0].id;
 
@@ -246,8 +284,8 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     const newPassword = generateBuyerPassword();
     const hash = await hashPassword(newPassword);
     const result = await query(
-      `update buyers set password_plain = $1, password_hash = $2 where id = $3 returning id, email`,
-      [newPassword, hash, params.data.buyerId]
+      `update buyers set password_hash = $1 where id = $2 returning id, email`,
+      [hash, params.data.buyerId]
     );
     if (!result.rowCount) return reply.code(404).send({ error: "Buyer not found" });
 
@@ -355,7 +393,7 @@ export async function registerAdminRoutes(app: FastifyInstance) {
 
   app.get("/admin/buyers", async () => {
     const result = await query(
-      `select b.*, b.password_plain,
+      `select b.id, b.name, b.email, b.notes, b.created_at,
         coalesce(sum(k.used_tokens) filter (where k.deleted_at is null and k.is_hidden = false), 0)::bigint as used_tokens,
         coalesce(sum(k.quota_tokens) filter (where k.deleted_at is null and k.is_hidden = false), 0)::bigint as total_quota,
         coalesce(sum(k.used_requests) filter (where k.deleted_at is null and k.is_hidden = false), 0)::bigint as request_count,
@@ -535,7 +573,7 @@ export async function registerAdminRoutes(app: FastifyInstance) {
 
   app.get("/admin/keys", async () => {
     const result = await query(
-      `select k.id, k.buyer_id, b.name as buyer_name, b.email as buyer_email, b.password_plain as buyer_password,
+      `select k.id, k.buyer_id, b.name as buyer_name, b.email as buyer_email,
         k.label, k.key_prefix, k.key_plain, k.expires_at,
         k.revoked_at, k.deleted_at, k.quota_tokens, k.quota_requests, k.used_tokens, k.used_requests, k.created_at,
         k.daily_reset, k.daily_quota_tokens, k.package_id, k.rate_limit_rpm

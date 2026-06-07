@@ -118,7 +118,7 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
   function getCopyText(key: Key): string {
     return buildCopyText({
       email: key.buyer_email || "-",
-      password: key.buyer_password || "-",
+      password: "-", // Password no longer stored for security
       apiKey: key.key_plain || key.key_prefix + "...",
       quotaTokens: key.quota_tokens || "unlimited",
       expiresAt: key.expires_at,
