@@ -63,6 +63,7 @@ export type UsageEvent = {
 export type ChartPoint = {
   label: string;
   requests: number;
+  tokens: number;
 };
 
 export type Overview = {

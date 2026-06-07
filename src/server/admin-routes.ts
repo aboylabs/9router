@@ -658,7 +658,8 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     const queryStr = `
       SELECT 
         to_char(${truncExpr}, '${cfg.format}') AS label,
-        COUNT(*)::integer AS requests
+        COUNT(*)::integer AS requests,
+        COALESCE(SUM(total_tokens), 0)::bigint AS tokens
       FROM usage_events
       WHERE created_at >= NOW() - INTERVAL '${cfg.interval}'
       GROUP BY ${truncExpr}

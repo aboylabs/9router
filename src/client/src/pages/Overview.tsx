@@ -65,7 +65,7 @@ export function Overview({ overview, chartData, chartRange, setChartRange, keys 
       <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <CardTitle>Total Request</CardTitle>
+            <CardTitle>Total Request & Tokens</CardTitle>
             <select
               value={chartRange}
               onChange={(e) => setChartRange(e.target.value)}
@@ -82,11 +82,15 @@ export function Overview({ overview, chartData, chartRange, setChartRange, keys 
         {chartData.length > 0 ? (
           <div className="h-48 sm:h-64 w-full">
             <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-              <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+              <AreaChart data={chartData} margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>
                 <defs>
                   <linearGradient id="requestGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
                     <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="tokenGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#eab308" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#eab308" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <XAxis
@@ -96,10 +100,19 @@ export function Overview({ overview, chartData, chartRange, setChartRange, keys 
                   tickLine={false}
                 />
                 <YAxis
+                  yAxisId="left"
                   tick={{ fontSize: 12, fill: "#94a3b8" }}
                   axisLine={false}
                   tickLine={false}
                   tickFormatter={(v) => formatNumber(v)}
+                />
+                <YAxis
+                  yAxisId="right"
+                  orientation="right"
+                  tick={{ fontSize: 12, fill: "#94a3b8" }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(v) => formatTokens(v)}
                 />
                 <Tooltip
                   contentStyle={{
@@ -108,14 +121,27 @@ export function Overview({ overview, chartData, chartRange, setChartRange, keys 
                     borderRadius: "8px",
                     fontSize: "12px"
                   }}
-                  formatter={(value) => [formatNumber(Number(value ?? 0)) + " requests", "Total"]}
+                  formatter={(value, name) => {
+                    if (name === "requests") return [formatNumber(Number(value ?? 0)) + " req", "Requests"];
+                    if (name === "tokens") return [formatTokens(Number(value ?? 0)), "Tokens"];
+                    return [value, name];
+                  }}
                 />
                 <Area
+                  yAxisId="left"
                   type="monotone"
                   dataKey="requests"
                   stroke="#10b981"
                   strokeWidth={2}
                   fill="url(#requestGradient)"
+                />
+                <Area
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="tokens"
+                  stroke="#eab308"
+                  strokeWidth={2}
+                  fill="url(#tokenGradient)"
                 />
               </AreaChart>
             </ResponsiveContainer>
