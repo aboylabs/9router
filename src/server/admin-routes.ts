@@ -569,6 +569,8 @@ export async function registerAdminRoutes(app: FastifyInstance) {
         [buyerId]
       );
       if (Number(remaining.rows[0].count) === 0) {
+        // Delete usage_rollups first to avoid FK SET NULL violation (buyer_id is NOT NULL in PK)
+        await client.query(`delete from usage_rollups where buyer_id = $1`, [buyerId]);
         await client.query(`delete from buyers where id = $1`, [buyerId]);
       }
       await client.query("commit");
