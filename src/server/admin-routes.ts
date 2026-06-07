@@ -630,6 +630,43 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     return { ok: true, message: "Request limit updated for all active keys" };
   });
 
+  app.get("/admin/usage/chart", async (request) => {
+    const range = (request.query as any)?.range || "7d";
+    
+    // Map range to interval and date_trunc level
+    const config: Record<string, { interval: string; trunc: string; format: string }> = {
+      "15m": { interval: "15 minutes", trunc: "minute", format: "HH24:MI" },
+      "1h":  { interval: "1 hour", trunc: "minute", format: "HH24:MI" },
+      "6h":  { interval: "6 hours", trunc: "hour", format: "HH24:MI" },
+      "12h": { interval: "12 hours", trunc: "hour", format: "HH24:MI" },
+      "1d":  { interval: "1 day", trunc: "hour", format: "HH24:MI" },
+      "3d":  { interval: "3 days", trunc: "day", format: "DD Mon" },
+      "7d":  { interval: "7 days", trunc: "day", format: "DD Mon" },
+      "1M":  { interval: "30 days", trunc: "day", format: "DD Mon" },
+    };
+    
+    const cfg = config[range] || config["7d"];
+    
+    // For 1h, we want 15-min buckets, so we need custom grouping
+    // For simplicity, use date_trunc and let frontend handle formatting if needed
+    const truncExpr = cfg.trunc === "minute" && range === "1h" 
+      ? "date_trunc('hour', created_at) + (floor(date_part('minute', created_at) / 15) * interval '15 min')"
+      : `date_trunc('${cfg.trunc}', created_at)`;
+    
+    const queryStr = `
+      SELECT 
+        to_char(${truncExpr}, '${cfg.format}') AS label,
+        COUNT(*)::integer AS requests
+      FROM usage_events
+      WHERE created_at >= NOW() - INTERVAL '${cfg.interval}'
+      GROUP BY ${truncExpr}
+      ORDER BY ${truncExpr} ASC
+    `;
+    
+    const result = await query(queryStr);
+    return { points: result.rows };
+  });
+
   app.get("/admin/usage", async () => {
     const result = await query(
       `select ue.created_at, ue.agent_id, ue.endpoint, ue.model_id, ue.status_code, ue.success,

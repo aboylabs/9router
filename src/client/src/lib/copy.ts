@@ -19,7 +19,7 @@ export function buildCopyText(data: CopyKeyData): string {
       : `Quota: ${formatNumber(data.quotaTokens)} tokens`;
 
   const lines = [
-    `Base URL: http://43.128.67.88/v1`,
+    `Base URL: https://routers9.my.id/v1`,
     `API Key: ${data.apiKey}`,
     ``,
   ];

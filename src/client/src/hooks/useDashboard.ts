@@ -60,6 +60,11 @@ export type UsageEvent = {
   cost_estimate?: string;
 };
 
+export type ChartPoint = {
+  label: string;
+  requests: number;
+};
+
 export type Overview = {
   buyers: number;
   activeKeys: number;
@@ -74,7 +79,18 @@ export function useDashboard() {
   const [keys, setKeys] = useState<Key[]>([]);
   const [usage, setUsage] = useState<UsageEvent[]>([]);
   const [overview, setOverview] = useState<Overview>({ buyers: 0, activeKeys: 0, requests: 0, tokens: 0, costEstimate: 0 });
+  const [chartData, setChartData] = useState<ChartPoint[]>([]);
+  const [chartRange, setChartRange] = useState<string>("7d");
   const [loading, setLoading] = useState(true);
+
+  const refreshChart = useCallback(async (range: string) => {
+    try {
+      const data = await api<{ points: ChartPoint[] }>(`/admin/usage/chart?range=${range}`);
+      setChartData(data.points);
+    } catch (err) {
+      console.error("Failed to refresh chart data:", err);
+    }
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -90,12 +106,13 @@ export function useDashboard() {
       setModels(modelData.models);
       setKeys(keyData.keys);
       setUsage(usageData.events);
+      await refreshChart(chartRange);
     } catch (err) {
       console.error("Failed to refresh dashboard data:", err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [chartRange, refreshChart]);
 
   useEffect(() => {
     refresh();
@@ -105,5 +122,5 @@ export function useDashboard() {
 
   const activeModels = models.filter((m) => m.active);
 
-  return { buyers, models, activeModels, keys, usage, overview, loading, refresh };
+  return { buyers, models, activeModels, keys, usage, overview, chartData, chartRange, setChartRange, refreshChart, loading, refresh };
 }

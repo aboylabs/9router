@@ -382,7 +382,7 @@ function customerPanelPage(): string {
       <div class="card">
         <div class="card-title">Base URL</div>
         <div class="copy-row">
-          <div class="card-value mono">https://9router.my.id/v1</div>
+          <div class="card-value mono">https://routers9.my.id/v1</div>
           <button class="copy-btn" onclick="copyText(this, 'base-url')">Copy</button>
         </div>
       </div>
@@ -553,7 +553,7 @@ function customerPanelPage(): string {
 
     function copyText(btn, type) {
       let text = '';
-      if (type === 'base-url') text = 'https://9router.my.id/v1';
+      if (type === 'base-url') text = 'https://routers9.my.id/v1';
       navigator.clipboard.writeText(text);
       btn.textContent = 'Copied!';
       btn.classList.add('copied');
@@ -927,16 +927,16 @@ function modelsLandingPage(): string {
           <div class="base-url-card">
             <div>
               <div class="label">Base URL</div>
-              <div class="url">https://9router.my.id/v1</div>
+              <div class="url">https://routers9.my.id/v1</div>
             </div>
-            <button class="copy-btn" onclick="copyToClip(this, 'https://9router.my.id/v1')">Copy</button>
+            <button class="copy-btn" onclick="copyToClip(this, 'https://routers9.my.id/v1')">Copy</button>
           </div>
 
           <div class="pro-tips">
             <h3>Pro Tips</h3>
             <ul>
               <li><span class="tip-icon">&#9679;</span>Your API key starts with <code>9r-xxxx</code></li>
-              <li><span class="tip-icon">&#9679;</span>Base URL: <code>https://9router.my.id/v1</code></li>
+              <li><span class="tip-icon">&#9679;</span>Base URL: <code>https://routers9.my.id/v1</code></li>
               <li><span class="tip-icon">&#9679;</span>Click any model ID to copy it to clipboard</li>
               <li><span class="tip-icon">&#9679;</span>Works with any OpenAI-compatible client (Cursor, Continue, OpenRouter, etc.)</li>
               <li><span class="tip-icon">&#9679;</span>Supports streaming, function calling, and vision</li>
@@ -966,8 +966,8 @@ function modelsLandingPage(): string {
           <div class="api-card">
             <div class="api-card-title">Base URL</div>
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
-              <div class="url" style="font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.9rem; color: #60a5fa;">https://9router.my.id/v1</div>
-              <button class="copy-btn" onclick="copyToClip(this, 'https://9router.my.id/v1')">Copy</button>
+              <div class="url" style="font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.9rem; color: #60a5fa;">https://routers9.my.id/v1</div>
+              <button class="copy-btn" onclick="copyToClip(this, 'https://routers9.my.id/v1')">Copy</button>
             </div>
           </div>
 
@@ -994,7 +994,7 @@ function modelsLandingPage(): string {
           <div class="api-card">
             <div class="api-card-title">Example: Chat Completion</div>
             <div class="code-block" id="code-nonstream"><button class="code-copy" onclick="copyCurl(this, 'nonstream')">Copy</button><span class="comment"># Non-streaming</span>
-curl https://9router.my.id/v1/chat/completions \
+curl https://routers9.my.id/v1/chat/completions \
   -H <span class="string">"Authorization: Bearer 9r-xxxx"</span> \
   -H <span class="string">"Content-Type: application/json"</span> \
   -d <span class="string">'{
@@ -1002,7 +1002,7 @@ curl https://9router.my.id/v1/chat/completions \
   "messages": [{"role": "user", "content": "Hello!"}]
 }'</span></div>
             <div class="code-block" id="code-stream"><button class="code-copy" onclick="copyCurl(this, 'stream')">Copy</button><span class="comment"># Streaming</span>
-curl https://9router.my.id/v1/chat/completions \
+curl https://routers9.my.id/v1/chat/completions \
   -H <span class="string">"Authorization: Bearer 9r-xxxx"</span> \
   -H <span class="string">"Content-Type: application/json"</span> \
   -d <span class="string">'{
@@ -1114,9 +1114,9 @@ curl https://9router.my.id/v1/chat/completions \
     function copyCurl(btn, type) {
       var text = '';
       if (type === 'nonstream') {
-        text = "curl https://9router.my.id/v1/chat/completions \\\\n  -H \\"Authorization: Bearer 9r-xxxx\\" \\\\n  -H \\"Content-Type: application/json\\" \\\\n  -d '{\\n  \\"model\\": \\"9router/claude-sonnet-4.6\\",\\n  \\"messages\\": [{\\"role\\": \\"user\\", \\"content\\": \\"Hello!\\"}]\\n}'";
+        text = "curl https://routers9.my.id/v1/chat/completions \\\\n  -H \\"Authorization: Bearer 9r-xxxx\\" \\\\n  -H \\"Content-Type: application/json\\" \\\\n  -d '{\\n  \\"model\\": \\"9router/claude-sonnet-4.6\\",\\n  \\"messages\\": [{\\"role\\": \\"user\\", \\"content\\": \\"Hello!\\"}]\\n}'";
       } else {
-        text = "curl https://9router.my.id/v1/chat/completions \\\\n  -H \\"Authorization: Bearer 9r-xxxx\\" \\\\n  -H \\"Content-Type: application/json\\" \\\\n  -d '{\\n  \\"model\\": \\"9router/claude-sonnet-4.6\\",\\n  \\"messages\\": [{\\"role\\": \\"user\\", \\"content\\": \\"Hello!\\"}],\\n  \\"stream\\": true\\n}'";
+        text = "curl https://routers9.my.id/v1/chat/completions \\\\n  -H \\"Authorization: Bearer 9r-xxxx\\" \\\\n  -H \\"Content-Type: application/json\\" \\\\n  -d '{\\n  \\"model\\": \\"9router/claude-sonnet-4.6\\",\\n  \\"messages\\": [{\\"role\\": \\"user\\", \\"content\\": \\"Hello!\\"}],\\n  \\"stream\\": true\\n}'";
       }
       navigator.clipboard.writeText(text);
       btn.textContent = 'Copied!';

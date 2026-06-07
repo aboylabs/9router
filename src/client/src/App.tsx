@@ -50,7 +50,7 @@ function Dashboard({ adminEmail, page, onNavigate, onLogout }: {
   onNavigate: (page: Page) => void;
   onLogout: () => void;
 }) {
-  const { models, activeModels, keys, usage, overview, loading, refresh } = useDashboard();
+  const { models, activeModels, keys, usage, overview, chartData, chartRange, setChartRange, refreshChart, loading, refresh } = useDashboard();
 
   return (
     <div className="min-h-screen bg-surface-secondary flex">
@@ -72,7 +72,7 @@ function Dashboard({ adminEmail, page, onNavigate, onLogout }: {
             </div>
           ) : (
             <>
-              {page === "overview" && <Overview overview={overview} usage={usage} keys={keys} />}
+              {page === "overview" && <Overview overview={overview} chartData={chartData} chartRange={chartRange} setChartRange={(r) => { setChartRange(r); refreshChart(r); }} keys={keys} />}
               {page === "keys" && <Keys keys={keys} onRefresh={refresh} />}
               {page === "models" && <Models models={models} onRefresh={refresh} />}
               {page === "usage" && <Usage usage={usage} />}

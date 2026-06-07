@@ -4,19 +4,29 @@ import { Card, CardHeader, CardTitle } from "../components/ui/Card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from "../components/ui/Table";
 import { Badge } from "../components/ui/Badge";
 import { formatDateShort, formatNumber, formatTokens } from "../lib/utils";
-import type { Overview as OverviewData, UsageEvent, Key as KeyType } from "../hooks/useDashboard";
+import type { Overview as OverviewData, ChartPoint, Key as KeyType } from "../hooks/useDashboard";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 interface OverviewProps {
   overview: OverviewData;
-  usage: UsageEvent[];
+  chartData: ChartPoint[];
+  chartRange: string;
+  setChartRange: (range: string) => void;
   keys: KeyType[];
 }
 
-export function Overview({ overview, usage, keys }: OverviewProps) {
-  // Build chart data from usage events (last 7 days aggregated by day)
-  const chartData = buildChartData(usage);
+const RANGE_OPTIONS = [
+  { value: "15m", label: "15 Min" },
+  { value: "1h", label: "1 Jam" },
+  { value: "6h", label: "6 Jam" },
+  { value: "12h", label: "12 Jam" },
+  { value: "1d", label: "1 Hari" },
+  { value: "3d", label: "3 Hari" },
+  { value: "7d", label: "7 Hari" },
+  { value: "1M", label: "1 Bulan" },
+];
 
+export function Overview({ overview, chartData, chartRange, setChartRange, keys }: OverviewProps) {
   // Recent keys (last 5)
   const recentKeys = keys.slice(0, 5);
 
@@ -54,20 +64,33 @@ export function Overview({ overview, usage, keys }: OverviewProps) {
       {/* Chart */}
       <Card>
         <CardHeader>
-          <CardTitle>Token Usage (Last 7 Days)</CardTitle>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <CardTitle>Total Request</CardTitle>
+            <select
+              value={chartRange}
+              onChange={(e) => setChartRange(e.target.value)}
+              className="text-sm bg-surface-tertiary border border-border rounded-md px-3 py-1.5 text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 w-full sm:w-auto"
+            >
+              {RANGE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </CardHeader>
         {chartData.length > 0 ? (
           <div className="h-48 sm:h-64 w-full">
             <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
                 <defs>
-                  <linearGradient id="tokenGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                  <linearGradient id="requestGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <XAxis
-                  dataKey="date"
+                  dataKey="label"
                   tick={{ fontSize: 12, fill: "#94a3b8" }}
                   axisLine={false}
                   tickLine={false}
@@ -76,7 +99,7 @@ export function Overview({ overview, usage, keys }: OverviewProps) {
                   tick={{ fontSize: 12, fill: "#94a3b8" }}
                   axisLine={false}
                   tickLine={false}
-                  tickFormatter={(v) => formatTokens(v)}
+                  tickFormatter={(v) => formatNumber(v)}
                 />
                 <Tooltip
                   contentStyle={{
@@ -85,14 +108,14 @@ export function Overview({ overview, usage, keys }: OverviewProps) {
                     borderRadius: "8px",
                     fontSize: "12px"
                   }}
-                  formatter={(value) => [formatNumber(Number(value ?? 0)) + " tokens", "Usage"]}
+                  formatter={(value) => [formatNumber(Number(value ?? 0)) + " requests", "Total"]}
                 />
                 <Area
                   type="monotone"
-                  dataKey="tokens"
-                  stroke="#3b82f6"
+                  dataKey="requests"
+                  stroke="#10b981"
                   strokeWidth={2}
-                  fill="url(#tokenGradient)"
+                  fill="url(#requestGradient)"
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -205,27 +228,4 @@ export function Overview({ overview, usage, keys }: OverviewProps) {
       </Card>
     </div>
   );
-}
-
-function buildChartData(usage: UsageEvent[]) {
-  const days = new Map<string, number>();
-
-  // Get last 7 days
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const key = d.toLocaleDateString("id-ID", { timeZone: "Asia/Jakarta", day: "2-digit", month: "short" });
-    days.set(key, 0);
-  }
-
-  // Aggregate usage
-  for (const event of usage) {
-    const d = new Date(event.created_at);
-    const key = d.toLocaleDateString("id-ID", { timeZone: "Asia/Jakarta", day: "2-digit", month: "short" });
-    if (days.has(key)) {
-      days.set(key, (days.get(key) || 0) + Number(event.total_tokens));
-    }
-  }
-
-  return Array.from(days.entries()).map(([date, tokens]) => ({ date, tokens }));
 }
