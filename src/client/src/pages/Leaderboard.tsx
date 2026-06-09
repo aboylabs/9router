@@ -233,6 +233,9 @@ export function Leaderboard() {
                         </span>
                       </div>
                     </td>
+                    <td className="p-3 text-right text-text-muted hidden md:table-cell">
+                      {formatDateShort(entry.last_request_at)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
