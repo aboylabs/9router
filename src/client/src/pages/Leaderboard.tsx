@@ -211,9 +211,6 @@ export function Leaderboard() {
                         <div className="flex items-center gap-1.5">
                           <code className="bg-surface-tertiary px-1.5 py-0.5 rounded font-mono text-text-muted text-xs">{entry.key_prefix}****</code>
                           <CopyButton text={entry.key_prefix} />
-                          {entry.key_label && entry.key_label !== "Hidden Key" && (
-                            <Badge variant="info" className="text-[10px]">{entry.key_label}</Badge>
-                          )}
                         </div>
                         <span className="text-text-primary font-medium">{entry.buyer_name}</span>
                         <span className="text-xs text-text-muted">{entry.buyer_email}</span>
