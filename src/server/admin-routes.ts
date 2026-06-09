@@ -518,6 +518,8 @@ export async function registerAdminRoutes(app: FastifyInstance) {
 
     const synced = [];
     let granted = 0;
+    const syncedIds = new Set<string>();
+    
     for (const model of parsed.data.data) {
       if (!isAllowedUpstreamModelId(model.id)) continue;
       const aliasId = aliasForUpstreamModel(model.id);
@@ -534,6 +536,7 @@ export async function registerAdminRoutes(app: FastifyInstance) {
         [aliasId, model.id, displayName]
       );
       synced.push(result.rows[0]);
+      syncedIds.add(aliasId);
 
       const grantResult = await query(
         `insert into buyer_model_access (api_key_id, model_id)
@@ -544,7 +547,23 @@ export async function registerAdminRoutes(app: FastifyInstance) {
       granted += grantResult.rowCount ?? 0;
     }
 
-    return { synced: synced.length, granted, models: synced };
+    // Clean up models that are no longer in the upstream response
+    const alwaysAvailableIds = ALWAYS_AVAILABLE_MODELS.map(m => m.id);
+    const idsToKeep = new Set([...syncedIds, ...alwaysAvailableIds]);
+    
+    const allModelsResult = await query<{ id: string }>(`SELECT id FROM models`);
+    const modelsToDelete = allModelsResult.rows
+      .map(r => r.id)
+      .filter(id => !idsToKeep.has(id));
+
+    if (modelsToDelete.length > 0) {
+      await query(
+        `DELETE FROM models WHERE id = ANY($1::varchar[])`,
+        [modelsToDelete]
+      );
+    }
+
+    return { synced: synced.length, granted, removed: modelsToDelete.length, models: synced };
   });
 
   app.post("/admin/buyers/:buyerId/keys", async (request, reply) => {
@@ -920,6 +939,7 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     }
 
     let synced = 0;
+    const syncedIds = new Set<string>();
     for (const model of parsedModels.data.data) {
       if (!isAllowedUpstreamModelId(model.id)) continue;
       const aliasId = aliasForUpstreamModel(model.id);
@@ -934,6 +954,7 @@ export async function registerAdminRoutes(app: FastifyInstance) {
           active = true`,
         [aliasId, model.id, displayName]
       );
+      syncedIds.add(aliasId);
       await query(
         `insert into buyer_model_access (api_key_id, model_id)
          select id, $1 from api_keys
@@ -943,7 +964,23 @@ export async function registerAdminRoutes(app: FastifyInstance) {
       synced++;
     }
 
-    return { saved: true, synced, message: `Upstream updated and ${synced} models synced` };
+    // Clean up models that are no longer in the upstream response
+    const alwaysAvailableIds = ALWAYS_AVAILABLE_MODELS.map(m => m.id);
+    const idsToKeep = new Set([...syncedIds, ...alwaysAvailableIds]);
+    
+    const allModelsResult = await query<{ id: string }>(`SELECT id FROM models`);
+    const modelsToDelete = allModelsResult.rows
+      .map(r => r.id)
+      .filter(id => !idsToKeep.has(id));
+
+    if (modelsToDelete.length > 0) {
+      await query(
+        `DELETE FROM models WHERE id = ANY($1::varchar[])`,
+        [modelsToDelete]
+      );
+    }
+
+    return { saved: true, synced, removed: modelsToDelete.length, message: `Upstream updated and ${synced} models synced, ${modelsToDelete.length} removed` };
   });
 
   // --- Upstreams Management ---
@@ -1053,6 +1090,7 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     }
 
     let synced = 0;
+    const syncedIds = new Set<string>();
     for (const model of parsedModels.data.data) {
       if (!isAllowedUpstreamModelId(model.id)) continue;
       const aliasId = aliasForUpstreamModel(model.id);
@@ -1067,6 +1105,7 @@ export async function registerAdminRoutes(app: FastifyInstance) {
           active = true`,
         [aliasId, model.id, displayName]
       );
+      syncedIds.add(aliasId);
       await query(
         `INSERT INTO buyer_model_access (api_key_id, model_id)
          SELECT id, $1 FROM api_keys ON CONFLICT DO NOTHING`,
@@ -1075,7 +1114,23 @@ export async function registerAdminRoutes(app: FastifyInstance) {
       synced++;
     }
 
-    return { synced, message: `Synced ${synced} models from upstream` };
+    // Clean up models that are no longer in the upstream response
+    const alwaysAvailableIds = ALWAYS_AVAILABLE_MODELS.map(m => m.id);
+    const idsToKeep = new Set([...syncedIds, ...alwaysAvailableIds]);
+    
+    const allModelsResult = await query<{ id: string }>(`SELECT id FROM models`);
+    const modelsToDelete = allModelsResult.rows
+      .map(r => r.id)
+      .filter(id => !idsToKeep.has(id));
+
+    if (modelsToDelete.length > 0) {
+      await query(
+        `DELETE FROM models WHERE id = ANY($1::varchar[])`,
+        [modelsToDelete]
+      );
+    }
+
+    return { synced, removed: modelsToDelete.length, message: `Synced ${synced} models from upstream, ${modelsToDelete.length} removed` };
   });
 
   // --- Sales ---
