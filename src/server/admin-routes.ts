@@ -815,6 +815,8 @@ export async function registerAdminRoutes(app: FastifyInstance) {
         k.id as key_id,
         k.label as key_label,
         k.key_prefix,
+        k.expires_at,
+        k.created_at as key_created_at,
         COUNT(ue.id)::int as total_requests,
         COALESCE(SUM(ue.total_tokens), 0)::bigint as total_tokens,
         COALESCE(SUM(ue.prompt_tokens), 0)::bigint as prompt_tokens,
@@ -824,7 +826,7 @@ export async function registerAdminRoutes(app: FastifyInstance) {
       JOIN api_keys k ON k.id = ue.api_key_id
       JOIN buyers b ON b.id = k.buyer_id
       WHERE k.is_hidden = false
-      GROUP BY b.id, b.name, b.email, k.id, k.label, k.key_prefix
+      GROUP BY b.id, b.name, b.email, k.id, k.label, k.key_prefix, k.expires_at, k.created_at
       HAVING COUNT(ue.id) > 0
       ORDER BY total_requests DESC
       LIMIT 100`

@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
 import { CopyButton } from "../components/CopyButton";
 import { api } from "../lib/api";
-import { formatDateShort, formatTokens } from "../lib/utils";
+import { formatTokens } from "../lib/utils";
 
 type LeaderboardEntry = {
   buyer_id: string;
@@ -14,6 +14,8 @@ type LeaderboardEntry = {
   key_id: string;
   key_label: string;
   key_prefix: string;
+  expires_at: string | null;
+  key_created_at: string;
   total_requests: number;
   total_tokens: string;
   prompt_tokens: string;
@@ -21,7 +23,30 @@ type LeaderboardEntry = {
   last_request_at: string;
 };
 
-type SortKey = "total_requests" | "total_tokens" | "last_request_at";
+function formatRemainingDays(expiresAt: string | null): string {
+  if (!expiresAt) return "No expiry";
+  const expiry = new Date(expiresAt);
+  const now = new Date();
+  const diffMs = expiry.getTime() - now.getTime();
+  if (diffMs <= 0) return "Expired";
+  const days = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  if (days === 1) return "1 day left";
+  return `${days} days left`;
+}
+
+function getExpiryColor(expiresAt: string | null): string {
+  if (!expiresAt) return "text-text-muted";
+  const expiry = new Date(expiresAt);
+  const now = new Date();
+  const diffMs = expiry.getTime() - now.getTime();
+  if (diffMs <= 0) return "text-red-500";
+  const days = diffMs / (1000 * 60 * 60 * 24);
+  if (days <= 3) return "text-orange-500";
+  if (days <= 7) return "text-yellow-500";
+  return "text-green-500";
+}
+
+type SortKey = "total_requests" | "total_tokens";
 type SortDir = "asc" | "desc";
 
 export function Leaderboard() {
@@ -162,13 +187,8 @@ export function Leaderboard() {
                       Tokens <SortIcon column="total_tokens" />
                     </div>
                   </th>
-                  <th 
-                    className="text-right p-3 font-medium text-text-muted cursor-pointer hover:text-text-primary transition-colors hidden md:table-cell"
-                    onClick={() => handleSort("last_request_at")}
-                  >
-                    <div className="flex items-center justify-end gap-1">
-                      Last Active <SortIcon column="last_request_at" />
-                    </div>
+                  <th className="text-right p-3 font-medium text-text-muted hidden md:table-cell">
+                    Remaining
                   </th>
                 </tr>
               </thead>
@@ -205,8 +225,10 @@ export function Leaderboard() {
                         </span>
                       </div>
                     </td>
-                    <td className="p-3 text-right text-text-muted hidden md:table-cell">
-                      {formatDateShort(entry.last_request_at)}
+                    <td className="p-3 text-right hidden md:table-cell">
+                      <span className={`font-medium ${getExpiryColor(entry.expires_at)}`}>
+                        {formatRemainingDays(entry.expires_at)}
+                      </span>
                     </td>
                   </tr>
                 ))}
