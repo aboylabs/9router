@@ -96,7 +96,7 @@ const ALWAYS_AVAILABLE_MODELS = [
   { id: "9router/combo-qwen-deepseek", upstream_model: "combo-qwen-deepseek", display_name: "Combo Qwen Deepseek" },
   { id: "9router/minimax/MiniMax-M2.7", upstream_model: "minimax/MiniMax-M2.7", display_name: "MiniMax M2.7" },
   { id: "9router/minimax/MiniMax-M2.5", upstream_model: "minimax/MiniMax-M2.5", display_name: "MiniMax M2.5" },
-  { id: "9router/minimax/MiniMax-M2.1", upstream_model: "minimax/MiniMax-M2.1", display_name: "MiniMax M2.1" },
+
   { id: "9router/minimax/MiniMax-M2.7-highspeed", upstream_model: "minimax/MiniMax-M2.7-highspeed", display_name: "MiniMax M2.7 Highspeed" },
   { id: "9router/MiniMax/MiniMax-M3", upstream_model: "MiniMax/MiniMax-M3", display_name: "MiniMax M3" },
   { id: "9router/MiniMax/MiniMax-M2.7", upstream_model: "MiniMax/MiniMax-M2.7", display_name: "MiniMax M2.7" },
