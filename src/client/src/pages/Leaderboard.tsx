@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
 import { CopyButton } from "../components/CopyButton";
 import { api } from "../lib/api";
-import { formatTokens } from "../lib/utils";
+import { formatDateShort, formatTokens } from "../lib/utils";
 
 type LeaderboardEntry = {
   buyer_id: string;
@@ -46,7 +46,7 @@ function getExpiryColor(expiresAt: string | null): string {
   return "text-green-500";
 }
 
-type SortKey = "total_requests" | "total_tokens";
+type SortKey = "total_requests" | "total_tokens" | "last_request_at";
 type SortDir = "asc" | "desc";
 
 export function Leaderboard() {
@@ -187,8 +187,13 @@ export function Leaderboard() {
                       Tokens <SortIcon column="total_tokens" />
                     </div>
                   </th>
-                  <th className="text-right p-3 font-medium text-text-muted hidden md:table-cell">
-                    Remaining
+                  <th 
+                    className="text-right p-3 font-medium text-text-muted cursor-pointer hover:text-text-primary transition-colors hidden md:table-cell"
+                    onClick={() => handleSort("last_request_at")}
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      Last Active <SortIcon column="last_request_at" />
+                    </div>
                   </th>
                 </tr>
               </thead>
@@ -212,6 +217,9 @@ export function Leaderboard() {
                         </div>
                         <span className="text-text-primary font-medium">{entry.buyer_name}</span>
                         <span className="text-xs text-text-muted">{entry.buyer_email}</span>
+                        <span className={`text-xs font-medium ${getExpiryColor(entry.expires_at)}`}>
+                          {formatRemainingDays(entry.expires_at)}
+                        </span>
                       </div>
                     </td>
                     <td className="p-3 text-right">
@@ -224,11 +232,6 @@ export function Leaderboard() {
                           P: {formatTokens(entry.prompt_tokens)} | C: {formatTokens(entry.completion_tokens)}
                         </span>
                       </div>
-                    </td>
-                    <td className="p-3 text-right hidden md:table-cell">
-                      <span className={`font-medium ${getExpiryColor(entry.expires_at)}`}>
-                        {formatRemainingDays(entry.expires_at)}
-                      </span>
                     </td>
                   </tr>
                 ))}
