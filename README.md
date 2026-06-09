@@ -145,6 +145,19 @@ npm start
 
 ---
 
+## 📋 Changelog
+
+### v1.1.0 (2026-06-09)
+- **feat**: Multi-upstream support with weighted round-robin and failover (`upstreams` table, per-upstream sync)
+- **feat**: Leaderboard page — top API keys ranked by request count and token usage, with sortable columns and summary cards
+- **fix**: Model sync now auto-removes models that no longer exist in upstream (prevents stale/ghost models in admin panel)
+- **fix**: Removed `MiniMax-M2.1` from `ALWAYS_AVAILABLE_MODELS` (no longer available upstream)
+- **feat**: Daily token quota reset at 00:00 WIB for configured packages
+- **feat**: Admin session tracking with device/IP info and remote revoke
+- **fix**: Rate limiter auto-cleanup to prevent memory leaks
+
+---
+
 ## 📝 License
 
 MIT License. See [LICENSE](LICENSE) for details.
