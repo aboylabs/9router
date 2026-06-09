@@ -8,12 +8,13 @@ import {
   LogOut,
   Menu,
   X,
-  Settings
+  Settings,
+  Trophy
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { ThemeToggle } from "./ThemeToggle";
 
-export type Page = "overview" | "keys" | "models" | "usage" | "live" | "settings";
+export type Page = "overview" | "keys" | "models" | "usage" | "live" | "leaderboard" | "settings";
 
 interface SidebarProps {
   currentPage: Page;
@@ -28,6 +29,7 @@ const navItems: { id: Page; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "models", label: "Models", icon: Box },
   { id: "usage", label: "Usage", icon: Activity },
   { id: "live", label: "Live", icon: Radio },
+  { id: "leaderboard", label: "Leaderboard", icon: Trophy },
   { id: "settings", label: "Settings", icon: Settings },
 ];
 

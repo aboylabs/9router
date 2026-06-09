@@ -9,6 +9,7 @@ import { Keys } from "./pages/Keys";
 import { Models } from "./pages/Models";
 import { Usage } from "./pages/Usage";
 import { Live } from "./pages/Live";
+import { Leaderboard } from "./pages/Leaderboard";
 import { Settings } from "./pages/Settings";
 
 function App() {
@@ -77,6 +78,7 @@ function Dashboard({ adminEmail, page, onNavigate, onLogout }: {
               {page === "models" && <Models models={models} onRefresh={refresh} />}
               {page === "usage" && <Usage usage={usage} />}
               {page === "live" && <Live />}
+              {page === "leaderboard" && <Leaderboard />}
               {page === "settings" && <Settings />}
             </>
           )}

@@ -805,6 +805,33 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     return { active: result.rows };
   });
 
+  // --- Leaderboard ---
+  app.get("/admin/leaderboard", async () => {
+    const result = await query(
+      `SELECT 
+        b.id as buyer_id,
+        b.name as buyer_name,
+        b.email as buyer_email,
+        k.id as key_id,
+        k.label as key_label,
+        k.key_prefix,
+        COUNT(ue.id)::int as total_requests,
+        COALESCE(SUM(ue.total_tokens), 0)::bigint as total_tokens,
+        COALESCE(SUM(ue.prompt_tokens), 0)::bigint as prompt_tokens,
+        COALESCE(SUM(ue.completion_tokens), 0)::bigint as completion_tokens,
+        MAX(ue.created_at) as last_request_at
+      FROM usage_events ue
+      JOIN api_keys k ON k.id = ue.api_key_id
+      JOIN buyers b ON b.id = k.buyer_id
+      WHERE k.is_hidden = false
+      GROUP BY b.id, b.name, b.email, k.id, k.label, k.key_prefix
+      HAVING COUNT(ue.id) > 0
+      ORDER BY total_requests DESC
+      LIMIT 100`
+    );
+    return { rows: result.rows };
+  });
+
   // --- Profile ---
   app.get("/admin/profile", async (request, reply) => {
     const session = await readSession(request);
