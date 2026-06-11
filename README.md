@@ -9,6 +9,7 @@ Built for reliability, scalability, and ease of use, 9router provides a modern a
 ## ✨ Features
 
 - **Unified API Gateway**: Single OpenAI-compatible endpoint (`/v1/chat/completions`) for all upstream models.
+- **Public Dashboard**: Read-only public dashboard (Leaderboard, Live Usage, Usage Charts, Models) served at `/` with gzip compression enabled.
 - **API Key Management**: Create, manage, extend, and revoke API keys for individual buyers.
 - **Quota Management**: 
   - Total token quotas per key.
@@ -20,6 +21,15 @@ Built for reliability, scalability, and ease of use, 9router provides a modern a
 - **Admin Session Tracking**: Monitor active admin sessions with device, IP, and browser information, with the ability to revoke specific sessions remotely.
 - **Model Catalog**: Dynamic model management with input/output cost configuration per million tokens.
 - **Modern Dashboard**: Responsive, dark-mode-ready React admin panel with real-time live usage monitoring and usage charts.
+- **Timezone Consistency**: All chart and time-display queries use `Asia/Jakarta` (WIB) for accurate local time representation.
+
+---
+
+## 🌐 Deployment Info
+
+- **Admin Panel + API**: `43.128.67.88` (or `routers9.my.id` when configured)
+- **Public Dashboard**: `routers9.web.id` (read-only access to Leaderboard, Live, Usage, and Models via `/public/*` endpoints)
+- **Reverse Proxy**: Caddy (handles TLS/HTTPS, gzip compression, and routing to `localhost:3000`)
 
 ---
 
@@ -119,7 +129,13 @@ npm start
 ## 🔌 API Endpoints Overview
 
 ### Public / Proxy
+- `GET /` - Public dashboard HTML (served at `routers9.web.id`).
 - `GET /health` - Health check endpoint.
+- `GET /public/overview` - Public overview stats (buyers, active keys, requests, tokens).
+- `GET /public/leaderboard` - Top 100 API keys by request count (masked emails).
+- `GET /public/live` - Live active sessions (last 5 minutes, masked emails).
+- `GET /public/usage` - Recent 200 usage events (masked key prefixes).
+- `GET /public/usage/chart?range=7d` - Usage chart data (ranges: 15m, 1h, 6h, 12h, 1d, 3d, 7d, 1M).
 - `GET /public/models` - List available white-label models.
 - `POST /v1/chat/completions` - OpenAI-compatible chat completion endpoint (requires Bearer API key).
 
@@ -146,6 +162,13 @@ npm start
 ---
 
 ## 📋 Changelog
+
+### v1.2.0 (2026-06-11)
+- **feat**: Public dashboard at `routers9.web.id` with read-only Leaderboard, Live Usage, Usage Charts, and Models pages
+- **fix**: Sync admin and public total request counts — both now exclude `status_code = 400` (bad requests)
+- **fix**: Admin chart queries now use `AT TIME ZONE 'Asia/Jakarta'` — time labels are consistent with WIB
+- **feat**: Caddy gzip compression enabled on both public dashboard and admin panel
+- **feat**: Inline data labels on public usage chart (numbers displayed directly on chart lines)
 
 ### v1.1.0 (2026-06-09)
 - **feat**: Multi-upstream support with weighted round-robin and failover (`upstreams` table, per-upstream sync)
