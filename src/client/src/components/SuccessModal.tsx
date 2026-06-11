@@ -61,7 +61,7 @@ export function SuccessModal({ open, onOpenChange, data }: SuccessModalProps) {
             </code>
           </div>
           {data.name && <InfoRow label="Nama User" value={data.name} />}
-          <InfoRow label="Base URL" value="https://routers9.my.id/v1" />
+          <InfoRow label="Base URL" value="https://routers9.web.id/v1" />
           <div className="border-t border-border my-3" />
           <InfoRow label="Quota" value={quotaDisplay} />
           <InfoRow label="Created" value={formatDateMY(data.created_at ?? "")} />

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Search, ClockArrowUp, Coins, Gauge, X, Settings2 } from "lucide-react";
+import { Plus, Search, ClockArrowUp, Coins, Gauge, X, Settings2, Edit, Eye, EyeOff } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from "../components/ui/Table";
 import { Badge } from "../components/ui/Badge";
@@ -36,6 +36,10 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
   const [editRpmId, setEditRpmId] = useState<string | null>(null);
   const [editRpmCurrent, setEditRpmCurrent] = useState<number | null>(null);
   const [bulkUpdateOpen, setBulkUpdateOpen] = useState(false);
+  const [editingNameId, setEditingNameId] = useState<string | null>(null);
+  const [editNameValue, setEditNameValue] = useState("");
+  const [editNameLoading, setEditNameLoading] = useState(false);
+  const [showFullKey, setShowFullKey] = useState<string | null>(null);
 
   const filtered = keys.filter((key) => {
     const q = search.toLowerCase();
@@ -132,6 +136,22 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
     return key.quota_tokens;
   }
 
+  async function updateBuyerName() {
+    if (!editingNameId || !editNameValue.trim()) return;
+    setEditNameLoading(true);
+    try {
+      await api(`/admin/buyers/${editingNameId}`, { method: "PATCH", body: JSON.stringify({ name: editNameValue.trim() }) });
+      toast("Buyer name updated");
+      setEditingNameId(null);
+      setEditNameValue("");
+      onRefresh();
+    } catch {
+      toast("Failed to update name", "error");
+    } finally {
+      setEditNameLoading(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -183,7 +203,30 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
             return (
               <div key={key.id} className="border border-border rounded-lg p-3 space-y-2 bg-surface">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium text-text-primary text-sm">{key.buyer_name}</span>
+                  {editingNameId === key.buyer_id ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={editNameValue}
+                        onChange={(e) => setEditNameValue(e.target.value)}
+                        className="h-7 w-32 rounded border border-border bg-surface px-2 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-primary-500"
+                        autoFocus
+                      />
+                      <Button size="sm" onClick={updateBuyerName} loading={editNameLoading}>Save</Button>
+                      <Button size="sm" variant="secondary" onClick={() => setEditingNameId(null)}>Cancel</Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-medium text-text-primary text-sm">{key.buyer_name}</span>
+                      <button
+                        onClick={() => { setEditingNameId(key.buyer_id); setEditNameValue(key.buyer_name); }}
+                        className="text-text-muted hover:text-text-primary transition-colors"
+                        title="Edit name"
+                      >
+                        <Edit className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
                   {key.revoked_at ? (
                     <Badge variant="danger">Revoked</Badge>
                   ) : key.expires_at && new Date(key.expires_at) < new Date() ? (
@@ -193,8 +236,17 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
                   )}
                 </div>
                 <div className="flex items-center gap-1">
-                  <code className="text-xs bg-surface-tertiary px-1.5 py-0.5 rounded font-mono">{key.key_prefix}</code>
-                  <CopyButton text={key.key_prefix} />
+                  <code className="text-xs bg-surface-tertiary px-1.5 py-0.5 rounded font-mono max-w-[200px] truncate" title={showFullKey === key.id ? key.key_plain : key.key_prefix}>
+                    {showFullKey === key.id ? key.key_plain : key.key_prefix}
+                  </code>
+                  <button
+                    onClick={() => setShowFullKey(showFullKey === key.id ? null : key.id)}
+                    className="text-text-muted hover:text-text-primary transition-colors"
+                    title={showFullKey === key.id ? "Hide full key" : "Show full key"}
+                  >
+                    {showFullKey === key.id ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                  </button>
+                  <CopyButton text={key.key_plain || key.key_prefix} />
                 </div>
                 <div className="flex items-center justify-between text-xs text-text-muted">
                   <span>{formatTokens(key.used_tokens)} / {effectiveQuota ? formatTokens(effectiveQuota) : "unlimited"}{key.daily_reset ? " /day" : ""}</span>
@@ -311,11 +363,45 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
               const effectiveQuota = getEffectiveQuota(key);
               return (
               <TableRow key={key.id}>
-                <TableCell className="font-medium text-text-primary">{key.buyer_name}</TableCell>
+                <TableCell className="font-medium text-text-primary">
+                  {editingNameId === key.buyer_id ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={editNameValue}
+                        onChange={(e) => setEditNameValue(e.target.value)}
+                        className="h-7 w-32 rounded border border-border bg-surface px-2 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-primary-500"
+                        autoFocus
+                      />
+                      <Button size="sm" onClick={updateBuyerName} loading={editNameLoading}>Save</Button>
+                      <Button size="sm" variant="secondary" onClick={() => setEditingNameId(null)}>Cancel</Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <span>{key.buyer_name}</span>
+                      <button
+                        onClick={() => { setEditingNameId(key.buyer_id); setEditNameValue(key.buyer_name); }}
+                        className="text-text-muted hover:text-text-primary transition-colors"
+                        title="Edit name"
+                      >
+                        <Edit className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1">
-                    <code className="text-xs bg-surface-tertiary px-1.5 py-0.5 rounded font-mono">{key.key_prefix}</code>
-                    <CopyButton text={key.key_prefix} />
+                    <code className="text-xs bg-surface-tertiary px-1.5 py-0.5 rounded font-mono max-w-[180px] truncate" title={showFullKey === key.id ? key.key_plain : key.key_prefix}>
+                      {showFullKey === key.id ? key.key_plain : key.key_prefix}
+                    </code>
+                    <button
+                      onClick={() => setShowFullKey(showFullKey === key.id ? null : key.id)}
+                      className="text-text-muted hover:text-text-primary transition-colors"
+                      title={showFullKey === key.id ? "Hide full key" : "Show full key"}
+                    >
+                      {showFullKey === key.id ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    </button>
+                    <CopyButton text={key.key_plain || key.key_prefix} />
                   </div>
                 </TableCell>
                 <TableCell>{Number(key.used_requests).toLocaleString()}</TableCell>

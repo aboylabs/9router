@@ -292,6 +292,24 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     return { password: newPassword, buyer: result.rows[0] };
   });
 
+  // --- Update buyer name ---
+  app.patch("/admin/buyers/:buyerId", async (request, reply) => {
+    const params = z.object({ buyerId: z.string().uuid() }).safeParse(request.params);
+    if (!params.success) return reply.code(400).send({ error: "Invalid buyer id" });
+
+    const body = z.object({ name: z.string().min(1) }).safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ error: "Invalid payload. Requires { name: string }" });
+
+    const result = await query<{ id: string; name: string }>(
+      `UPDATE buyers SET name = $1 WHERE id = $2 RETURNING id, name`,
+      [body.data.name, params.data.buyerId]
+    );
+    if (!result.rowCount) return reply.code(404).send({ error: "Buyer not found" });
+
+    invalidateApiKeyCache();
+    return { buyer: result.rows[0] };
+  });
+
   // --- Extend key expiry ---
   app.post("/admin/keys/:keyId/extend", async (request, reply) => {
     const params = z.object({ keyId: z.string().uuid() }).safeParse(request.params);
@@ -378,7 +396,7 @@ export async function registerAdminRoutes(app: FastifyInstance) {
       query<{ count: string }>(`select count(*) from api_keys where deleted_at is null and revoked_at is null and is_hidden = false`),
       query<{ requests: string; tokens: string; cost: string }>(
         `select count(*) as requests, coalesce(sum(total_tokens), 0) as tokens, coalesce(sum(cost_estimate), 0) as cost
-         from usage_events`
+         from usage_events WHERE status_code != 400`
       )
     ]);
 
@@ -708,9 +726,10 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     
     // For 1h, we want 15-min buckets, so we need custom grouping
     // For simplicity, use date_trunc and let frontend handle formatting if needed
-    const truncExpr = cfg.trunc === "minute" && range === "1h" 
-      ? "date_trunc('hour', created_at) + (floor(date_part('minute', created_at) / 15) * interval '15 min')"
-      : `date_trunc('${cfg.trunc}', created_at)`;
+    const truncExpr =
+      cfg.trunc === "minute" && range === "1h"
+        ? "date_trunc('hour', created_at AT TIME ZONE 'Asia/Jakarta') + (floor(date_part('minute', created_at AT TIME ZONE 'Asia/Jakarta') / 15) * interval '15 min')"
+        : `date_trunc('${cfg.trunc}', created_at AT TIME ZONE 'Asia/Jakarta')`;
     
     const queryStr = `
       SELECT 
