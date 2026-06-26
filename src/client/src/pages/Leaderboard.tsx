@@ -21,6 +21,7 @@ type LeaderboardEntry = {
   prompt_tokens: string;
   completion_tokens: string;
   last_request_at: string;
+  is_vip: boolean;
 };
 
 function formatRemainingDays(expiresAt: string | null): string {
@@ -212,7 +213,8 @@ export function Leaderboard() {
                           <code className="bg-surface-tertiary px-1.5 py-0.5 rounded font-mono text-text-muted text-xs">{entry.key_prefix}****</code>
                           <CopyButton text={entry.key_prefix} />
                         </div>
-                        <span className="text-text-primary font-medium">{entry.buyer_name}</span>
+                        <span className={`font-medium ${entry.is_vip ? 'text-yellow-500' : 'text-text-primary'}`}>{entry.buyer_name}</span>
+                        {entry.is_vip && <span className="text-yellow-500 text-xs">👑</span>}
                         <span className="text-xs text-text-muted">{entry.buyer_email}</span>
                         <span className={`text-xs font-medium ${getExpiryColor(entry.expires_at)}`}>
                           {formatRemainingDays(entry.expires_at)}

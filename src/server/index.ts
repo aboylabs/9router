@@ -638,9 +638,14 @@ function publicDashboardPage(): string {
       padding: 0 1.25rem 1.5rem;
       border-bottom: 1px solid #334155;
       margin-bottom: 1rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
     }
-    .sidebar-header h1 { font-size: 1.35rem; font-weight: 700; color: #f8fafc; }
-    .sidebar-header p { font-size: 0.75rem; color: #64748b; margin-top: 0.25rem; }
+    .sidebar-header h1 { font-size: 1.35rem; font-weight: 700; color: #f8fafc; margin-right: auto; }
+    .sidebar-header p { font-size: 0.75rem; color: #64748b; margin-top: 0.25rem; width: 100%; }
+    .tg-link { color: #94a3b8; transition: color 0.2s; text-decoration: none; display: flex; align-items: center; }
+    .tg-link:hover { color: #3b82f6; }
     .nav-item {
       display: flex;
       align-items: center;
@@ -809,7 +814,7 @@ function publicDashboardPage(): string {
       .sidebar {
         width: 100%;
         height: auto;
-        position: static;
+        position: relative;
         padding: 0;
         border-right: none;
         border-bottom: 1px solid #334155;
@@ -831,6 +836,7 @@ function publicDashboardPage(): string {
         scrollbar-width: none;
       }
       nav::-webkit-scrollbar { display: none; }
+      .tg-link svg { width: 20px; height: 20px; }
       .nav-item {
         flex: 1;
         min-width: 80px;
@@ -904,6 +910,9 @@ function publicDashboardPage(): string {
     <aside class="sidebar">
       <div class="sidebar-header">
         <h1>9router</h1>
+        <a href="https://t.me/routers_9" target="_blank" rel="noopener" class="tg-link" title="Telegram">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+        </a>
         <p>Public Dashboard</p>
       </div>
       <nav>
@@ -1051,9 +1060,7 @@ function publicDashboardPage(): string {
         const statsEl = document.getElementById('overview-stats');
         if (overviewRes) {
           statsEl.innerHTML = '<div class="stat-card"><div class="stat-value">' + formatNum(overviewRes.requests) + '</div><div class="stat-label">Total Requests</div></div>' +
-            '<div class="stat-card"><div class="stat-value">' + formatTokens(overviewRes.tokens) + '</div><div class="stat-label">Total Tokens</div></div>' +
-            '<div class="stat-card"><div class="stat-value">' + formatNum(overviewRes.activeKeys) + '</div><div class="stat-label">Active Keys</div></div>' +
-            '<div class="stat-card"><div class="stat-value">' + formatNum(overviewRes.buyers) + '</div><div class="stat-label">Buyers</div></div>';
+            '<div class="stat-card"><div class="stat-value">' + formatTokens(overviewRes.tokens) + '</div><div class="stat-label">Total Tokens</div></div>';
         }
 
         lbData = lbRes.rows || [];
@@ -1101,7 +1108,9 @@ function publicDashboardPage(): string {
         const rankClass = i < 3 ? ' rank-' + (i + 1) : '';
         const daysText = row.remaining_days !== null ? row.remaining_days + 'd' : '∞';
         const daysClass = row.remaining_days !== null ? (row.remaining_days <= 3 ? 'badge-red' : row.remaining_days <= 7 ? 'badge-yellow' : 'badge-green') : 'badge-blue';
-        html += '<tr><td class="rank' + rankClass + '">' + (i + 1) + '</td><td>' + (row.buyer_name || '-') + '</td><td>' + formatNum(row.total_requests) + '</td><td>' + formatTokens(row.total_tokens) + '</td><td><span class="badge ' + daysClass + '">' + daysText + '</span></td><td>' + formatTime(row.last_request_at) + '</td></tr>';
+        const nameStyle = row.is_vip ? ' style="color:#fbbf24;font-weight:700"' : '';
+        const vipBadge = row.is_vip ? ' <span style="color:#fbbf24" title="VIP Unlimited">👑</span>' : '';
+        html += '<tr><td class="rank' + rankClass + '">' + (i + 1) + '</td><td' + nameStyle + '>' + (row.buyer_name || '-') + vipBadge + '</td><td>' + formatNum(row.total_requests) + '</td><td>' + formatTokens(row.total_tokens) + '</td><td><span class="badge ' + daysClass + '">' + daysText + '</span></td><td>' + formatTime(row.last_request_at) + '</td></tr>';
       });
       html += '</tbody></table></div>';
       document.getElementById('lb-content').innerHTML = html;
@@ -1126,7 +1135,9 @@ function publicDashboardPage(): string {
         let html = '<div class="table-wrapper"><table><thead><tr><th>User</th><th>Requests</th><th>Tokens</th><th>Models</th><th>Last Request</th></tr></thead><tbody>';
         data.active.forEach(row => {
           const models = (row.models_used || []).map(m => '<span class="model-tag">' + m + '</span>').join('');
-          html += '<tr><td>' + (row.buyer_name || '-') + '</td><td>' + formatNum(row.request_count) + '</td><td>' + formatTokens(row.total_tokens) + '</td><td>' + models + '</td><td>' + formatTime(row.last_request_at) + '</td></tr>';
+          const nameStyle = row.is_vip ? ' style="color:#fbbf24;font-weight:700"' : '';
+          const vipBadge = row.is_vip ? ' <span style="color:#fbbf24" title="VIP Unlimited">👑</span>' : '';
+          html += '<tr><td' + nameStyle + '>' + (row.buyer_name || '-') + vipBadge + '</td><td>' + formatNum(row.request_count) + '</td><td>' + formatTokens(row.total_tokens) + '</td><td>' + models + '</td><td>' + formatTime(row.last_request_at) + '</td></tr>';
         });
         html += '</tbody></table></div>';
         content.innerHTML = html;
@@ -1154,7 +1165,9 @@ function publicDashboardPage(): string {
           const statusBadge = row.success ? '<span class="badge badge-green">200</span>' : '<span class="badge badge-red">' + (row.status_code || 'ERR') + '</span>';
           const tokens = formatTokens(row.total_tokens);
           const latency = row.latency_ms ? row.latency_ms + 'ms' : '-';
-          html += '<tr><td>' + formatTime(row.created_at) + '</td><td>' + (row.buyer_name || '-') + '</td><td class="model-tag">' + (row.model_id || '-') + '</td><td>' + statusBadge + '</td><td>' + tokens + '</td><td>' + latency + '</td></tr>';
+          const nameStyle = row.is_vip ? ' style="color:#fbbf24;font-weight:700"' : '';
+          const vipBadge = row.is_vip ? ' <span style="color:#fbbf24" title="VIP Unlimited">👑</span>' : '';
+          html += '<tr><td>' + formatTime(row.created_at) + '</td><td' + nameStyle + '>' + (row.buyer_name || '-') + vipBadge + '</td><td class="model-tag">' + (row.model_id || '-') + '</td><td>' + statusBadge + '</td><td>' + tokens + '</td><td>' + latency + '</td></tr>';
         });
         html += '</tbody></table></div>';
         content.innerHTML = html;

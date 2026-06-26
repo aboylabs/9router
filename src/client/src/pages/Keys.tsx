@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Search, ClockArrowUp, Coins, Gauge, X, Settings2, Edit, Eye, EyeOff } from "lucide-react";
+import { Plus, Search, ClockArrowUp, Coins, Gauge, X, Settings2, Edit, Eye, EyeOff, Crown } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from "../components/ui/Table";
 import { Badge } from "../components/ui/Badge";
@@ -40,6 +40,7 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
   const [editNameValue, setEditNameValue] = useState("");
   const [editNameLoading, setEditNameLoading] = useState(false);
   const [showFullKey, setShowFullKey] = useState<string | null>(null);
+  const [vipLoading, setVipLoading] = useState<string | null>(null);
 
   const filtered = keys.filter((key) => {
     const q = search.toLowerCase();
@@ -152,6 +153,19 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
     }
   }
 
+  async function toggleVip(keyId: string, currentVip: boolean) {
+    setVipLoading(keyId);
+    try {
+      await api(`/admin/keys/${keyId}/vip`, { method: "PATCH", body: JSON.stringify({ is_vip: !currentVip }) });
+      toast(currentVip ? "VIP status removed" : "VIP status enabled");
+      onRefresh();
+    } catch {
+      toast("Failed to toggle VIP status", "error");
+    } finally {
+      setVipLoading(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -217,7 +231,8 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
                     </div>
                   ) : (
                     <div className="flex items-center gap-1.5">
-                      <span className="font-medium text-text-primary text-sm">{key.buyer_name}</span>
+                      <span className={`font-medium text-sm ${key.is_vip ? 'text-yellow-500' : 'text-text-primary'}`}>{key.buyer_name}</span>
+                      {key.is_vip && <Crown className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />}
                       <button
                         onClick={() => { setEditingNameId(key.buyer_id); setEditNameValue(key.buyer_name); }}
                         className="text-text-muted hover:text-text-primary transition-colors"
@@ -249,7 +264,7 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
                   <CopyButton text={key.key_plain || key.key_prefix} />
                 </div>
                 <div className="flex items-center justify-between text-xs text-text-muted">
-                  <span>{formatTokens(key.used_tokens)} / {effectiveQuota ? formatTokens(effectiveQuota) : "unlimited"}{key.daily_reset ? " /day" : ""}</span>
+                  <span>{formatTokens(key.used_tokens)} / {effectiveQuota ? formatTokens(effectiveQuota) : (key.is_vip ? "∞ VIP" : "unlimited")}{key.daily_reset ? " /day" : ""}</span>
                   <span>{pct.toFixed(0)}%</span>
                 </div>
                 {effectiveQuota && (
@@ -291,6 +306,17 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
                        >
                          <Gauge className="h-3.5 w-3.5" />
                          RPM
+                       </Button>
+                       <Button
+                         variant="secondary"
+                         size="sm"
+                         onClick={() => toggleVip(key.id, key.is_vip)}
+                         loading={vipLoading === key.id}
+                         className={key.is_vip ? "bg-yellow-500/20 text-yellow-500 hover:bg-yellow-500/30" : ""}
+                         title={key.is_vip ? "Remove VIP status" : "Set VIP unlimited"}
+                       >
+                         <Crown className={`h-3.5 w-3.5 ${key.is_vip ? "fill-yellow-500" : ""}`} />
+                         VIP
                        </Button>
                         <Button
                           variant="danger"
@@ -378,7 +404,8 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
                     </div>
                   ) : (
                     <div className="flex items-center gap-1.5">
-                      <span>{key.buyer_name}</span>
+                      <span className={key.is_vip ? 'text-yellow-500' : ''}>{key.buyer_name}</span>
+                      {key.is_vip && <Crown className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />}
                       <button
                         onClick={() => { setEditingNameId(key.buyer_id); setEditNameValue(key.buyer_name); }}
                         className="text-text-muted hover:text-text-primary transition-colors"
@@ -418,7 +445,7 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
                   <div className="flex items-center gap-2">
                     <span>{formatTokens(key.used_tokens)}</span>
                     <span className="text-text-muted">/</span>
-                    <span>{effectiveQuota ? formatTokens(effectiveQuota) : "unlimited"}{key.daily_reset ? "/day" : ""}</span>
+                    <span>{effectiveQuota ? formatTokens(effectiveQuota) : (key.is_vip ? "∞ VIP" : "unlimited")}{key.daily_reset ? "/day" : ""}</span>
                   </div>
                   {effectiveQuota && (() => {
                     const pct = Math.min(100, (Number(key.used_tokens) / Number(effectiveQuota)) * 100);
@@ -475,6 +502,16 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
                            title="Edit rate limit"
                          >
                            <Gauge className="h-3.5 w-3.5" />
+                         </Button>
+                         <Button
+                           variant="secondary"
+                           size="sm"
+                           onClick={() => toggleVip(key.id, key.is_vip)}
+                           loading={vipLoading === key.id}
+                           className={key.is_vip ? "bg-yellow-500/20 text-yellow-500 hover:bg-yellow-500/30" : ""}
+                           title={key.is_vip ? "Remove VIP status" : "Set VIP unlimited"}
+                         >
+                           <Crown className={`h-3.5 w-3.5 ${key.is_vip ? "fill-yellow-500" : ""}`} />
                          </Button>
                          <Button
                            variant="danger"

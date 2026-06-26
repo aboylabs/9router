@@ -17,6 +17,7 @@ export async function registerPublicRoutes(app: FastifyInstance) {
         b.email as buyer_email,
         k.key_prefix,
         k.label as key_label,
+        k.is_vip,
         COUNT(ue.id)::int as total_requests,
         COALESCE(SUM(ue.total_tokens), 0)::bigint as total_tokens,
         MAX(ue.created_at) as last_request_at,
@@ -28,7 +29,7 @@ export async function registerPublicRoutes(app: FastifyInstance) {
       JOIN api_keys k ON k.id = ue.api_key_id
       JOIN buyers b ON b.id = k.buyer_id
       WHERE k.is_hidden = false AND ue.status_code != 400
-      GROUP BY b.id, b.name, b.email, k.id, k.label, k.key_prefix, k.expires_at
+      GROUP BY b.id, b.name, b.email, k.id, k.label, k.key_prefix, k.expires_at, k.is_vip
       HAVING COUNT(ue.id) > 0
       ORDER BY total_requests DESC
       LIMIT 100`
@@ -50,6 +51,7 @@ export async function registerPublicRoutes(app: FastifyInstance) {
       `SELECT 
         k.key_prefix,
         b.name as buyer_name,
+        k.is_vip,
         count(ue.id)::int as request_count,
         max(ue.created_at) as last_request_at,
         sum(ue.total_tokens)::bigint as total_tokens,
@@ -59,7 +61,7 @@ export async function registerPublicRoutes(app: FastifyInstance) {
        JOIN buyers b ON b.id = k.buyer_id
        WHERE ue.created_at > now() - interval '5 minutes'
          AND k.is_hidden = false AND ue.status_code != 400
-       GROUP BY k.id, k.key_prefix, b.name
+       GROUP BY k.id, k.key_prefix, b.name, k.is_vip
        ORDER BY max(ue.created_at) DESC`
     );
     return {
@@ -75,7 +77,7 @@ export async function registerPublicRoutes(app: FastifyInstance) {
     const result = await query(
       `SELECT ue.created_at, ue.endpoint, ue.model_id, ue.status_code, ue.success,
         ue.prompt_tokens, ue.completion_tokens, ue.total_tokens, ue.latency_ms,
-        k.key_prefix, b.name as buyer_name
+        k.key_prefix, b.name as buyer_name, k.is_vip
        FROM usage_events ue
        JOIN api_keys k ON k.id = ue.api_key_id
        JOIN buyers b ON b.id = k.buyer_id

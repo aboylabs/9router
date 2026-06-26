@@ -42,6 +42,7 @@ export type Key = {
   daily_quota_tokens: string | null;
   package_id: string | null;
   rate_limit_rpm: number | null;
+  is_vip: boolean;
 };
 
 export type UsageEvent = {

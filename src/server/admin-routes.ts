@@ -89,34 +89,14 @@ const keySchema = z.object({
   model_ids: z.array(z.string()).min(1)
 });
 
+// Hanya model internal/combo yang selalu tersedia.
+// Model dari upstream (MiniMax, Alibaba, dll) dikelola otomatis oleh proses sync:
+// - Jika upstream return model -> otomatis masuk DB (active = true)
+// - Jika upstream tidak return -> otomatis dihapus dari DB saat sync
 const ALWAYS_AVAILABLE_MODELS = [
-  { id: "9router/combo-qwen3.7-plus", upstream_model: "combo-qwen3.7-plus", display_name: "Combo Qwen3.7 Plus" },
   { id: "9router/combo-qwen3.7-max", upstream_model: "combo-qwen3.7-max", display_name: "Combo Qwen3.7 Max" },
   { id: "9router/combo-qwen3.6-max", upstream_model: "combo-qwen3.6-max", display_name: "Combo Qwen3.6 Max" },
   { id: "9router/combo-qwen-deepseek", upstream_model: "combo-qwen-deepseek", display_name: "Combo Qwen Deepseek" },
-  { id: "9router/minimax/MiniMax-M2.7", upstream_model: "minimax/MiniMax-M2.7", display_name: "MiniMax M2.7" },
-  { id: "9router/minimax/MiniMax-M2.5", upstream_model: "minimax/MiniMax-M2.5", display_name: "MiniMax M2.5" },
-
-  { id: "9router/minimax/MiniMax-M2.7-highspeed", upstream_model: "minimax/MiniMax-M2.7-highspeed", display_name: "MiniMax M2.7 Highspeed" },
-  { id: "9router/MiniMax/MiniMax-M3", upstream_model: "MiniMax/MiniMax-M3", display_name: "MiniMax M3" },
-  { id: "9router/MiniMax/MiniMax-M2.7", upstream_model: "MiniMax/MiniMax-M2.7", display_name: "MiniMax M2.7" },
-  { id: "9router/MiniMax/MiniMax-M2.7-highspeed", upstream_model: "MiniMax/MiniMax-M2.7-highspeed", display_name: "MiniMax M2.7 Highspeed" },
-  { id: "9router/alibaba/qwen3.7-plus-2026-05-26", upstream_model: "alibaba/qwen3.7-plus-2026-05-26", display_name: "Qwen3.7 Plus (2026-05-26)" },
-  { id: "9router/alibaba/qwen3.7-plus", upstream_model: "alibaba/qwen3.7-plus", display_name: "Qwen3.7 Plus" },
-  { id: "9router/alibaba/glm-5.1", upstream_model: "alibaba/glm-5.1", display_name: "GLM 5.1" },
-  { id: "9router/alibaba/qwen3.7-max-2026-05-17", upstream_model: "alibaba/qwen3.7-max-2026-05-17", display_name: "Qwen3.7 Max (2026-05-17)" },
-  { id: "9router/alibaba/qwen3.7-max-preview", upstream_model: "alibaba/qwen3.7-max-preview", display_name: "Qwen3.7 Max Preview" },
-  { id: "9router/alibaba/qwen3.7-max-2026-05-20", upstream_model: "alibaba/qwen3.7-max-2026-05-20", display_name: "Qwen3.7 Max (2026-05-20)" },
-  { id: "9router/alibaba/qwen3.7-max", upstream_model: "alibaba/qwen3.7-max", display_name: "Qwen3.7 Max" },
-  { id: "9router/alibaba/deepseek-v4-flash", upstream_model: "alibaba/deepseek-v4-flash", display_name: "DeepSeek V4 Flash" },
-  { id: "9router/alibaba/deepseek-v4-pro", upstream_model: "alibaba/deepseek-v4-pro", display_name: "DeepSeek V4 Pro" },
-  { id: "9router/alibaba/qwen3.6-max-preview", upstream_model: "alibaba/qwen3.6-max-preview", display_name: "Qwen3.6 Max Preview" },
-  { id: "9router/alibaba/qwen3.6-plus-2026-04-02", upstream_model: "alibaba/qwen3.6-plus-2026-04-02", display_name: "Qwen3.6 Plus (2026-04-02)" },
-  { id: "9router/alibaba/qwen3.6-plus", upstream_model: "alibaba/qwen3.6-plus", display_name: "Qwen3.6 Plus" },
-  { id: "9router/alibaba/qwen3.6-35b-a3b", upstream_model: "alibaba/qwen3.6-35b-a3b", display_name: "Qwen3.6 35B-A3B" },
-  { id: "9router/alibaba/qwen3.6-27b", upstream_model: "alibaba/qwen3.6-27b", display_name: "Qwen3.6 27B" },
-  { id: "9router/alibaba/qwen3.6-flash", upstream_model: "alibaba/qwen3.6-flash", display_name: "Qwen3.6 Flash" },
-  { id: "9router/alibaba/qwen3.6-flash-2026-04-16", upstream_model: "alibaba/qwen3.6-flash-2026-04-16", display_name: "Qwen3.6 Flash (2026-04-16)" },
 ] as const;
 
 const buyerPackageSchema = z.object({
@@ -613,7 +593,7 @@ export async function registerAdminRoutes(app: FastifyInstance) {
       `select k.id, k.buyer_id, b.name as buyer_name, b.email as buyer_email,
         k.label, k.key_prefix, k.key_plain, k.expires_at,
         k.revoked_at, k.deleted_at, k.quota_tokens, k.quota_requests, k.used_tokens, k.used_requests, k.created_at,
-        k.daily_reset, k.daily_quota_tokens, k.package_id, k.rate_limit_rpm
+        k.daily_reset, k.daily_quota_tokens, k.package_id, k.rate_limit_rpm, k.is_vip
        from api_keys k
        join buyers b on b.id = k.buyer_id
        where k.deleted_at is null and k.revoked_at is null and k.is_hidden = false
@@ -705,6 +685,26 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     );
     invalidateApiKeyCache();
     return { ok: true, message: "Request limit updated for all active keys" };
+  });
+
+  // --- Toggle VIP status for a key ---
+  app.patch("/admin/keys/:keyId/vip", async (request, reply) => {
+    const params = z.object({ keyId: z.string().uuid() }).safeParse(request.params);
+    if (!params.success) return reply.code(400).send({ error: "Invalid key id" });
+
+    const body = z.object({
+      is_vip: z.boolean()
+    }).safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ error: "Invalid payload. Requires { is_vip: boolean }" });
+
+    const result = await query(
+      `UPDATE api_keys SET is_vip = $1 WHERE id = $2 AND deleted_at IS NULL RETURNING id, is_vip`,
+      [body.data.is_vip, params.data.keyId]
+    );
+    if (!result.rowCount) return reply.code(404).send({ error: "Key not found" });
+
+    invalidateApiKeyCache();
+    return { ok: true, key: result.rows[0] };
   });
 
   app.get("/admin/usage/chart", async (request) => {
@@ -836,6 +836,7 @@ export async function registerAdminRoutes(app: FastifyInstance) {
         k.key_prefix,
         k.expires_at,
         k.created_at as key_created_at,
+        k.is_vip,
         COUNT(ue.id)::int as total_requests,
         COALESCE(SUM(ue.total_tokens), 0)::bigint as total_tokens,
         COALESCE(SUM(ue.prompt_tokens), 0)::bigint as prompt_tokens,
@@ -845,7 +846,7 @@ export async function registerAdminRoutes(app: FastifyInstance) {
       JOIN api_keys k ON k.id = ue.api_key_id
       JOIN buyers b ON b.id = k.buyer_id
       WHERE k.is_hidden = false
-      GROUP BY b.id, b.name, b.email, k.id, k.label, k.key_prefix, k.expires_at, k.created_at
+      GROUP BY b.id, b.name, b.email, k.id, k.label, k.key_prefix, k.expires_at, k.created_at, k.is_vip
       HAVING COUNT(ue.id) > 0
       ORDER BY total_requests DESC
       LIMIT 100`

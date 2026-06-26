@@ -20,6 +20,7 @@ export type ApiKeyRecord = {
   package_id: string | null;
   is_hidden: boolean;
   rate_limit_rpm: number | null;
+  is_vip: boolean;
 };
 
 const apiKeyCache = new Map<string, { record: ApiKeyRecord; expires: number }>();
@@ -59,6 +60,8 @@ export function apiKeyIsUsable(record: ApiKeyRecord) {
   if (record.expires_at && new Date(record.expires_at).getTime() <= Date.now()) {
     return { ok: false, code: "key_expired", message: "API key has expired" };
   }
+  // VIP keys bypass all quota checks
+  if (record.is_vip) return { ok: true as const };
   if (record.quota_requests !== null && Number(record.used_requests) >= Number(record.quota_requests)) {
     return { ok: false, code: "request_quota_exceeded", message: "Request quota exceeded" };
   }
