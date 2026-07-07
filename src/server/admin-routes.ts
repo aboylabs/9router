@@ -89,15 +89,11 @@ const keySchema = z.object({
   model_ids: z.array(z.string()).min(1)
 });
 
-// Hanya model internal/combo yang selalu tersedia.
+// Model internal/combo sudah tidak dipakai — kosongkan agar tidak di-seed/di-keep lagi.
 // Model dari upstream (MiniMax, Alibaba, dll) dikelola otomatis oleh proses sync:
 // - Jika upstream return model -> otomatis masuk DB (active = true)
 // - Jika upstream tidak return -> otomatis dihapus dari DB saat sync
-const ALWAYS_AVAILABLE_MODELS = [
-  { id: "9router/combo-qwen3.7-max", upstream_model: "combo-qwen3.7-max", display_name: "Combo Qwen3.7 Max" },
-  { id: "9router/combo-qwen3.6-max", upstream_model: "combo-qwen3.6-max", display_name: "Combo Qwen3.6 Max" },
-  { id: "9router/combo-qwen-deepseek", upstream_model: "combo-qwen-deepseek", display_name: "Combo Qwen Deepseek" },
-] as const;
+const ALWAYS_AVAILABLE_MODELS = [] as const;
 
 const buyerPackageSchema = z.object({
   name: z.string().min(1),
