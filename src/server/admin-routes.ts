@@ -93,7 +93,8 @@ const keySchema = z.object({
 // Model dari upstream (MiniMax, Alibaba, dll) dikelola otomatis oleh proses sync:
 // - Jika upstream return model -> otomatis masuk DB (active = true)
 // - Jika upstream tidak return -> otomatis dihapus dari DB saat sync
-const ALWAYS_AVAILABLE_MODELS = [] as const;
+type AlwaysAvailableModel = { id: string; upstream_model: string; display_name: string };
+const ALWAYS_AVAILABLE_MODELS: AlwaysAvailableModel[] = [];
 
 const buyerPackageSchema = z.object({
   name: z.string().min(1),
