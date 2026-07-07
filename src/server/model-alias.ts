@@ -2,7 +2,7 @@ const BRAND_PREFIX = "9router/";
 
 const PUBLIC_MODEL_ALLOWLIST = [/^9router\/.+/];
 
-const UPSTREAM_MODEL_ALLOWLIST = [/^(?!.*\.\.)(?!9router\/)[A-Za-z0-9][A-Za-z0-9._/-]*$/];
+const UPSTREAM_MODEL_ALLOWLIST = [/^(?!.*\.\.)(?!9router\/)[A-Za-z0-9][A-Za-z0-9._\/:\\-]*$/];
 
 export function isBrandedModelId(modelId: string) {
   return modelId.startsWith(BRAND_PREFIX) || modelId.startsWith("brand/");
