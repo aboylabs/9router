@@ -1,202 +1,278 @@
 # 9router
 
-**9router** is a high-performance, self-hosted LLM API Gateway and Router. It allows you to manage API keys, enforce quotas, apply rate limits, and route requests to various upstream AI providers (Qwen, DeepSeek, MiniMax, GLM, etc.) through a single, unified OpenAI-compatible endpoint.
+**9router** is a self-hosted OpenAI-compatible LLM API gateway.
 
-Built for reliability, scalability, and ease of use, 9router provides a modern admin dashboard to manage buyers, monitor live usage, and control model access.
+It fronts one or more upstream providers, issues buyer API keys with quotas + rate limits, meters usage 1:1 with upstream token counts, and exposes both an admin dashboard and a public read-only panel.
 
----
-
-## ✨ Features
-
-- **Unified API Gateway**: Single OpenAI-compatible endpoint (`/v1/chat/completions`) for all upstream models.
-- **Public Dashboard**: Read-only public dashboard (Leaderboard, Live Usage, Usage Charts, Models) served at `/` with gzip compression enabled.
-- **API Key Management**: Create, manage, extend, and revoke API keys for individual buyers.
-- **Quota Management**: 
-  - Total token quotas per key.
-  - **Daily Reset**: Automatic token quota reset at 00:00 WIB for specific packages.
-- **Advanced Rate Limiting**: 
-  - Per-key RPM (Requests Per Minute) rate limiting.
-  - Bulk update capabilities to apply rate/request limits to all active keys simultaneously.
-- **Usage Tracking**: Detailed logging of prompt/completion tokens, latency, cost estimates, and success/failure rates.
-- **Admin Session Tracking**: Monitor active admin sessions with device, IP, and browser information, with the ability to revoke specific sessions remotely.
-- **Model Catalog**: Dynamic model management with input/output cost configuration per million tokens.
-- **Modern Dashboard**: Responsive, dark-mode-ready React admin panel with real-time live usage monitoring and usage charts.
-- **Timezone Consistency**: All chart and time-display queries use `Asia/Jakarta` (WIB) for accurate local time representation.
+Current release: **v1.3.0**
 
 ---
 
-## 🌐 Deployment Info
+## Features
 
-- **Admin Panel + API**: `43.128.67.88` (or `routers9.my.id` when configured)
-- **Public Dashboard**: `routers9.web.id` (read-only access to Leaderboard, Live, Usage, and Models via `/public/*` endpoints)
-- **Reverse Proxy**: Caddy (handles TLS/HTTPS, gzip compression, and routing to `localhost:3000`)
+- OpenAI-compatible proxy: `POST /v1/chat/completions`, `GET /v1/models`
+- Multi-upstream load balancing with weighted round-robin, failover, and on/off toggle
+- Per-model upstream pinning (`models.upstream_id`) for preferred routing
+- Branded catalog IDs with prefix `routers9/` (example: `routers9/grok/grok-4.5`)
+- API key lifecycle: create, extend, add quota, VIP/Super Admin, soft-delete, bulk RPM/request limits
+- Create-key defaults: token quota **100M / 250M / 500M**, fixed **50 RPM**
+- VIP: token quota enforced (typically 500M); request quota skipped
+- Super Admin: purple UI styling, unlimited token quota preserved on VIP toggle
+- Token billing multiplier = **1** (matches upstream usage; no 2x)
+- Public dashboard: Leaderboard (search `?q=`), Live, Usage (success-only 200), Models, Prices
+- Admin dashboard: Overview, Keys, Leaderboard, Live, Usage, Models, Sales, Settings
+- Daily token reset at 00:00 WIB for keys with `daily_reset = true`
+- Admin session tracking + remote revoke
+- Chart/time labels in `Asia/Jakarta` (WIB)
 
 ---
 
-## 🛠️ Tech Stack
+## Production deployment
 
-- **Backend**: Node.js, TypeScript, Fastify
-- **Frontend**: React 18, Vite, TailwindCSS, Radix UI, Recharts
-- **Database**: PostgreSQL 16 (with `pgcrypto` extension)
-- **Reverse Proxy**: Caddy (recommended for TLS/HTTPS)
-- **Authentication**: JWT (JSON Web Tokens) + bcrypt
+| Role | URL |
+|------|-----|
+| Public dashboard | https://routers9.web.id |
+| Admin panel + API | http://43.128.67.88 |
+| OpenAI base URL | `http://43.128.67.88/v1` |
+| Telegram orders | https://t.me/routers9 |
+
+Stack in production:
+- Backend: Node.js + TypeScript + Fastify (`src/server/`)
+- Frontend: React 18 + Vite + Tailwind (`src/client/`)
+- DB: PostgreSQL 16 (`9router`)
+- Reverse proxy: Caddy
+- Process manager: systemd unit `9router`
 
 ---
 
-## 📦 Prerequisites
+## Quick start (self-host)
 
-- Node.js 20.x or higher
+### Prerequisites
+- Node.js 20+
 - PostgreSQL 16
-- npm or pnpm
+- npm
 
----
-
-## 🚀 Installation & Setup
-
-### 1. Clone the Repository
+### 1. Clone
 ```bash
 git clone https://github.com/kevinnft/9router.git
 cd 9router
 ```
 
-### 2. Install Dependencies
+### 2. Install
 ```bash
 npm install
 ```
 
-### 3. Environment Configuration
-Create a `.env` file in the root directory:
+### 3. Environment
+Create `.env` in the repo root (never commit this file):
+
 ```env
-# Server Configuration
 PORT=3000
 HOST=0.0.0.0
 NODE_ENV=production
 
-# Database Configuration
-DATABASE_URL=postgresql://postgres:yourpassword@localhost:5432/9router
+DATABASE_URL=postgresql://postgres:PASSWORD@localhost:5432/9router
 
-# Security
-JWT_SECRET=your-super-secret-jwt-key-change-this
-COOKIE_SECURE=false # Set to true if using HTTPS
+JWT_SECRET=change-me-to-a-long-random-string
+COOKIE_SECURE=false
 
-# Rate Limiting Defaults
+# Fallback defaults when a key has no per-key RPM
 BUYER_CHAT_RPM=60
 HIDDEN_KEY_CHAT_RPM=100
 
-# Upstream Configuration (Example)
-UPSTREAM_BASE_URL=https://api.upstream-provider.com/v1
-UPSTREAM_API_KEY=your-upstream-api-key
+# Optional legacy single-upstream seed (multi-upstream is preferred via admin UI / upstreams table)
+UPSTREAM_BASE_URL=https://api.example.com/v1
+UPSTREAM_API_KEY=sk-...
 ```
 
-### 4. Database Setup
-Create the database and apply the schema:
+### 4. Database
 ```bash
-# Create database (via psql)
 createdb 9router
-
-# Apply schema (enables pgcrypto and creates tables)
 psql -d 9router -f schema.sql
 ```
 
-### 5. Build and Start
-```bash
-# Build frontend and backend
-npm run build
+Apply any later ops migrations as needed (VIP, Super Admin, `upstreams`, `usage_rollups`, brand rebrand, etc.). Production may already be ahead of the base `schema.sql`.
 
-# Start the production server
+### 5. Build & run
+```bash
+npm run build
 npm start
+# dev: npm run dev
 ```
-*(For development, use `npm run dev`)*
+
+Frontend rebuild alone is zero-downtime:
+```bash
+npm run build
+```
+Backend code changes need a process restart (do not restart production without explicit approval).
 
 ---
 
-## 📁 Project Structure
+## Project structure
 
 ```text
 9router/
 ├── src/
-│   ├── client/       # React frontend (Vite + Tailwind)
-│   ├── server/       # Fastify backend (routes, db, security)
-│   └── shared/       # Shared types and constants
-├── schema.sql        # PostgreSQL database schema
-├── package.json      # Dependencies and scripts
-├── tsconfig.json     # TypeScript configuration
-└── vite.config.ts    # Vite build configuration
+│   ├── client/                 # Admin React app
+│   │   └── src/pages/          # Overview, Keys, Leaderboard, Live, Usage, Models, Sales, Settings
+│   ├── server/
+│   │   ├── index.ts            # Fastify app, public HTML dashboard, static admin
+│   │   ├── proxy-routes.ts     # /v1/* OpenAI proxy + metering
+│   │   ├── admin-routes.ts     # Admin API
+│   │   ├── public-routes.ts    # /public/* read-only API
+│   │   ├── upstream.ts         # Multi-upstream RR / pin / failover
+│   │   ├── model-alias.ts      # BRAND_PREFIX = routers9/
+│   │   ├── repositories.ts     # API key cache + usability checks
+│   │   ├── rate-limiter.ts     # Per-key fixed-window RPM
+│   │   └── daily-reset.ts      # 00:00 WIB token reset
+│   └── shared/
+├── schema.sql
+├── package.json                # version 1.3.0
+├── tsconfig.json
+└── vite.config.ts
 ```
 
 ---
 
-## 🔌 API Endpoints Overview
+## Model IDs
 
-### Public / Proxy
-- `GET /` - Public dashboard HTML (served at `routers9.web.id`).
-- `GET /health` - Health check endpoint.
-- `GET /public/overview` - Public overview stats (buyers, active keys, requests, tokens).
-- `GET /public/leaderboard` - Top 100 API keys by request count (masked emails).
-- `GET /public/live` - Live active sessions (last 5 minutes, masked emails).
-- `GET /public/usage` - Recent 200 usage events (masked key prefixes).
-- `GET /public/usage/chart?range=7d` - Usage chart data (ranges: 15m, 1h, 6h, 12h, 1d, 3d, 7d, 1M).
-- `GET /public/models` - List available white-label models.
-- `POST /v1/chat/completions` - OpenAI-compatible chat completion endpoint (requires Bearer API key).
+Public catalog IDs are branded:
 
-### Admin (Requires Authentication)
-- `POST /admin/auth/login` - Admin authentication.
-- `GET /admin/overview` - Dashboard metrics.
-- `GET /admin/keys` - List all active API keys.
-- `POST /admin/create-key` - Create a new buyer and API key.
-- `PATCH /admin/keys/:keyId/rate-limit` - Update RPM limit for a specific key.
-- `PATCH /admin/keys/bulk-rate-limit` - Apply RPM limit to all active keys.
-- `PATCH /admin/keys/bulk-request-limit` - Apply request limit to all active keys.
-- `GET /admin/sessions` - List active admin sessions.
-- `DELETE /admin/sessions/:id` - Revoke a specific admin session.
+```text
+routers9/<upstream-model-path>
+```
+
+Examples:
+- `routers9/grok/grok-4.5`
+- `routers9/claude-sonnet-4.6`
+
+Breaking change in v1.3.0: old `9router/...` IDs no longer match the brand allowlist. Clients must use `routers9/...`.
 
 ---
 
-## 🛡️ Security & Best Practices
+## API overview
 
-1. **Never commit `.env`**: The `.env` file is ignored by git. Keep your `JWT_SECRET` and `UPSTREAM_API_KEY` secure.
-2. **Use HTTPS**: Always set `COOKIE_SECURE=true` and run behind a reverse proxy like Caddy or Nginx with valid SSL certificates.
-3. **Session Management**: Regularly review the "Active Sessions" in the admin settings and revoke any unrecognized devices.
-4. **Database Backups**: Schedule regular PostgreSQL dumps (`pg_dump`) to prevent data loss.
+### Public
+| Method | Path | Notes |
+|--------|------|-------|
+| GET | `/` | Public dashboard HTML |
+| GET | `/health` | Health check |
+| GET | `/public/overview` | Global stats |
+| GET | `/public/leaderboard?q=` | Top keys; optional name/key search; used/quota |
+| GET | `/public/live` | Active buyers (last 5 min) |
+| GET | `/public/usage` | Recent events, **success-only** (`success=true`, `status_code=200`) |
+| GET | `/public/usage/chart?range=` | `15m` `1h` `6h` `12h` `1d` `3d` `7d` `1M` |
+| GET | `/public/models` | Active branded models |
+
+Emails are masked. Full API keys / key prefixes are not exposed on public endpoints.
+
+### OpenAI-compatible proxy
+| Method | Path | Auth |
+|--------|------|------|
+| GET | `/v1/models` | Bearer API key |
+| POST | `/v1/chat/completions` | Bearer API key |
+
+Example:
+```bash
+curl http://43.128.67.88/v1/chat/completions \
+  -H "Authorization: Bearer 9r-YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "routers9/grok/grok-4.5",
+    "messages": [{"role":"user","content":"Hello!"}]
+  }'
+```
+
+### Admin (session cookie after login)
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST | `/admin/auth/login` | Login (rate-limited) |
+| GET | `/admin/overview` | Dashboard metrics |
+| GET | `/admin/keys` | List keys |
+| POST | `/admin/create-key` | Create buyer + key (`quotaTokens`, fixed 50 RPM) |
+| PATCH | `/admin/keys/:keyId/rate-limit` | Per-key RPM |
+| PATCH | `/admin/keys/:keyId/vip` | Toggle VIP (+ quota tier, Super Admin exempt) |
+| PATCH | `/admin/keys/bulk-rate-limit` | Bulk RPM |
+| PATCH | `/admin/keys/bulk-request-limit` | Bulk request quota |
+| GET/POST/PATCH/DELETE | `/admin/upstreams` | Multi-upstream CRUD |
+| POST | `/admin/upstreams/:id/sync` | Sync models for one upstream (scoped delete) |
+| POST | `/admin/models/sync` | Global free-tier sync (scoped) |
+| GET/PUT | `/admin/settings/round-robin` | RR on/off flag |
+| GET | `/admin/sessions` | Active admin sessions |
+| DELETE | `/admin/sessions/:id` | Revoke session |
 
 ---
 
-## 📋 Changelog
+## Quotas & VIP
+
+| Kind | Default / behavior |
+|------|--------------------|
+| New key token quota | 100M (choices: 100M / 250M / 500M) |
+| New key RPM | 50 (fixed on create; editable later) |
+| Non-VIP | Enforces `quota_tokens` + optional `quota_requests` |
+| VIP | Enforces `quota_tokens` (typically 500M); skips `quota_requests` |
+| Super Admin buyer | Unlimited token quota; VIP toggle does not overwrite to 100M/500M |
+
+Billing: `TOKEN_MULTIPLIER = 1` — logged/charged tokens match upstream usage.
+
+---
+
+## Multi-upstream routing
+
+1. If the requested model has `upstream_id`, route to that upstream first.
+2. Else if round-robin is **on** (default): weighted RR across active upstreams.
+3. Else: always primary (first active by `created_at`).
+4. On retriable failure (429 / 5xx / timeout / connection): failover to next active upstream.
+
+Response header `x-9router-upstream` shows which upstream handled the request.
+
+**Sync safety:** per-upstream and global sync DELETEs are scoped — they do not wipe models belonging to other upstreams.
+
+---
+
+## Security notes
+
+1. Never commit `.env`, production dumps, or `backup/config.json` secrets.
+2. Prefer HTTPS + `COOKIE_SECURE=true` behind Caddy/Nginx when serving public domains.
+3. Public panel strips key material server-side; do not reintroduce `key_prefix` in `/public/*`.
+4. Review admin sessions periodically and revoke unknown devices.
+5. This repository may contain operational history — treat it as private production code.
+
+---
+
+## Changelog
 
 ### v1.3.0 (2026-07-19)
-- **feat**: Model brand prefix rebrand `9router/` → `routers9/` (catalog IDs, allowlists, public models)
-- **feat**: Per-model upstream pinning (`models.upstream_id`) with preferred-upstream routing in proxy
-- **feat**: Round-robin on/off toggle via `system_settings.round_robin_enabled` + Settings UI
-- **feat**: Create-key token quota choices (100M / 250M / 500M); fixed default RPM = 50
+- **feat**: Model brand prefix rebrand `9router/` → `routers9/`
+- **feat**: Per-model upstream pinning with preferred-upstream proxy routing
+- **feat**: Round-robin on/off toggle (`system_settings.round_robin_enabled` + Settings UI)
+- **feat**: Create-key token quota choices 100M / 250M / 500M; fixed default RPM = 50
 - **feat**: Super Admin special-case (purple UI, unlimited quota preserved on VIP toggle)
-- **feat**: VIP now enforces token quota (typically 500M) while still skipping request quota
-- **feat**: Public leaderboard search (`?q=`) by buyer name / API key; shows used/quota tokens
-- **fix**: Public Usage shows success-only (`success=true` and `status_code=200`)
-- **fix**: Token billing multiplier set to `1` (match upstream usage, no 2x)
-- **chore**: Drop obsolete local backup `.json.gz` artifacts from tracked history path
+- **feat**: VIP enforces token quota (typically 500M) while still skipping request quota
+- **feat**: Public leaderboard search (`?q=`) by buyer name / API key; shows used/quota
+- **fix**: Public Usage is success-only (`success=true` and `status_code=200`)
+- **fix**: Token billing multiplier set to `1` (match upstream, no 2x)
+- **chore**: Ignore local backup dumps; drop obsolete tracked `.json.gz` backups
 
 ### v1.2.0 (2026-06-11)
-- **feat**: Public dashboard at `routers9.web.id` with read-only Leaderboard, Live Usage, Usage Charts, and Models pages
-- **fix**: Sync admin and public total request counts — both now exclude `status_code = 400` (bad requests)
-- **fix**: Admin chart queries now use `AT TIME ZONE 'Asia/Jakarta'` — time labels are consistent with WIB
-- **feat**: Caddy gzip compression enabled on both public dashboard and admin panel
-- **feat**: Inline data labels on public usage chart (numbers displayed directly on chart lines)
+- **feat**: Public dashboard at `routers9.web.id` (Leaderboard, Live, Usage, Models)
+- **fix**: Admin/public request totals exclude `status_code = 400`
+- **fix**: Chart queries use `AT TIME ZONE 'Asia/Jakarta'`
+- **feat**: Caddy gzip compression
+- **feat**: Inline data labels on public usage chart
 
 ### v1.1.0 (2026-06-09)
-- **feat**: Multi-upstream support with weighted round-robin and failover (`upstreams` table, per-upstream sync)
-- **feat**: Leaderboard page — top API keys ranked by request count and token usage, with sortable columns and summary cards
-- **fix**: Model sync now auto-removes models that no longer exist in upstream (prevents stale/ghost models in admin panel)
-- **fix**: Removed `MiniMax-M2.1` from `ALWAYS_AVAILABLE_MODELS` (no longer available upstream)
-- **feat**: Daily token quota reset at 00:00 WIB for configured packages
-- **feat**: Admin session tracking with device/IP info and remote revoke
-- **fix**: Rate limiter auto-cleanup to prevent memory leaks
+- **feat**: Multi-upstream weighted round-robin + failover
+- **feat**: Leaderboard page (top requests/tokens)
+- **fix**: Model sync auto-removes models missing from upstream
+- **feat**: Daily token quota reset at 00:00 WIB
+- **feat**: Admin session tracking with remote revoke
+- **fix**: Rate limiter auto-cleanup
 
 ---
 
-## 📝 License
+## License
 
-MIT License. See [LICENSE](LICENSE) for details.
+Private / proprietary unless otherwise stated by the owner.
 
----
-
-> **Note**: This project is actively maintained. For issues or feature requests, please open an issue in the repository.
+> Operational note: production restarts of the `9router` systemd service require explicit approval (zero-downtime preference).
