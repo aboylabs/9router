@@ -20,6 +20,8 @@ export function Settings() {
 
   const [upstreams, setUpstreams] = useState<Upstream[]>([]);
   const [loadingUpstreams, setLoadingUpstreams] = useState(true);
+  const [roundRobin, setRoundRobin] = useState(true);
+  const [rrSaving, setRrSaving] = useState(false);
 
   // Form state for add/edit
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -54,6 +56,7 @@ export function Settings() {
   useEffect(() => {
     Promise.all([
       loadUpstreams(),
+      loadRoundRobin(),
       api<{ admin: { id: string; email: string } | null }>("/admin/profile").then((data) => {
         if (data.admin) {
           setAdminEmail(data.admin.email);
@@ -69,6 +72,32 @@ export function Settings() {
       toast("Failed to load settings", "error");
     });
   }, []);
+
+  async function loadRoundRobin() {
+    try {
+      const data = await api<{ round_robin_enabled: boolean }>("/admin/settings/round-robin");
+      setRoundRobin(data.round_robin_enabled);
+    } catch {
+      // keep default (true)
+    }
+  }
+
+  async function saveRoundRobin() {
+    setRrSaving(true);
+    try {
+      const next = !roundRobin;
+      await api("/admin/settings/round-robin", {
+        method: "PUT",
+        body: JSON.stringify({ enabled: next }),
+      });
+      setRoundRobin(next);
+      toast(next ? "Round-Robin enabled" : "Round-Robin disabled", "success");
+    } catch {
+      toast("Failed to update Round-Robin setting", "error");
+    } finally {
+      setRrSaving(false);
+    }
+  }
 
   async function loadUpstreams() {
     setLoadingUpstreams(true);
@@ -333,6 +362,30 @@ export function Settings() {
         <p className="text-xs text-text-muted mb-4">
           Multiple upstreams are supported with weighted round-robin load balancing and automatic failover.
         </p>
+
+        {/* Round-Robin toggle */}
+        <div className="flex items-center justify-between mb-6 p-4 rounded-lg border border-border bg-surface-secondary">
+          <div>
+            <p className="text-sm font-medium text-text-primary">Round-Robin Load Balancing</p>
+            <p className="text-xs text-text-muted mt-0.5">
+              {roundRobin
+                ? "On: requests are distributed across active upstreams by weight."
+                : "Off: requests always use the primary (first active) upstream."}
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={roundRobin}
+            disabled={rrSaving}
+            onClick={saveRoundRobin}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${roundRobin ? "bg-green-500" : "bg-gray-600"} ${rrSaving ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${roundRobin ? "translate-x-6" : "translate-x-1"}`}
+            />
+          </button>
+        </div>
 
         {/* Form */}
         <div className="space-y-4 mb-6 p-4 rounded-lg border border-border bg-surface-secondary">

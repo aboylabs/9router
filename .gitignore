@@ -23,5 +23,14 @@ Thumbs.db
 # Database
 *.sql.backup
 
+# Local ops dumps / secrets snapshots (never commit production data)
+backup/*.json.gz
+backup/*.csv
+backup/*.dump
+backup/*_backup_*.sql
+backup/*_pre_*.sql
+backup/*_before_*.sql
+backup/cron.log
+
 # Cache
 .cache/

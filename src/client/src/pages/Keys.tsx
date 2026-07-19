@@ -12,7 +12,7 @@ import { BulkUpdateModal } from "../components/BulkUpdateModal";
 import { useToast } from "../components/ui/Toast";
 import { api } from "../lib/api";
 import { buildCopyText } from "../lib/copy";
-import { formatDateShort, formatTokens } from "../lib/utils";
+import { formatDateShort, formatTokens, buyerNameClassName, isSuperAdminName } from "../lib/utils";
 import type { Key } from "../hooks/useDashboard";
 
 interface KeysPageProps {
@@ -231,8 +231,12 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
                     </div>
                   ) : (
                     <div className="flex items-center gap-1.5">
-                      <span className={`font-medium text-sm ${key.is_vip ? 'text-yellow-500' : 'text-text-primary'}`}>{key.buyer_name}</span>
-                      {key.is_vip && <Crown className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />}
+                      <span className={`font-medium text-sm ${buyerNameClassName(key.buyer_name, key.is_vip)}`}>{key.buyer_name}</span>
+                      {isSuperAdminName(key.buyer_name) ? (
+                        <Crown className="h-3.5 w-3.5 text-purple-400 fill-purple-400" />
+                      ) : key.is_vip ? (
+                        <Crown className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />
+                      ) : null}
                       <button
                         onClick={() => { setEditingNameId(key.buyer_id); setEditNameValue(key.buyer_name); }}
                         className="text-text-muted hover:text-text-primary transition-colors"
@@ -277,7 +281,7 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
                   <span>RPM: <span className="text-text-primary font-medium">{key.rate_limit_rpm ? `${key.rate_limit_rpm}` : "default"}</span></span>
                 </div>
                 <div className="flex items-center justify-between text-xs text-text-muted">
-                  <span>Expires: {formatDateShort(key.expires_at)}</span>
+                  <span>Expires: {key.expires_at ? formatDateShort(key.expires_at) : "No expiry"}</span>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5 pt-1">
                    <CopyButton text={getCopyText(key)} />
@@ -313,7 +317,7 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
                          onClick={() => toggleVip(key.id, key.is_vip)}
                          loading={vipLoading === key.id}
                          className={key.is_vip ? "bg-yellow-500/20 text-yellow-500 hover:bg-yellow-500/30" : ""}
-                         title={key.is_vip ? "Remove VIP status" : "Set VIP unlimited"}
+                         title={key.is_vip ? "Remove VIP status (back to 100M)" : "Set VIP (500M token quota)"}
                        >
                          <Crown className={`h-3.5 w-3.5 ${key.is_vip ? "fill-yellow-500" : ""}`} />
                          VIP
@@ -404,8 +408,12 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
                     </div>
                   ) : (
                     <div className="flex items-center gap-1.5">
-                      <span className={key.is_vip ? 'text-yellow-500' : ''}>{key.buyer_name}</span>
-                      {key.is_vip && <Crown className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />}
+                      <span className={buyerNameClassName(key.buyer_name, key.is_vip)}>{key.buyer_name}</span>
+                      {isSuperAdminName(key.buyer_name) ? (
+                        <Crown className="h-3.5 w-3.5 text-purple-400 fill-purple-400" />
+                      ) : key.is_vip ? (
+                        <Crown className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />
+                      ) : null}
                       <button
                         onClick={() => { setEditingNameId(key.buyer_id); setEditNameValue(key.buyer_name); }}
                         className="text-text-muted hover:text-text-primary transition-colors"
@@ -464,7 +472,7 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
                   })()}
                 </TableCell>
                 <TableCell>{formatDateShort(key.created_at)}</TableCell>
-                <TableCell>{formatDateShort(key.expires_at)}</TableCell>
+                <TableCell>{key.expires_at ? formatDateShort(key.expires_at) : "No expiry"}</TableCell>
                 <TableCell>
                   {key.revoked_at ? (
                     <Badge variant="danger">Revoked</Badge>
@@ -509,7 +517,7 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
                            onClick={() => toggleVip(key.id, key.is_vip)}
                            loading={vipLoading === key.id}
                            className={key.is_vip ? "bg-yellow-500/20 text-yellow-500 hover:bg-yellow-500/30" : ""}
-                           title={key.is_vip ? "Remove VIP status" : "Set VIP unlimited"}
+                           title={key.is_vip ? "Remove VIP status (back to 100M)" : "Set VIP (500M token quota)"}
                          >
                            <Crown className={`h-3.5 w-3.5 ${key.is_vip ? "fill-yellow-500" : ""}`} />
                          </Button>

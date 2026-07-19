@@ -123,7 +123,7 @@ export function Live() {
                   <div className="flex flex-wrap gap-1 pt-1">
                     {entry.models_used.map((model) => (
                       <span key={model} className="text-xs bg-surface-tertiary px-1.5 py-0.5 rounded text-text-muted">
-                        {model.replace("9router/", "")}
+                        {model.replace("routers9/", "")}
                       </span>
                     ))}
                   </div>

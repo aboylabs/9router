@@ -36,21 +36,28 @@ export function CreateKeyModal({ open, onOpenChange, onSuccess }: CreateKeyModal
   const [result, setResult] = useState<CreateKeyResult | null>(null);
   const [userName, setUserName] = useState("");
   const [days, setDays] = useState("");
-  const [rateLimitRpm, setRateLimitRpm] = useState("");
+  const [quotaTokens, setQuotaTokens] = useState<number>(100_000_000);
+
+  // Fixed default RPM for new keys (no longer configurable in this form)
+  const DEFAULT_RATE_LIMIT_RPM = 50;
+
+  const QUOTA_OPTIONS = [
+    { value: 100_000_000, label: "100M tokens" },
+    { value: 250_000_000, label: "250M tokens" },
+    { value: 500_000_000, label: "500M tokens" },
+  ] as const;
 
   useEffect(() => {
     if (open) {
       setResult(null);
       setUserName("");
       setDays("");
-      setRateLimitRpm("");
+      setQuotaTokens(100_000_000);
     }
   }, [open]);
 
   const daysNum = parseInt(days, 10);
   const daysValid = !isNaN(daysNum) && daysNum > 0;
-  const rpmNum = parseInt(rateLimitRpm, 10);
-  const rpmValid = rateLimitRpm === "" || (!isNaN(rpmNum) && rpmNum > 0);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -62,10 +69,6 @@ export function CreateKeyModal({ open, onOpenChange, onSuccess }: CreateKeyModal
       toast("Jumlah hari harus diisi dengan angka positif", "error");
       return;
     }
-    if (!rpmValid) {
-      toast("Rate limit harus berupa angka positif atau dikosongkan", "error");
-      return;
-    }
     setLoading(true);
     try {
       const data = await api<CreateKeyResult>("/admin/create-key", {
@@ -73,7 +76,8 @@ export function CreateKeyModal({ open, onOpenChange, onSuccess }: CreateKeyModal
         body: JSON.stringify({
           name: userName.trim(),
           days: daysNum,
-          rateLimitRpm: rpmValid && rateLimitRpm !== "" ? rpmNum : null
+          rateLimitRpm: DEFAULT_RATE_LIMIT_RPM,
+          quotaTokens
         })
       });
       setResult(data);
@@ -106,7 +110,7 @@ export function CreateKeyModal({ open, onOpenChange, onSuccess }: CreateKeyModal
         <DialogHeader>
           <DialogTitle>Create API Key</DialogTitle>
           <DialogDescription>
-            Enter buyer name and number of active days
+            Enter buyer name, active days, and token quota
           </DialogDescription>
         </DialogHeader>
 
@@ -141,17 +145,20 @@ export function CreateKeyModal({ open, onOpenChange, onSuccess }: CreateKeyModal
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1.5">Rate Limit (request/menit)</label>
-            <input
-              type="number"
-              min="1"
-              value={rateLimitRpm}
-              onChange={(e) => setRateLimitRpm(e.target.value)}
-              placeholder="Kosongkan untuk pakai default"
-              className="w-full px-3 py-2 rounded-md border border-border-primary bg-surface-primary text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            />
+            <label className="block text-sm font-medium text-text-secondary mb-1.5">Token Quota</label>
+            <select
+              value={quotaTokens}
+              onChange={(e) => setQuotaTokens(Number(e.target.value))}
+              className="w-full px-3 py-2 rounded-md border border-border-primary bg-surface-primary text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            >
+              {QUOTA_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
             <p className="text-xs text-text-muted mt-1">
-              Batas request per menit. Kosongkan untuk menggunakan default sistem.
+              Batas total token untuk key ini. Default 100M. Rate limit fixed 50 RPM.
             </p>
           </div>
 

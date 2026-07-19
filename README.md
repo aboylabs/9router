@@ -163,6 +163,18 @@ npm start
 
 ## 📋 Changelog
 
+### v1.3.0 (2026-07-19)
+- **feat**: Model brand prefix rebrand `9router/` → `routers9/` (catalog IDs, allowlists, public models)
+- **feat**: Per-model upstream pinning (`models.upstream_id`) with preferred-upstream routing in proxy
+- **feat**: Round-robin on/off toggle via `system_settings.round_robin_enabled` + Settings UI
+- **feat**: Create-key token quota choices (100M / 250M / 500M); fixed default RPM = 50
+- **feat**: Super Admin special-case (purple UI, unlimited quota preserved on VIP toggle)
+- **feat**: VIP now enforces token quota (typically 500M) while still skipping request quota
+- **feat**: Public leaderboard search (`?q=`) by buyer name / API key; shows used/quota tokens
+- **fix**: Public Usage shows success-only (`success=true` and `status_code=200`)
+- **fix**: Token billing multiplier set to `1` (match upstream usage, no 2x)
+- **chore**: Drop obsolete local backup `.json.gz` artifacts from tracked history path
+
 ### v1.2.0 (2026-06-11)
 - **feat**: Public dashboard at `routers9.web.id` with read-only Leaderboard, Live Usage, Usage Charts, and Models pages
 - **fix**: Sync admin and public total request counts — both now exclude `status_code = 400` (bad requests)

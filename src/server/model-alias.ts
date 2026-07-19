@@ -1,8 +1,8 @@
-const BRAND_PREFIX = "9router/";
+const BRAND_PREFIX = "routers9/";
 
-const PUBLIC_MODEL_ALLOWLIST = [/^9router\/.+/];
+const PUBLIC_MODEL_ALLOWLIST = [/^routers9\/.+/];
 
-const UPSTREAM_MODEL_ALLOWLIST = [/^(?!.*\.\.)(?!9router\/)[A-Za-z0-9][A-Za-z0-9._\/:\\-]*$/];
+const UPSTREAM_MODEL_ALLOWLIST = [/^(?!.*\.\.)(?!routers9\/)[A-Za-z0-9][A-Za-z0-9._\/:\\-]*$/];
 
 export function isBrandedModelId(modelId: string) {
   return modelId.startsWith(BRAND_PREFIX) || modelId.startsWith("brand/");
@@ -18,9 +18,9 @@ export function isAllowedUpstreamModelId(modelId: string) {
 
 export function aliasForUpstreamModel(upstreamModel: string) {
   const stripped = upstreamModel.startsWith("kr/") ? upstreamModel.slice(3) : upstreamModel;
-  if (stripped.startsWith("9router/") || stripped.startsWith("brand/")) return stripped;
+  if (stripped.startsWith("routers9/") || stripped.startsWith("brand/")) return stripped;
   // Strip a trailing ":free" tag so the public model id stays clean
-  // (e.g. op/tencent/hy3:free -> 9router/op/tencent/hy3). The upstream_model
+  // (e.g. op/tencent/hy3:free -> routers9/op/tencent/hy3). The upstream_model
   // itself is kept intact so proxying to the upstream is unaffected.
   const cleaned = stripped.replace(/:free$/i, "");
   return `${BRAND_PREFIX}${cleaned}`;
@@ -29,7 +29,7 @@ export function aliasForUpstreamModel(upstreamModel: string) {
 export function displayNameForModel(modelId: string) {
   const stripped = modelId
     .replace(/^kr\//, "")
-    .replace(/^9router\//, "")
+    .replace(/^routers9\//, "")
     .replace(/^brand\//, "");
 
   return stripped

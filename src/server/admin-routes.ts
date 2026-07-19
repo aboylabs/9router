@@ -106,7 +106,14 @@ const buyerPackageSchema = z.object({
 const createKeySchema = z.object({
   name: z.string().min(1),
   days: z.number().int().positive(),
-  rateLimitRpm: z.number().int().positive().optional().nullable(),
+  // Default 50 RPM for new keys; form no longer exposes this field
+  rateLimitRpm: z.number().int().positive().optional().nullable().default(50),
+  // Token quota choices for newly created keys (default 100M)
+  quotaTokens: z.union([
+    z.literal(100_000_000),
+    z.literal(250_000_000),
+    z.literal(500_000_000),
+  ]).default(100_000_000),
 });
 
 const upstreamModelSchema = z.object({
@@ -126,7 +133,7 @@ async function activeAllowedModelIds() {
     `select id
      from models
      where active = true
-       and id like '9router/%'
+       and id like 'routers9/%'
      order by display_name asc`
   );
   return result.rows.map((row) => row.id);
@@ -219,13 +226,13 @@ export async function registerAdminRoutes(app: FastifyInstance) {
       label,
       apiKey,
       expiresAt,
-      quotaTokens: null,
+      quotaTokens: parsed.data.quotaTokens,
       quotaRequests: null,
       modelIds,
       dailyReset: false,
       dailyQuotaTokens: null,
       packageId: null,
-      rateLimitRpm: parsed.data.rateLimitRpm ?? null
+      rateLimitRpm: parsed.data.rateLimitRpm ?? 50
     });
     invalidateApiKeyCache();
 
@@ -245,7 +252,7 @@ export async function registerAdminRoutes(app: FastifyInstance) {
       package: {
         id: null,
         label,
-        quota_tokens: null,
+        quota_tokens: parsed.data.quotaTokens,
         daily_quota_tokens: null,
         daily_reset: false,
         expires_at: expiresAt
@@ -368,18 +375,20 @@ export async function registerAdminRoutes(app: FastifyInstance) {
   });
 
   app.get("/admin/overview", async () => {
-    const [buyers, keys, usage] = await Promise.all([
+    const [buyers, keys, usage, totalKeys] = await Promise.all([
       query<{ count: string }>(`select count(*) from buyers`),
       query<{ count: string }>(`select count(*) from api_keys where deleted_at is null and revoked_at is null and is_hidden = false`),
       query<{ requests: string; tokens: string; cost: string }>(
         `select count(*) as requests, coalesce(sum(total_tokens), 0) as tokens, coalesce(sum(cost_estimate), 0) as cost
          from usage_events WHERE status_code != 400`
-      )
+      ),
+      query<{ count: string }>(`select count(*) from api_keys`)
     ]);
 
     return {
       buyers: Number(buyers.rows[0].count),
       activeKeys: Number(keys.rows[0].count),
+      totalKeys: Number(totalKeys.rows[0].count),
       requests: Number(usage.rows[0].requests),
       tokens: Number(usage.rows[0].tokens),
       costEstimate: Number(usage.rows[0].cost)
@@ -497,6 +506,12 @@ export async function registerAdminRoutes(app: FastifyInstance) {
   });
 
   app.post("/admin/models/sync", async (_request, reply) => {
+    // Determine the primary (default) upstream id so synced models are pinned to it.
+    const upstreamsResult = await query<{ id: string }>(
+      `SELECT id FROM upstreams WHERE is_active = true ORDER BY created_at ASC LIMIT 1`
+    );
+    const primaryUpstreamId = upstreamsResult.rows[0]?.id ?? null;
+
     const upstream = await fetchUpstreamModels();
     if (upstream.statusCode < 200 || upstream.statusCode >= 400) {
       return reply.code(502).send({
@@ -513,25 +528,26 @@ export async function registerAdminRoutes(app: FastifyInstance) {
 
     const synced = [];
     let granted = 0;
-    const syncedIds = new Set<string>();
-    
+
     for (const model of parsed.data.data) {
       if (!isAllowedUpstreamModelId(model.id)) continue;
+      // Free-tier gateway: only sync :free models from the default upstream.
+      if (!model.id.endsWith(":free")) continue;
       const aliasId = aliasForUpstreamModel(model.id);
       if (!isAllowedPublicModelId(aliasId)) continue;
       const displayName = displayNameForModel(aliasId);
       const result = await query(
-        `insert into models (id, upstream_model, display_name, active)
-         values ($1, $2, $3, true)
+        `insert into models (id, upstream_model, display_name, active, upstream_id)
+         values ($1, $2, $3, true, $4)
          on conflict (id) do update set
           upstream_model = excluded.upstream_model,
           display_name = excluded.display_name,
-          active = true
+          active = true,
+          upstream_id = excluded.upstream_id
          returning *`,
-        [aliasId, model.id, displayName]
+        [aliasId, model.id, displayName, primaryUpstreamId]
       );
       synced.push(result.rows[0]);
-      syncedIds.add(aliasId);
 
       const grantResult = await query(
         `insert into buyer_model_access (api_key_id, model_id)
@@ -542,23 +558,9 @@ export async function registerAdminRoutes(app: FastifyInstance) {
       granted += grantResult.rowCount ?? 0;
     }
 
-    // Clean up models that are no longer in the upstream response
-    const alwaysAvailableIds = ALWAYS_AVAILABLE_MODELS.map(m => m.id);
-    const idsToKeep = new Set([...syncedIds, ...alwaysAvailableIds]);
-    
-    const allModelsResult = await query<{ id: string }>(`SELECT id FROM models`);
-    const modelsToDelete = allModelsResult.rows
-      .map(r => r.id)
-      .filter(id => !idsToKeep.has(id));
-
-    if (modelsToDelete.length > 0) {
-      await query(
-        `DELETE FROM models WHERE id = ANY($1::varchar[])`,
-        [modelsToDelete]
-      );
-    }
-
-    return { synced: synced.length, granted, removed: modelsToDelete.length, models: synced };
+    // Additive only: never auto-delete models missing from upstream.
+    // Manual delete remains available via admin model DELETE.
+    return { synced: synced.length, granted, removed: 0, models: synced };
   });
 
   app.post("/admin/buyers/:buyerId/keys", async (request, reply) => {
@@ -694,8 +696,29 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     }).safeParse(request.body);
     if (!body.success) return reply.code(400).send({ error: "Invalid payload. Requires { is_vip: boolean }" });
 
+    // Super Admin keeps unlimited quota (NULL); never overwrite via VIP toggle
+    const owner = await query<{ buyer_name: string | null }>(
+      `SELECT b.name AS buyer_name
+       FROM api_keys k
+       LEFT JOIN buyers b ON b.id = k.buyer_id
+       WHERE k.id = $1 AND k.deleted_at IS NULL
+       LIMIT 1`,
+      [params.data.keyId]
+    );
+    if (!owner.rowCount) return reply.code(404).send({ error: "Key not found" });
+    const isSuperAdmin = (owner.rows[0].buyer_name || "").trim().toLowerCase() === "super admin";
+
     const result = await query(
-      `UPDATE api_keys SET is_vip = $1 WHERE id = $2 AND deleted_at IS NULL RETURNING id, is_vip`,
+      isSuperAdmin
+        ? `UPDATE api_keys
+           SET is_vip = $1
+           WHERE id = $2 AND deleted_at IS NULL
+           RETURNING id, is_vip, quota_tokens`
+        : `UPDATE api_keys
+           SET is_vip = $1,
+               quota_tokens = CASE WHEN $1 THEN 500000000 ELSE 100000000 END
+           WHERE id = $2 AND deleted_at IS NULL
+           RETURNING id, is_vip, quota_tokens`,
       [body.data.is_vip, params.data.keyId]
     );
     if (!result.rowCount) return reply.code(404).send({ error: "Key not found" });
@@ -929,6 +952,33 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
+  // --- Settings: Round-Robin toggle ---
+  app.get("/admin/settings/round-robin", async () => {
+    const result = await query<{ value: string }>(
+      `SELECT value FROM system_settings WHERE key = 'round_robin_enabled'`
+    );
+    const raw = result.rows[0]?.value;
+    const enabled = raw === undefined ? true : raw === "true" || raw === "1";
+    return { round_robin_enabled: enabled };
+  });
+
+  app.put("/admin/settings/round-robin", async (request, reply) => {
+    const parsed = z
+      .object({ enabled: z.boolean() })
+      .safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "Invalid payload. Requires { enabled: boolean }" });
+    }
+    const value = parsed.data.enabled ? "true" : "false";
+    await query(
+      `INSERT INTO system_settings (key, value, updated_at) VALUES ('round_robin_enabled', $1, now())
+       ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = now()`,
+      [value]
+    );
+    clearUpstreamCache();
+    return { ok: true, round_robin_enabled: parsed.data.enabled };
+  });
+
   // --- Settings: Upstream ---
   app.get("/admin/settings/upstream", async () => {
     const result = await query<{ key: string; value: string }>(
@@ -985,22 +1035,24 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     }
 
     let synced = 0;
-    const syncedIds = new Set<string>();
+    const primaryUpstreamId = (await query<{ id: string }>(`SELECT id FROM upstreams WHERE is_active = true ORDER BY created_at ASC LIMIT 1`)).rows[0]?.id ?? null;
     for (const model of parsedModels.data.data) {
-      if (!isAllowedUpstreamModelId(model.id)) continue;
-      const aliasId = aliasForUpstreamModel(model.id);
+    if (!isAllowedUpstreamModelId(model.id)) continue;
+    // Free-tier gateway: only sync :free models from the default upstream.
+    if (!model.id.endsWith(":free")) continue;
+    const aliasId = aliasForUpstreamModel(model.id);
       if (!isAllowedPublicModelId(aliasId)) continue;
       const displayName = displayNameForModel(aliasId);
       await query(
-        `insert into models (id, upstream_model, display_name, active)
-         values ($1, $2, $3, true)
+        `insert into models (id, upstream_model, display_name, active, upstream_id)
+         values ($1, $2, $3, true, $4)
          on conflict (id) do update set
           upstream_model = excluded.upstream_model,
           display_name = excluded.display_name,
-          active = true`,
-        [aliasId, model.id, displayName]
+          active = true,
+          upstream_id = excluded.upstream_id`,
+        [aliasId, model.id, displayName, primaryUpstreamId]
       );
-      syncedIds.add(aliasId);
       await query(
         `insert into buyer_model_access (api_key_id, model_id)
          select id, $1 from api_keys
@@ -1010,23 +1062,8 @@ export async function registerAdminRoutes(app: FastifyInstance) {
       synced++;
     }
 
-    // Clean up models that are no longer in the upstream response
-    const alwaysAvailableIds = ALWAYS_AVAILABLE_MODELS.map(m => m.id);
-    const idsToKeep = new Set([...syncedIds, ...alwaysAvailableIds]);
-    
-    const allModelsResult = await query<{ id: string }>(`SELECT id FROM models`);
-    const modelsToDelete = allModelsResult.rows
-      .map(r => r.id)
-      .filter(id => !idsToKeep.has(id));
-
-    if (modelsToDelete.length > 0) {
-      await query(
-        `DELETE FROM models WHERE id = ANY($1::varchar[])`,
-        [modelsToDelete]
-      );
-    }
-
-    return { saved: true, synced, removed: modelsToDelete.length, message: `Upstream updated and ${synced} models synced, ${modelsToDelete.length} removed` };
+    // Additive only: never auto-delete models missing from upstream.
+    return { saved: true, synced, removed: 0, message: `Upstream updated and ${synced} models synced, 0 removed` };
   });
 
   // --- Upstreams Management ---
@@ -1136,22 +1173,21 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     }
 
     let synced = 0;
-    const syncedIds = new Set<string>();
     for (const model of parsedModels.data.data) {
       if (!isAllowedUpstreamModelId(model.id)) continue;
       const aliasId = aliasForUpstreamModel(model.id);
       if (!isAllowedPublicModelId(aliasId)) continue;
       const displayName = displayNameForModel(aliasId);
       await query(
-        `INSERT INTO models (id, upstream_model, display_name, active)
-         VALUES ($1, $2, $3, true)
+        `INSERT INTO models (id, upstream_model, display_name, active, upstream_id)
+         VALUES ($1, $2, $3, true, $4)
          ON CONFLICT (id) DO UPDATE SET
           upstream_model = excluded.upstream_model,
           display_name = excluded.display_name,
-          active = true`,
-        [aliasId, model.id, displayName]
+          active = true,
+          upstream_id = excluded.upstream_id`,
+        [aliasId, model.id, displayName, params.data.id]
       );
-      syncedIds.add(aliasId);
       await query(
         `INSERT INTO buyer_model_access (api_key_id, model_id)
          SELECT id, $1 FROM api_keys ON CONFLICT DO NOTHING`,
@@ -1160,23 +1196,9 @@ export async function registerAdminRoutes(app: FastifyInstance) {
       synced++;
     }
 
-    // Clean up models that are no longer in the upstream response
-    const alwaysAvailableIds = ALWAYS_AVAILABLE_MODELS.map(m => m.id);
-    const idsToKeep = new Set([...syncedIds, ...alwaysAvailableIds]);
-    
-    const allModelsResult = await query<{ id: string }>(`SELECT id FROM models`);
-    const modelsToDelete = allModelsResult.rows
-      .map(r => r.id)
-      .filter(id => !idsToKeep.has(id));
-
-    if (modelsToDelete.length > 0) {
-      await query(
-        `DELETE FROM models WHERE id = ANY($1::varchar[])`,
-        [modelsToDelete]
-      );
-    }
-
-    return { synced, removed: modelsToDelete.length, message: `Synced ${synced} models from upstream, ${modelsToDelete.length} removed` };
+    // Additive only: never auto-delete models missing from this upstream.
+    // Manual delete remains available via admin model DELETE.
+    return { synced, removed: 0, message: `Synced ${synced} models from upstream, 0 removed` };
   });
 
   // --- Sales ---

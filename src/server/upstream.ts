@@ -66,12 +66,51 @@ async function getActiveUpstreams(): Promise<Upstream[]> {
   return active;
 }
 
-/** Pick next upstream via weighted round-robin */
-async function pickUpstream(excludeIds?: Set<string>): Promise<Upstream> {
+// Round-robin toggle — controlled by system_settings key 'round_robin_enabled'.
+// Default is ON (true) for backward compatibility. When OFF, we always pick the
+// primary (first active) upstream instead of rotating across the pool. Failover
+// on upstream failure still works because callers pass excludeIds on retry.
+let rrEnabledCache: { enabled: boolean; expiry: number } | null = null;
+const RR_CACHE_MS = 30_000;
+
+async function isRoundRobinEnabled(): Promise<boolean> {
+  if (rrEnabledCache && Date.now() < rrEnabledCache.expiry) {
+    return rrEnabledCache.enabled;
+  }
+  try {
+    const { query } = await import("./db.js");
+    const result = await query<{ value: string }>(
+      `SELECT value FROM system_settings WHERE key = 'round_robin_enabled'`
+    );
+    const raw = result.rows[0]?.value;
+    const enabled = raw === undefined ? true : raw === "true" || raw === "1";
+    rrEnabledCache = { enabled, expiry: Date.now() + RR_CACHE_MS };
+    return enabled;
+  } catch {
+    rrEnabledCache = { enabled: true, expiry: Date.now() + RR_CACHE_MS };
+    return true;
+  }
+}
+
+/** Pick next upstream via weighted round-robin (or the primary when RR is off).
+ *  If preferredUpstreamId is provided and active, it is always chosen first
+ *  (model→upstream affinity), falling back to RR/primary only when excluded. */
+async function pickUpstream(excludeIds?: Set<string>, preferredUpstreamId?: string | null): Promise<Upstream> {
   const active = await getActiveUpstreams();
   const candidates = excludeIds ? active.filter((u) => !excludeIds.has(u.id)) : active;
   if (candidates.length === 0) {
     throw new Error("All upstreams failed or no active upstreams");
+  }
+
+  // Model→upstream affinity: if this model is pinned to a specific upstream, use it.
+  if (preferredUpstreamId) {
+    const preferred = candidates.find((u) => u.id === preferredUpstreamId);
+    if (preferred) return preferred;
+  }
+
+  // Round-robin disabled: always use the primary (first active) upstream.
+  if (!(await isRoundRobinEnabled())) {
+    return candidates[0];
   }
 
   // Weighted round-robin: build expanded list based on weight
@@ -96,6 +135,7 @@ export async function getUpstreamConfig(): Promise<{ baseUrl: string; apiKey: st
 export function clearUpstreamCache() {
   cachedUpstreams = null;
   upstreamCacheExpiry = 0;
+  rrEnabledCache = null;
 }
 
 const MAX_RETRIES = 3;
@@ -238,7 +278,7 @@ async function callSingleUpstream(
   };
 }
 
-export async function callUpstream(path: string, body?: unknown): Promise<UpstreamResult> {
+export async function callUpstream(path: string, body?: unknown, preferredUpstreamId?: string | null): Promise<UpstreamResult> {
   const triedIds = new Set<string>();
 
   // Try up to N upstreams with failover
@@ -246,7 +286,7 @@ export async function callUpstream(path: string, body?: unknown): Promise<Upstre
   const maxAttempts = active.length;
 
   for (let i = 0; i < maxAttempts; i++) {
-    const upstream = await pickUpstream(triedIds);
+    const upstream = await pickUpstream(triedIds, preferredUpstreamId);
     triedIds.add(upstream.id);
 
     const result = await callSingleUpstream(upstream, path, body);
@@ -314,7 +354,7 @@ async function streamSingleUpstream(upstream: Upstream, path: string, body: unkn
   };
 }
 
-export async function streamUpstream(path: string, body: unknown) {
+export async function streamUpstream(path: string, body: unknown, preferredUpstreamId?: string | null) {
   const triedIds = new Set<string>();
   const active = await getActiveUpstreams();
   const maxAttempts = active.length;
@@ -322,7 +362,7 @@ export async function streamUpstream(path: string, body: unknown) {
   let lastFailure: UpstreamFailure | null = null;
 
   for (let i = 0; i < maxAttempts; i++) {
-    const upstream = await pickUpstream(triedIds);
+    const upstream = await pickUpstream(triedIds, preferredUpstreamId);
     triedIds.add(upstream.id);
 
     const result = await streamSingleUpstream(upstream, path, body);

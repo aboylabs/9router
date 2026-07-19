@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
 import { CopyButton } from "../components/CopyButton";
 import { api } from "../lib/api";
-import { formatDateShort, formatTokens } from "../lib/utils";
+import { formatDateShort, formatTokens, buyerNameClassName, isSuperAdminName } from "../lib/utils";
 
 type LeaderboardEntry = {
   buyer_id: string;
@@ -25,7 +25,7 @@ type LeaderboardEntry = {
 };
 
 function formatRemainingDays(expiresAt: string | null): string {
-  if (!expiresAt) return "No expiry";
+  if (!expiresAt) return "No expiry ∞";
   const expiry = new Date(expiresAt);
   const now = new Date();
   const diffMs = expiry.getTime() - now.getTime();
@@ -36,7 +36,7 @@ function formatRemainingDays(expiresAt: string | null): string {
 }
 
 function getExpiryColor(expiresAt: string | null): string {
-  if (!expiresAt) return "text-text-muted";
+  if (!expiresAt) return "text-purple-400";
   const expiry = new Date(expiresAt);
   const now = new Date();
   const diffMs = expiry.getTime() - now.getTime();
@@ -213,8 +213,12 @@ export function Leaderboard() {
                           <code className="bg-surface-tertiary px-1.5 py-0.5 rounded font-mono text-text-muted text-xs">{entry.key_prefix}****</code>
                           <CopyButton text={entry.key_prefix} />
                         </div>
-                        <span className={`font-medium ${entry.is_vip ? 'text-yellow-500' : 'text-text-primary'}`}>{entry.buyer_name}</span>
-                        {entry.is_vip && <span className="text-yellow-500 text-xs">👑</span>}
+                        <span className={`font-medium ${buyerNameClassName(entry.buyer_name, entry.is_vip)}`}>{entry.buyer_name}</span>
+                        {isSuperAdminName(entry.buyer_name) ? (
+                          <span className="text-purple-400 text-xs">👑</span>
+                        ) : entry.is_vip ? (
+                          <span className="text-yellow-500 text-xs">👑</span>
+                        ) : null}
                         <span className="text-xs text-text-muted">{entry.buyer_email}</span>
                         <span className={`text-xs font-medium ${getExpiryColor(entry.expires_at)}`}>
                           {formatRemainingDays(entry.expires_at)}

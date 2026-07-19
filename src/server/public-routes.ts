@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import crypto from "node:crypto";
 import { query } from "./db.js";
 
 function maskEmail(email: string): string {
@@ -8,33 +9,87 @@ function maskEmail(email: string): string {
   return local.substring(0, 1) + "***@" + domain;
 }
 
+function hashApiKeyValue(apiKey: string) {
+  return crypto.createHash("sha256").update(apiKey).digest("hex");
+}
+
+function looksLikeFullApiKey(q: string) {
+  // generated keys look like: 9r-<base64url ~43 chars>
+  return /^9r-[A-Za-z0-9_-]{20,}$/.test(q) || q.length >= 24;
+}
+
 export async function registerPublicRoutes(app: FastifyInstance) {
   // --- Public Leaderboard (read-only, masked emails) ---
-  app.get("/public/leaderboard", async () => {
+  // Optional ?q= filters by buyer name or API key (full key / prefix). Never returns key material.
+  app.get("/public/leaderboard", async (request) => {
+    const rawQ = String((request.query as any)?.q ?? "").trim();
+    const q = rawQ.slice(0, 128);
+    const params: unknown[] = [];
+    let filterSql = `
+      WHERE k.is_hidden = false
+        AND k.deleted_at IS NULL
+        AND k.revoked_at IS NULL
+    `;
+
+    if (q) {
+      if (looksLikeFullApiKey(q)) {
+        // Exact match via hash + plain (legacy) + prefix fallback
+        params.push(hashApiKeyValue(q), q, q + "%");
+        filterSql += `
+          AND (
+            k.key_hash = $1
+            OR k.key_plain = $2
+            OR k.key_prefix ILIKE $3
+          )
+        `;
+      } else {
+        // Name search (and prefix if user types short 9r-xxx)
+        params.push("%" + q + "%", q + "%");
+        filterSql += `
+          AND (
+            b.name ILIKE $1
+            OR k.key_prefix ILIKE $2
+          )
+        `;
+      }
+    }
+
+    const limit = q ? 50 : 100;
     const result = await query(
-      `SELECT 
+      `SELECT
         b.name as buyer_name,
         b.email as buyer_email,
         k.key_prefix,
         k.label as key_label,
         k.is_vip,
-        COUNT(ue.id)::int as total_requests,
-        COALESCE(SUM(ue.total_tokens), 0)::bigint as total_tokens,
-        MAX(ue.created_at) as last_request_at,
-        CASE 
+        k.used_tokens::bigint as used_tokens,
+        k.quota_tokens::bigint as quota_tokens,
+        COALESCE(stats.total_requests, 0)::int as total_requests,
+        COALESCE(stats.total_tokens, 0)::bigint as total_tokens,
+        stats.last_request_at,
+        CASE
           WHEN k.expires_at IS NULL THEN NULL
           ELSE GREATEST(0, EXTRACT(EPOCH FROM (k.expires_at - NOW())) / 86400)::int
         END as remaining_days
-      FROM usage_events ue
-      JOIN api_keys k ON k.id = ue.api_key_id
+      FROM api_keys k
       JOIN buyers b ON b.id = k.buyer_id
-      WHERE k.is_hidden = false AND ue.status_code != 400
-      GROUP BY b.id, b.name, b.email, k.id, k.label, k.key_prefix, k.expires_at, k.is_vip
-      HAVING COUNT(ue.id) > 0
-      ORDER BY total_requests DESC
-      LIMIT 100`
+      LEFT JOIN (
+        SELECT
+          ue.api_key_id,
+          COUNT(ue.id)::int as total_requests,
+          COALESCE(SUM(ue.total_tokens), 0)::bigint as total_tokens,
+          MAX(ue.created_at) as last_request_at
+        FROM usage_events ue
+        WHERE ue.status_code != 400
+        GROUP BY ue.api_key_id
+      ) stats ON stats.api_key_id = k.id
+      ${filterSql}
+      ORDER BY total_requests DESC, k.used_tokens DESC, b.name ASC
+      LIMIT ${limit}`,
+      params
     );
     return {
+      q: q || null,
       rows: result.rows.map((r: any) => {
         const { key_prefix, key_label, ...rest } = r;
         return {
@@ -81,7 +136,9 @@ export async function registerPublicRoutes(app: FastifyInstance) {
        FROM usage_events ue
        JOIN api_keys k ON k.id = ue.api_key_id
        JOIN buyers b ON b.id = k.buyer_id
-       WHERE k.is_hidden = false AND ue.status_code != 400
+       WHERE k.is_hidden = false
+         AND ue.success = true
+         AND ue.status_code = 200
        ORDER BY ue.created_at DESC
        LIMIT 200`
     );

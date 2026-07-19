@@ -12,7 +12,7 @@ const chatCompletionSchema = z.object({
   stream: z.boolean().optional()
 }).passthrough();
 
-export const TOKEN_MULTIPLIER = 2;
+export const TOKEN_MULTIPLIER = 1;
 
 export type MeteredUsage = {
   promptTokens: number;
@@ -139,7 +139,7 @@ export async function registerProxyRoutes(app: FastifyInstance) {
           include_usage: true
         }
       };
-      const upstream = await streamUpstream("/chat/completions", streamBody);
+      const upstream = await streamUpstream("/chat/completions", streamBody, access.upstream_id);
       const upstreamErrorCode = upstream.headers.get("x-9router-error-code") ?? "upstream_error";
 
       if (upstream.status >= 400) {
@@ -285,7 +285,7 @@ export async function registerProxyRoutes(app: FastifyInstance) {
       return;
     }
 
-    const upstream = await callUpstream("/chat/completions", upstreamBody);
+    const upstream = await callUpstream("/chat/completions", upstreamBody, access.upstream_id);
     const success = upstream.statusCode >= 200 && upstream.statusCode < 400;
     let usageForLog = zeroFailedUsage();
 

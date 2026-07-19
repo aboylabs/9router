@@ -68,6 +68,7 @@ export type ChartPoint = {
 export type Overview = {
   buyers: number;
   activeKeys: number;
+  totalKeys: number;
   requests: number;
   tokens: number;
   costEstimate: number;
@@ -78,7 +79,7 @@ export function useDashboard() {
   const [models, setModels] = useState<Model[]>([]);
   const [keys, setKeys] = useState<Key[]>([]);
   const [usage, setUsage] = useState<UsageEvent[]>([]);
-  const [overview, setOverview] = useState<Overview>({ buyers: 0, activeKeys: 0, requests: 0, tokens: 0, costEstimate: 0 });
+  const [overview, setOverview] = useState<Overview>({ buyers: 0, activeKeys: 0, totalKeys: 0, requests: 0, tokens: 0, costEstimate: 0 });
   const [chartData, setChartData] = useState<ChartPoint[]>([]);
   const [chartRange, setChartRange] = useState<string>("7d");
   const [loading, setLoading] = useState(true);

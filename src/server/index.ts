@@ -55,7 +55,7 @@ export async function buildApp() {
   app.get("/public/models", async () => {
     const { query: dbQuery } = await import("./db.js");
     const result = await dbQuery<{ id: string; display_name: string }>(
-      `SELECT id, display_name FROM models WHERE active = true AND id LIKE '9router/%' ORDER BY id`
+      `SELECT id, display_name FROM models WHERE active = true AND id LIKE 'routers9/%' ORDER BY id`
     );
     return { models: result.rows };
   });
@@ -469,18 +469,18 @@ function modelsLandingPage(): string {
             <div class="api-card-title">Example: Chat Completion</div>
             <div class="code-block" id="code-nonstream"><button class="code-copy" onclick="copyCurl(this, 'nonstream')">Copy</button><span class="comment"># Non-streaming</span>
 curl http://43.128.67.88/v1/chat/completions \
-  -H <span class="string">"Authorization: Bearer 9r-xxxx"</span> \
+  -H <span class="string">"Authorization: Bearer ***"</span> \
   -H <span class="string">"Content-Type: application/json"</span> \
   -d <span class="string">'{
-  "model": "9router/claude-sonnet-4.6",
+  "model": "routers9/claude-sonnet-4.6",
   "messages": [{"role": "user", "content": "Hello!"}]
 }'</span></div>
             <div class="code-block" id="code-stream"><button class="code-copy" onclick="copyCurl(this, 'stream')">Copy</button><span class="comment"># Streaming</span>
 curl http://43.128.67.88/v1/chat/completions \
-  -H <span class="string">"Authorization: Bearer 9r-xxxx"</span> \
+  -H <span class="string">"Authorization: Bearer ***"</span> \
   -H <span class="string">"Content-Type: application/json"</span> \
   -d <span class="string">'{
-  "model": "9router/claude-sonnet-4.6",
+  "model": "routers9/claude-sonnet-4.6",
   "messages": [{"role": "user", "content": "Hello!"}],
   "stream": true
 }'</span></div>
@@ -543,7 +543,7 @@ curl http://43.128.67.88/v1/chat/completions \
         for (var j = 0; j < variants.length; j++) {
           if (variants[j].id === base) { baseName = variants[j].display_name; break; }
         }
-        if (!baseName) baseName = base.replace('9router/', '');
+        if (!baseName) baseName = base.replace('routers9/', '');
         html += '<div class="section-title">' + baseName + '</div>';
         html += '<div class="models-grid">';
         for (var v = 0; v < variants.length; v++) {
@@ -588,9 +588,9 @@ curl http://43.128.67.88/v1/chat/completions \
     function copyCurl(btn, type) {
       var text = '';
       if (type === 'nonstream') {
-        text = "curl http://43.128.67.88/v1/chat/completions \\\\n  -H \\"Authorization: Bearer 9r-xxxx\\" \\\\n  -H \\"Content-Type: application/json\\" \\\\n  -d '{\\n  \\"model\\": \\"9router/claude-sonnet-4.6\\",\\n  \\"messages\\": [{\\"role\\": \\"user\\", \\"content\\": \\"Hello!\\"}]\\n}'";
+        text = "curl http://43.128.67.88/v1/chat/completions \\\\n  -H \\"Authorization: Bearer 9r-xxxx\\" \\\\n  -H \\"Content-Type: application/json\\" \\\\n  -d '{\\n  \\"model\\": \\"routers9/claude-sonnet-4.6\\",\\n  \\"messages\\": [{\\"role\\": \\"user\\", \\"content\\": \\"Hello!\\"}]\\n}'";
       } else {
-        text = "curl http://43.128.67.88/v1/chat/completions \\\\n  -H \\"Authorization: Bearer 9r-xxxx\\" \\\\n  -H \\"Content-Type: application/json\\" \\\\n  -d '{\\n  \\"model\\": \\"9router/claude-sonnet-4.6\\",\\n  \\"messages\\": [{\\"role\\": \\"user\\", \\"content\\": \\"Hello!\\"}],\\n  \\"stream\\": true\\n}'";
+        text = "curl http://43.128.67.88/v1/chat/completions \\\\n  -H \\"Authorization: Bearer 9r-xxxx\\" \\\\n  -H \\"Content-Type: application/json\\" \\\\n  -d '{\\n  \\"model\\": \\"routers9/claude-sonnet-4.6\\",\\n  \\"messages\\": [{\\"role\\": \\"user\\", \\"content\\": \\"Hello!\\"}],\\n  \\"stream\\": true\\n}'";
       }
       navigator.clipboard.writeText(text);
       btn.textContent = 'Copied!';
@@ -610,68 +610,166 @@ function publicDashboardPage(): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>9router Public</title>
+  <title>Routers9 Public</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { -webkit-tap-highlight-color: transparent; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #0f172a;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(124,58,237,0.18), transparent 55%),
+        radial-gradient(900px 500px at 100% 0%, rgba(37,99,235,0.16), transparent 50%),
+        radial-gradient(800px 500px at 50% 100%, rgba(16,185,129,0.08), transparent 55%),
+        #070b16;
       color: #e2e8f0;
       min-height: 100vh;
       overflow-x: hidden;
     }
-    .layout { display: flex; min-height: 100vh; }
+    .layout { display: flex; min-height: 100vh; position: relative; }
 
     /* === DESKTOP SIDEBAR === */
     .sidebar {
-      width: 220px;
-      background: #1e293b;
-      border-right: 1px solid #334155;
-      padding: 1.5rem 0;
+      width: 232px;
+      background: linear-gradient(180deg, rgba(15,23,42,0.95) 0%, rgba(15,23,42,0.82) 100%);
+      backdrop-filter: blur(16px);
+      border-right: 1px solid rgba(148,163,184,0.12);
+      padding: 1.25rem 0.85rem 1.5rem;
       position: fixed;
       height: 100vh;
       overflow-y: auto;
       z-index: 100;
+      box-shadow: 8px 0 40px rgba(0,0,0,0.18);
     }
     .sidebar-header {
-      padding: 0 1.25rem 1.5rem;
-      border-bottom: 1px solid #334155;
-      margin-bottom: 1rem;
+      padding: 0.35rem 0.55rem 1.15rem;
+      border-bottom: 1px solid rgba(148,163,184,0.12);
+      margin-bottom: 0.9rem;
       display: flex;
       flex-wrap: wrap;
       align-items: center;
+      gap: 0.5rem;
     }
-    .sidebar-header h1 { font-size: 1.35rem; font-weight: 700; color: #f8fafc; margin-right: auto; }
-    .sidebar-header p { font-size: 0.75rem; color: #64748b; margin-top: 0.25rem; width: 100%; }
-    .tg-link { color: #94a3b8; transition: color 0.2s; text-decoration: none; display: flex; align-items: center; }
-    .tg-link:hover { color: #3b82f6; }
+    .brand-wrap { display: flex; align-items: center; gap: 0.7rem; margin-right: auto; }
+    .brand-mark {
+      width: 40px; height: 40px; border-radius: 12px;
+      position: relative;
+      display: grid; place-items: center;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,0.18), transparent 40%),
+        linear-gradient(145deg, #7c3aed 0%, #4f46e5 42%, #2563eb 72%, #06b6d4 100%);
+      color: #fff;
+      font-weight: 900;
+      font-size: 0.92rem;
+      letter-spacing: -0.04em;
+      box-shadow:
+        0 10px 24px rgba(124,58,237,0.38),
+        inset 0 1px 0 rgba(255,255,255,0.28),
+        inset 0 -8px 16px rgba(15,23,42,0.18);
+      overflow: hidden;
+    }
+    .brand-mark::before {
+      content: '';
+      position: absolute;
+      inset: 1px;
+      border-radius: 11px;
+      border: 1px solid rgba(255,255,255,0.18);
+      pointer-events: none;
+    }
+    .brand-mark::after {
+      content: '';
+      position: absolute;
+      top: -40%; left: -30%;
+      width: 70%; height: 70%;
+      background: radial-gradient(circle, rgba(255,255,255,0.35), transparent 70%);
+      pointer-events: none;
+    }
+    .brand-mark span {
+      position: relative;
+      z-index: 1;
+      text-shadow: 0 1px 8px rgba(15,23,42,0.35);
+      font-variant-numeric: tabular-nums;
+    }
+    .sidebar-header h1 {
+      font-size: 1.2rem; font-weight: 900; letter-spacing: -0.03em;
+      background: linear-gradient(90deg, #f8fafc 0%, #c4b5fd 45%, #67e8f9 100%);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+      line-height: 1.1;
+    }
+    .sidebar-header p { font-size: 0.72rem; color: #64748b; margin-top: 0.18rem; width: 100%; padding-left: 0.15rem; }
+    .tg-link {
+      color: #94a3b8; transition: all 0.2s; text-decoration: none;
+      display: flex; align-items: center; justify-content: center;
+      width: 34px; height: 34px; border-radius: 10px;
+      border: 1px solid rgba(148,163,184,0.14);
+      background: rgba(15,23,42,0.55);
+    }
+    .tg-link:hover { color: #60a5fa; border-color: rgba(96,165,250,0.45); background: rgba(37,99,235,0.12); transform: translateY(-1px); }
     .nav-item {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
-      padding: 0.75rem 1.25rem;
+      gap: 0.7rem;
+      padding: 0.72rem 0.85rem;
+      margin: 0.18rem 0;
       font-size: 0.9rem;
       color: #94a3b8;
       cursor: pointer;
-      transition: all 0.2s;
-      border-left: 3px solid transparent;
+      transition: all 0.18s ease;
+      border-left: none;
+      border-radius: 12px;
+      font-weight: 500;
     }
-    .nav-item:hover { background: #334155; color: #e2e8f0; }
-    .nav-item.active { background: #334155; color: #f8fafc; border-left-color: #3b82f6; }
+    .nav-item:hover { background: rgba(148,163,184,0.08); color: #e2e8f0; }
+    .nav-item.active {
+      background: linear-gradient(90deg, rgba(124,58,237,0.22), rgba(37,99,235,0.12));
+      color: #f8fafc;
+      box-shadow: inset 0 0 0 1px rgba(167,139,250,0.25);
+    }
+    .nav-item.active .nav-icon { color: #c4b5fd; }
     .nav-icon { width: 18px; height: 18px; flex-shrink: 0; }
 
     /* === MAIN CONTENT === */
     .content {
       flex: 1;
-      margin-left: 220px;
-      padding: 2rem 2.5rem;
+      margin-left: 232px;
+      padding: 2rem 2.5rem 3rem;
       max-width: 1400px;
+      position: relative;
+      z-index: 1;
     }
-    .page { display: none; }
+    .page { display: none; animation: pageIn 0.28s ease; }
     .page.active { display: block; }
-    .page-title { font-size: 1.5rem; font-weight: 600; color: #f8fafc; margin-bottom: 0.5rem; }
-    .page-desc { font-size: 0.875rem; color: #64748b; margin-bottom: 1.5rem; }
+    @keyframes pageIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .page-header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 1rem; flex-wrap: wrap; margin-bottom: 1.25rem;
+    }
+    .page-title {
+      font-size: 1.65rem; font-weight: 800; letter-spacing: -0.03em;
+      color: #f8fafc; margin-bottom: 0.35rem;
+    }
+    .page-title span.grad {
+      background: linear-gradient(90deg, #c4b5fd, #60a5fa, #34d399);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .page-desc { font-size: 0.9rem; color: #94a3b8; margin-bottom: 0; line-height: 1.5; max-width: 48rem; }
+    .live-dot {
+      display: inline-flex; align-items: center; gap: 0.45rem;
+      font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+      color: #86efac; background: rgba(22,163,74,0.12); border: 1px solid rgba(74,222,128,0.25);
+      padding: 0.35rem 0.7rem; border-radius: 999px;
+    }
+    .live-dot::before {
+      content: ''; width: 8px; height: 8px; border-radius: 999px; background: #4ade80;
+      box-shadow: 0 0 0 0 rgba(74,222,128,0.55); animation: livePulse 1.6s infinite;
+    }
+    @keyframes livePulse {
+      0% { box-shadow: 0 0 0 0 rgba(74,222,128,0.55); }
+      70% { box-shadow: 0 0 0 8px rgba(74,222,128,0); }
+      100% { box-shadow: 0 0 0 0 rgba(74,222,128,0); }
+    }
 
     /* === STATS GRID === */
     .stats-grid {
@@ -681,132 +779,312 @@ function publicDashboardPage(): string {
       margin-bottom: 2rem;
     }
     .stat-card {
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 12px;
-      padding: 1.25rem 1.5rem;
-      transition: transform 0.2s, border-color 0.2s;
+      background: linear-gradient(180deg, rgba(30,41,59,0.9), rgba(15,23,42,0.75));
+      border: 1px solid rgba(148,163,184,0.14);
+      border-radius: 16px;
+      padding: 1.15rem 1.25rem;
+      transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+      position: relative;
+      overflow: hidden;
     }
-    .stat-card:hover { transform: translateY(-2px); border-color: #3b82f6; }
-    .stat-label { font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
-    .stat-value { font-size: 1.75rem; font-weight: 700; color: #f8fafc; }
-    .stat-value.blue { color: #3b82f6; }
+    .stat-card::after {
+      content: ''; position: absolute; inset: auto -20% -40% auto; width: 120px; height: 120px;
+      background: radial-gradient(circle, rgba(96,165,250,0.18), transparent 70%);
+      pointer-events: none;
+    }
+    .stat-card:hover { transform: translateY(-3px); border-color: rgba(96,165,250,0.35); box-shadow: 0 14px 30px rgba(0,0,0,0.22); }
+    .stat-label { font-size: 0.72rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.45rem; font-weight: 600; }
+    .stat-value { font-size: 1.7rem; font-weight: 800; color: #f8fafc; letter-spacing: -0.02em; }
+    .stat-value.blue { color: #60a5fa; }
     .stat-value.green { color: #4ade80; }
     .stat-value.yellow { color: #fbbf24; }
 
     /* === TABLES === */
-    .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .table-wrapper {
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
+      background: rgba(15,23,42,0.55);
+      border: 1px solid rgba(148,163,184,0.12);
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+    }
     table { width: 100%; border-collapse: collapse; min-width: 700px; }
     th {
       text-align: left;
-      font-size: 0.75rem;
-      color: #64748b;
+      font-size: 0.72rem;
+      color: #94a3b8;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
-      padding: 0.75rem 1rem;
-      border-bottom: 2px solid #334155;
+      letter-spacing: 0.06em;
+      padding: 0.9rem 1rem;
+      border-bottom: 1px solid rgba(148,163,184,0.12);
       position: sticky;
       top: 0;
-      background: #0f172a;
+      background: rgba(15,23,42,0.95);
+      backdrop-filter: blur(8px);
       z-index: 10;
+      font-weight: 700;
     }
     td {
       font-size: 0.875rem;
-      padding: 0.875rem 1rem;
-      border-bottom: 1px solid #1e293b;
+      padding: 0.95rem 1rem;
+      border-bottom: 1px solid rgba(148,163,184,0.07);
     }
-    tr:hover td { background: #1e293b; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(96,165,250,0.05); }
 
     /* === BADGES === */
     .badge {
       display: inline-block;
-      font-size: 0.75rem;
-      padding: 0.25rem 0.625rem;
-      border-radius: 6px;
-      font-weight: 600;
+      font-size: 0.72rem;
+      padding: 0.28rem 0.65rem;
+      border-radius: 999px;
+      font-weight: 700;
+      border: 1px solid transparent;
     }
-    .badge-green { background: #052e16; color: #4ade80; }
-    .badge-blue { background: #1e3a5f; color: #60a5fa; }
-    .badge-yellow { background: #451a03; color: #fbbf24; }
-    .badge-red { background: #450a0a; color: #f87171; }
+    .badge-green { background: rgba(22,163,74,0.15); color: #4ade80; border-color: rgba(74,222,128,0.2); }
+    .badge-blue { background: rgba(37,99,235,0.15); color: #60a5fa; border-color: rgba(96,165,250,0.2); }
+    .badge-yellow { background: rgba(202,138,4,0.15); color: #fbbf24; border-color: rgba(251,191,36,0.2); }
+    .badge-red { background: rgba(220,38,38,0.15); color: #f87171; border-color: rgba(248,113,113,0.2); }
 
     /* === RANK === */
-    .rank { font-weight: 700; color: #64748b; font-size: 0.875rem; }
-    .rank-1 { color: #fbbf24; }
-    .rank-2 { color: #d1d5db; }
-    .rank-3 { color: #d97706; }
+    .rank { font-weight: 800; color: #64748b; font-size: 0.9rem; }
+    .rank-1, .rank-2, .rank-3 {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 1.75rem;
+      height: 1.75rem;
+      border-radius: 999px;
+      font-weight: 800;
+      font-size: 0.85rem;
+      letter-spacing: -0.02em;
+    }
+    .rank-1 {
+      color: #fef3c7;
+      background: linear-gradient(135deg, rgba(251,191,36,0.28), rgba(245,158,11,0.12));
+      border: 1px solid rgba(251,191,36,0.35);
+      box-shadow: 0 0 0 0 rgba(251,191,36,0.35);
+      animation: rankGoldPulse 2.4s ease-in-out infinite;
+    }
+    .rank-2 {
+      color: #f8fafc;
+      background: linear-gradient(135deg, rgba(226,232,240,0.22), rgba(148,163,184,0.1));
+      border: 1px solid rgba(226,232,240,0.28);
+      animation: rankSilverShimmer 3s ease-in-out infinite;
+    }
+    .rank-3 {
+      color: #ffedd5;
+      background: linear-gradient(135deg, rgba(251,146,60,0.25), rgba(217,119,6,0.1));
+      border: 1px solid rgba(251,146,60,0.3);
+      animation: rankBronzeGlow 2.8s ease-in-out infinite;
+    }
+    @keyframes rankGoldPulse {
+      0%, 100% {
+        transform: translateY(0) scale(1);
+        box-shadow: 0 0 0 0 rgba(251,191,36,0.0), 0 0 14px rgba(251,191,36,0.28);
+        text-shadow: 0 0 10px rgba(251,191,36,0.35);
+      }
+      50% {
+        transform: translateY(-1px) scale(1.05);
+        box-shadow: 0 0 0 5px rgba(251,191,36,0.08), 0 0 22px rgba(251,191,36,0.45);
+        text-shadow: 0 0 16px rgba(251,191,36,0.55);
+      }
+    }
+    @keyframes rankSilverShimmer {
+      0%, 100% {
+        transform: translateY(0);
+        box-shadow: 0 0 10px rgba(226,232,240,0.12);
+        filter: brightness(1);
+      }
+      50% {
+        transform: translateY(-1px);
+        box-shadow: 0 0 16px rgba(226,232,240,0.28);
+        filter: brightness(1.08);
+      }
+    }
+    @keyframes rankBronzeGlow {
+      0%, 100% {
+        transform: translateY(0);
+        box-shadow: 0 0 10px rgba(251,146,60,0.14);
+      }
+      50% {
+        transform: translateY(-1px);
+        box-shadow: 0 0 18px rgba(251,146,60,0.32);
+      }
+    }
+    tr.top-row td {
+      background: transparent;
+      transition: background 0.25s ease;
+    }
+    tr.top-1 td {
+      background: linear-gradient(90deg, rgba(251,191,36,0.10), rgba(251,191,36,0.02) 55%, transparent);
+      animation: topRowGold 3.2s ease-in-out infinite;
+    }
+    tr.top-2 td {
+      background: linear-gradient(90deg, rgba(226,232,240,0.08), rgba(226,232,240,0.015) 55%, transparent);
+      animation: topRowSilver 3.6s ease-in-out infinite;
+    }
+    tr.top-3 td {
+      background: linear-gradient(90deg, rgba(251,146,60,0.09), rgba(251,146,60,0.015) 55%, transparent);
+      animation: topRowBronze 3.4s ease-in-out infinite;
+    }
+    tr.top-1:hover td { background: linear-gradient(90deg, rgba(251,191,36,0.16), rgba(251,191,36,0.04) 60%, transparent); }
+    tr.top-2:hover td { background: linear-gradient(90deg, rgba(226,232,240,0.12), rgba(226,232,240,0.03) 60%, transparent); }
+    tr.top-3:hover td { background: linear-gradient(90deg, rgba(251,146,60,0.14), rgba(251,146,60,0.03) 60%, transparent); }
+    @keyframes topRowGold {
+      0%, 100% { box-shadow: inset 3px 0 0 rgba(251,191,36,0.35); }
+      50% { box-shadow: inset 3px 0 0 rgba(251,191,36,0.75); }
+    }
+    @keyframes topRowSilver {
+      0%, 100% { box-shadow: inset 3px 0 0 rgba(226,232,240,0.25); }
+      50% { box-shadow: inset 3px 0 0 rgba(226,232,240,0.55); }
+    }
+    @keyframes topRowBronze {
+      0%, 100% { box-shadow: inset 3px 0 0 rgba(251,146,60,0.28); }
+      50% { box-shadow: inset 3px 0 0 rgba(251,146,60,0.6); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .rank-1, .rank-2, .rank-3,
+      tr.top-1 td, tr.top-2 td, tr.top-3 td {
+        animation: none !important;
+      }
+    }
 
     /* === KEY PREFIX === */
     .key-prefix {
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 0.875rem;
-      color: #60a5fa;
-      font-weight: 500;
+      font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace;
+      font-size: 0.85rem;
+      color: #93c5fd;
+      font-weight: 600;
     }
 
     /* === CHART === */
     .chart-container {
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 12px;
-      padding: 1.5rem;
-      margin-bottom: 2rem;
+      background: linear-gradient(180deg, rgba(30,41,59,0.85), rgba(15,23,42,0.7));
+      border: 1px solid rgba(148,163,184,0.14);
+      border-radius: 18px;
+      padding: 1.35rem 1.4rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.18);
     }
     .chart-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 1.25rem;
+      margin-bottom: 1.1rem;
       flex-wrap: wrap;
       gap: 0.75rem;
     }
-    .chart-title { font-size: 1rem; font-weight: 600; color: #f8fafc; }
-    .range-selector { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .chart-title { font-size: 1rem; font-weight: 700; color: #f8fafc; }
+    .range-selector { display: flex; gap: 0.4rem; flex-wrap: wrap; }
     .range-btn {
-      font-size: 0.875rem;
-      padding: 0.5rem 1rem;
-      border-radius: 6px;
-      background: #0f172a;
-      border: 1px solid #334155;
+      font-size: 0.8rem;
+      padding: 0.42rem 0.8rem;
+      border-radius: 999px;
+      background: rgba(15,23,42,0.7);
+      border: 1px solid rgba(148,163,184,0.14);
       color: #94a3b8;
       cursor: pointer;
       transition: all 0.2s;
-      font-weight: 500;
+      font-weight: 600;
     }
-    .range-btn:hover { border-color: #3b82f6; color: #e2e8f0; }
-    .range-btn.active { background: #3b82f6; border-color: #3b82f6; color: white; }
+    .range-btn:hover { border-color: rgba(96,165,250,0.4); color: #e2e8f0; }
+    .range-btn.active {
+      background: linear-gradient(90deg, #7c3aed, #2563eb);
+      border-color: transparent;
+      color: white;
+      box-shadow: 0 6px 16px rgba(37,99,235,0.28);
+    }
     .chart-svg { width: 100%; height: 320px; }
     .chart-legend {
       display: flex;
-      gap: 1.5rem;
-      margin-top: 1rem;
-      font-size: 0.875rem;
+      gap: 1.25rem;
+      margin-top: 0.9rem;
+      font-size: 0.85rem;
       color: #94a3b8;
     }
-    .chart-legend-item { display: flex; align-items: center; gap: 0.5rem; }
-    .chart-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .chart-legend-item { display: flex; align-items: center; gap: 0.45rem; font-weight: 600; }
+    .chart-dot { width: 10px; height: 10px; border-radius: 50%; box-shadow: 0 0 10px currentColor; }
 
     /* === LOADING & EMPTY === */
-    .loading { text-align: center; padding: 3rem; color: #64748b; font-size: 1rem; }
+    .loading { text-align: center; padding: 3rem; color: #94a3b8; font-size: 0.95rem; }
     .pulse { animation: pulse 1.5s infinite; }
     @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-    .empty { text-align: center; padding: 4rem 2rem; color: #64748b; font-size: 1rem; }
-    .updated-at { font-size: 0.75rem; color: #64748b; }
+    .empty {
+      text-align: center; padding: 3.5rem 1.5rem; color: #94a3b8; font-size: 0.95rem;
+      border: 1px dashed rgba(148,163,184,0.18); border-radius: 16px; background: rgba(15,23,42,0.35);
+    }
+    .updated-at {
+      font-size: 0.75rem; color: #94a3b8; font-weight: 600;
+      background: rgba(15,23,42,0.55); border: 1px solid rgba(148,163,184,0.12);
+      padding: 0.35rem 0.7rem; border-radius: 999px;
+    }
 
     /* === MODEL TAG === */
     .model-tag {
       display: inline-block;
-      background: #0f172a;
-      border: 1px solid #334155;
-      border-radius: 6px;
-      padding: 0.375rem 0.75rem;
-      font-size: 0.875rem;
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      color: #60a5fa;
+      background: rgba(15,23,42,0.7);
+      border: 1px solid rgba(148,163,184,0.16);
+      border-radius: 10px;
+      padding: 0.45rem 0.8rem;
+      font-size: 0.85rem;
+      font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace;
+      color: #93c5fd;
       margin: 0.25rem;
       transition: all 0.2s;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.12);
     }
-    .model-tag:hover { border-color: #3b82f6; background: #1e293b; }
+    .model-tag:hover {
+      border-color: rgba(167,139,250,0.45);
+      background: rgba(124,58,237,0.12);
+      color: #c4b5fd;
+      transform: translateY(-1px);
+    }
+
+    /* === SEARCH === */
+    .search-box {
+      margin: 0 0 1rem 0;
+      display: flex;
+      gap: 0.55rem;
+      align-items: center;
+      flex-wrap: wrap;
+      background: rgba(15,23,42,0.45);
+      border: 1px solid rgba(148,163,184,0.12);
+      border-radius: 14px;
+      padding: 0.55rem;
+    }
+    .search-box input {
+      flex: 1; min-width: 220px;
+      padding: 0.7rem 0.9rem;
+      border-radius: 10px;
+      border: 1px solid rgba(148,163,184,0.14);
+      background: rgba(7,11,22,0.75);
+      color: #f8fafc;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .search-box input:focus {
+      border-color: rgba(124,58,237,0.55);
+      box-shadow: 0 0 0 3px rgba(124,58,237,0.15);
+    }
+    .search-box button {
+      padding: 0.7rem 1rem;
+      border-radius: 10px;
+      border: 1px solid rgba(148,163,184,0.14);
+      background: rgba(30,41,59,0.85);
+      color: #e2e8f0;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 700;
+      transition: all 0.2s;
+    }
+    .search-box button:hover { border-color: rgba(96,165,250,0.4); color: #fff; }
+    .search-box button.primary {
+      background: linear-gradient(90deg, #7c3aed, #2563eb);
+      border-color: transparent;
+      color: #fff;
+    }
+    .search-box button.primary:hover { filter: brightness(1.08); }
 
     /* === MOBILE (< 768px) === */
     @media (max-width: 768px) {
@@ -817,103 +1095,318 @@ function publicDashboardPage(): string {
         position: relative;
         padding: 0;
         border-right: none;
-        border-bottom: 1px solid #334155;
+        border-bottom: 1px solid rgba(148,163,184,0.12);
+        box-shadow: none;
+        backdrop-filter: blur(12px);
       }
       .sidebar-header {
-        padding: 1rem;
+        padding: 0.9rem 1rem;
         margin-bottom: 0;
-        border-bottom: 1px solid #334155;
+        border-bottom: 1px solid rgba(148,163,184,0.12);
         display: flex;
         align-items: center;
         justify-content: space-between;
+        gap: 0.5rem;
       }
-      .sidebar-header h1 { font-size: 1.25rem; }
+      .sidebar-header h1 { font-size: 1.1rem; }
       .sidebar-header p { display: none; }
+      .brand-mark { width: 34px; height: 34px; border-radius: 10px; font-size: 0.8rem; }
       nav {
         display: flex;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
         scrollbar-width: none;
+        padding: 0.25rem 0.35rem 0.45rem;
+        gap: 0.15rem;
       }
       nav::-webkit-scrollbar { display: none; }
-      .tg-link svg { width: 20px; height: 20px; }
+      .tg-link svg { width: 18px; height: 18px; }
       .nav-item {
         flex: 1;
-        min-width: 80px;
-        padding: 0.875rem 0.5rem;
-        font-size: 0.75rem;
+        min-width: 72px;
+        padding: 0.7rem 0.4rem;
+        font-size: 0.7rem;
         flex-direction: column;
-        gap: 0.375rem;
+        gap: 0.3rem;
         border-left: none;
-        border-bottom: 2px solid transparent;
+        border-bottom: none;
         text-align: center;
+        margin: 0;
+        border-radius: 12px;
       }
-      .nav-item.active { border-bottom-color: #3b82f6; background: transparent; }
+      .nav-item.active {
+        border-bottom: none;
+        background: linear-gradient(180deg, rgba(124,58,237,0.22), rgba(37,99,235,0.12));
+      }
       .nav-item:hover { background: transparent; }
-      .nav-icon { width: 20px; height: 20px; }
-      .content { margin-left: 0; padding: 1.25rem 1rem; }
-      .page-title { font-size: 1.25rem; }
-      .page-desc { font-size: 0.875rem; margin-bottom: 1.25rem; }
+      .nav-item.active:hover { background: linear-gradient(180deg, rgba(124,58,237,0.22), rgba(37,99,235,0.12)); }
+      .nav-icon { width: 18px; height: 18px; }
+      .content { margin-left: 0; padding: 1.15rem 0.9rem 2rem; }
+      .page-title { font-size: 1.3rem; }
+      .page-desc { font-size: 0.85rem; }
       .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
-      .stat-card { padding: 1rem; }
-      .stat-label { font-size: 0.7rem; }
-      .stat-value { font-size: 1.35rem; }
-      th, td { padding: 0.625rem 0.75rem; }
-      th { font-size: 0.7rem; }
-      td { font-size: 0.813rem; }
-      .chart-container { padding: 1rem; }
+      .stat-card { padding: 1rem; border-radius: 14px; }
+      .stat-label { font-size: 0.68rem; }
+      .stat-value { font-size: 1.25rem; }
+      th, td { padding: 0.65rem 0.75rem; }
+      th { font-size: 0.68rem; }
+      td { font-size: 0.8rem; }
+      .chart-container { padding: 1rem; border-radius: 14px; }
       .chart-title { font-size: 0.875rem; }
-      .range-btn { font-size: 0.75rem; padding: 0.375rem 0.75rem; }
+      .range-btn { font-size: 0.72rem; padding: 0.35rem 0.65rem; }
       .chart-svg { height: 180px; }
+      .search-box { padding: 0.45rem; border-radius: 12px; }
     }
 
     /* === TABLET (769px - 1024px) === */
     @media (min-width: 769px) and (max-width: 1024px) {
-      .sidebar { width: 180px; }
-      .content { margin-left: 180px; padding: 1.5rem 1.75rem; }
+      .sidebar { width: 196px; padding: 1rem 0.65rem 1.25rem; }
+      .content { margin-left: 196px; padding: 1.5rem 1.5rem; }
       .stats-grid { grid-template-columns: repeat(3, 1fr); }
     }
 
     /* === LARGE DESKTOP (> 1440px) === */
     @media (min-width: 1441px) {
-      .sidebar { width: 240px; }
-      .content { margin-left: 240px; padding: 2.5rem 3rem; }
-      .page-title { font-size: 1.75rem; }
+      .sidebar { width: 248px; }
+      .content { margin-left: 248px; padding: 2.5rem 3rem 3.5rem; }
+      .page-title { font-size: 1.85rem; }
     }
 
     /* === OVERVIEW STATS & SORTABLE === */
     .overview-stats {
-      display: flex;
-      gap: 0.75rem;
-      margin-bottom: 1.5rem;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 0.85rem;
+      margin-bottom: 1.25rem;
     }
-    .stat-card {
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 0.5rem;
-      padding: 0.85rem 1rem;
-      flex: 1;
-      min-width: 110px;
-      text-align: center;
+    .overview-stats .stat-card {
+      text-align: left;
+      min-width: 0;
+      padding: 1.05rem 1.15rem;
     }
-    .stat-value { font-size: 1.25rem; font-weight: 700; color: #f8fafc; }
-    .stat-label { font-size: 0.7rem; color: #64748b; margin-top: 0.25rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .overview-stats .stat-value {
+      font-size: 1.55rem;
+      background: linear-gradient(90deg, #f8fafc, #93c5fd);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .overview-stats .stat-label { margin-top: 0.35rem; margin-bottom: 0; }
     .sortable { cursor: pointer; user-select: none; white-space: nowrap; }
-    .sortable:hover { color: #f8fafc; }
+    .sortable:hover { color: #e2e8f0; }
     .sort-arrow { font-size: 0.65rem; margin-left: 2px; }
     .sort-arrow.inactive { opacity: 0.3; }
+
+    /* === PRICES === */
+    .prices-hero {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 55%, #1e1b4b 100%);
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 1.5rem 1.75rem;
+      margin-bottom: 1.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .prices-hero::before {
+      content: '';
+      position: absolute;
+      top: -40px; right: -30px;
+      width: 160px; height: 160px;
+      background: radial-gradient(circle, rgba(168,85,247,0.25), transparent 70%);
+      pointer-events: none;
+    }
+    .prices-hero-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #f8fafc;
+      margin-bottom: 0.35rem;
+    }
+    .prices-hero-sub {
+      font-size: 0.9rem;
+      color: #94a3b8;
+      line-height: 1.5;
+      max-width: 640px;
+    }
+    .prices-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+    .price-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.4rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      border: 1px solid #334155;
+      background: rgba(15, 23, 42, 0.7);
+      color: #e2e8f0;
+    }
+    .price-pill.purple { border-color: #7c3aed; color: #c4b5fd; background: rgba(124, 58, 237, 0.15); }
+    .price-pill.blue { border-color: #2563eb; color: #93c5fd; background: rgba(37, 99, 235, 0.15); }
+    .price-pill.green { border-color: #16a34a; color: #86efac; background: rgba(22, 163, 74, 0.15); }
+    .price-pill.yellow { border-color: #ca8a04; color: #fde68a; background: rgba(202, 138, 4, 0.15); }
+
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .price-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 1.35rem 1.25rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+    }
+    .price-card:hover {
+      transform: translateY(-4px);
+      border-color: #475569;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.25);
+    }
+    .price-card.featured {
+      border-color: #7c3aed;
+      background: linear-gradient(180deg, rgba(124,58,237,0.18) 0%, #1e293b 45%);
+      box-shadow: 0 0 0 1px rgba(124,58,237,0.25), 0 16px 40px rgba(124,58,237,0.12);
+    }
+    .price-card.featured:hover { border-color: #a78bfa; }
+    .price-badge {
+      position: absolute;
+      top: -11px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(90deg, #7c3aed, #2563eb);
+      color: white;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 0.28rem 0.7rem;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    .price-tier {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 0.5rem;
+    }
+    .price-amount {
+      font-size: 1.85rem;
+      font-weight: 800;
+      color: #f8fafc;
+      line-height: 1.1;
+      margin-bottom: 0.2rem;
+    }
+    .price-amount span {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #94a3b8;
+      margin-right: 0.15rem;
+    }
+    .price-period {
+      font-size: 0.82rem;
+      color: #64748b;
+      margin-bottom: 1rem;
+    }
+    .price-features {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+      margin: 0 0 1.25rem;
+      flex: 1;
+    }
+    .price-features li {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.55rem;
+      font-size: 0.88rem;
+      color: #e2e8f0;
+      line-height: 1.35;
+    }
+    .price-check {
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      background: rgba(74, 222, 128, 0.15);
+      color: #4ade80;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 0.7rem;
+      font-weight: 700;
+      margin-top: 1px;
+    }
+    .price-cta {
+      display: block;
+      text-align: center;
+      text-decoration: none;
+      padding: 0.8rem 1rem;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+      border: 1px solid #334155;
+      background: #0f172a;
+      color: #e2e8f0;
+    }
+    .price-cta:hover { border-color: #3b82f6; color: #fff; background: #1e293b; }
+    .price-cta.primary {
+      background: linear-gradient(90deg, #7c3aed, #2563eb);
+      border-color: transparent;
+      color: #fff;
+    }
+    .price-cta.primary:hover {
+      filter: brightness(1.08);
+      box-shadow: 0 8px 20px rgba(124,58,237,0.3);
+    }
+    .prices-note {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 1.1rem 1.25rem;
+      color: #94a3b8;
+      font-size: 0.88rem;
+      line-height: 1.55;
+    }
+    .prices-note strong { color: #e2e8f0; }
+    .prices-note a { color: #60a5fa; text-decoration: none; font-weight: 600; }
+    .prices-note a:hover { text-decoration: underline; }
+
+    @media (max-width: 1024px) {
+      .pricing-grid { grid-template-columns: 1fr; max-width: 420px; }
+      .price-card.featured { order: -1; }
+    }
+    @media (max-width: 768px) {
+      .prices-hero { padding: 1.15rem 1rem; }
+      .price-amount { font-size: 1.6rem; }
+      .pricing-grid { max-width: none; }
+    }
   </style>
 </head>
 <body>
   <div class="layout">
     <aside class="sidebar">
       <div class="sidebar-header">
-        <h1>9router</h1>
-        <a href="https://t.me/routers_9" target="_blank" rel="noopener" class="tg-link" title="Telegram">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+        <div class="brand-wrap">
+          <div class="brand-mark" title="Routers9"><span>R9</span></div>
+          <div>
+            <h1>Routers9</h1>
+          </div>
+        </div>
+        <a href="https://t.me/grokapi_id" target="_blank" rel="noopener" class="tg-link" title="Telegram">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
         </a>
-        <p>Public Dashboard</p>
+        <p>Public Dashboard · Grok 4.5 API</p>
       </div>
       <nav>
         <div class="nav-item active" data-page="leaderboard" onclick="switchPage('leaderboard')">
@@ -932,34 +1425,72 @@ function publicDashboardPage(): string {
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
           <span class="nav-label">Models</span>
         </div>
+        <div class="nav-item" data-page="prices" onclick="switchPage('prices')">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          <span class="nav-label">Prices</span>
+        </div>
       </nav>
     </aside>
 
     <main class="content">
       <!-- Leaderboard -->
       <div class="page active" id="page-leaderboard">
-        <h2 class="page-title">Leaderboard</h2>
-        <p class="page-desc">Top API keys by request count and token usage</p>
+        <div class="page-header">
+          <div>
+            <h2 class="page-title"><span class="grad">Leaderboard</span></h2>
+            <p class="page-desc">Top API keys by request count and token usage</p>
+          </div>
+        </div>
         <div class="overview-stats" id="overview-stats"></div>
+        <div class="search-box">
+          <input
+            id="lb-search"
+            type="search"
+            placeholder="Cari nama user atau paste API key..."
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button
+            id="lb-search-btn"
+            type="button"
+            class="primary"
+            onclick="runLeaderboardSearch()"
+          >Cari</button>
+          <button
+            id="lb-search-clear"
+            type="button"
+            onclick="clearLeaderboardSearch()"
+          >Reset</button>
+        </div>
+        <div id="lb-search-meta" style="font-size:0.8rem;color:#94a3b8;margin:-0.35rem 0 0.85rem 0;min-height:1.1em"></div>
         <div class="loading pulse" id="lb-loading">Loading...</div>
         <div id="lb-content" style="display:none"></div>
       </div>
 
       <!-- Live -->
       <div class="page" id="page-live">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
-          <h2 class="page-title">Live Usage</h2>
-          <span class="updated-at" id="live-updated">-</span>
+        <div class="page-header">
+          <div>
+            <h2 class="page-title"><span class="grad">Live Usage</span></h2>
+            <p class="page-desc">Active API keys in the last 5 minutes</p>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.55rem;flex-wrap:wrap">
+            <span class="live-dot">Live</span>
+            <span class="updated-at" id="live-updated">-</span>
+          </div>
         </div>
-        <p class="page-desc">Active API keys in the last 5 minutes</p>
         <div class="loading pulse" id="live-loading">Loading...</div>
         <div id="live-content" style="display:none"></div>
       </div>
 
       <!-- Usage -->
       <div class="page" id="page-usage">
-        <h2 class="page-title">Usage</h2>
-        <p class="page-desc">Recent API requests</p>
+        <div class="page-header">
+          <div>
+            <h2 class="page-title"><span class="grad">Usage</span></h2>
+            <p class="page-desc">Recent API requests and traffic trends</p>
+          </div>
+        </div>
         <div class="chart-container">
           <div class="chart-header">
             <span class="chart-title">Requests & Tokens</span>
@@ -976,8 +1507,8 @@ function publicDashboardPage(): string {
           </div>
           <svg class="chart-svg" id="usage-chart" viewBox="0 0 800 250" preserveAspectRatio="none"></svg>
           <div class="chart-legend">
-            <div class="chart-legend-item"><div class="chart-dot" style="background:#3b82f6"></div>Requests</div>
-            <div class="chart-legend-item"><div class="chart-dot" style="background:#fbbf24"></div>Tokens</div>
+            <div class="chart-legend-item"><div class="chart-dot" style="background:#3b82f6;color:#3b82f6"></div>Requests</div>
+            <div class="chart-legend-item"><div class="chart-dot" style="background:#fbbf24;color:#fbbf24"></div>Tokens</div>
           </div>
         </div>
         <div class="loading pulse" id="usage-loading">Loading...</div>
@@ -986,10 +1517,90 @@ function publicDashboardPage(): string {
 
       <!-- Models -->
       <div class="page" id="page-models">
-        <h2 class="page-title">Available Models</h2>
-        <p class="page-desc">Click any model ID to copy it</p>
+        <div class="page-header">
+          <div>
+            <h2 class="page-title"><span class="grad">Available Models</span></h2>
+            <p class="page-desc">Click any model ID to copy it</p>
+          </div>
+        </div>
         <div class="loading pulse" id="models-loading">Loading...</div>
         <div id="models-content" style="display:none"></div>
+      </div>
+
+      <!-- Prices -->
+      <div class="page" id="page-prices">
+        <div class="page-header">
+          <div>
+            <h2 class="page-title"><span class="grad">Harga / Prices</span></h2>
+            <p class="page-desc">Paket akses Routers9 — bayar sekali, langsung pakai</p>
+          </div>
+        </div>
+
+        <div class="prices-hero">
+          <div class="prices-hero-title">Akses Grok 4.5 lewat API OpenAI-compatible</div>
+          <div class="prices-hero-sub">
+            Semua paket sudah include model <strong style="color:#c4b5fd">Grok 4.5</strong>, rate limit
+            <strong style="color:#93c5fd">50 RPM</strong>, dan endpoint siap pakai. Order cepat via Telegram.
+          </div>
+          <div class="prices-pills">
+            <span class="price-pill purple">Grok 4.5</span>
+            <span class="price-pill blue">50 RPM</span>
+            <span class="price-pill green">OpenAI Compatible</span>
+            <span class="price-pill yellow">Aktif Instant</span>
+          </div>
+        </div>
+
+        <div class="pricing-grid">
+          <div class="price-card">
+            <div class="price-tier">Starter</div>
+            <div class="price-amount"><span>Rp</span>100.000</div>
+            <div class="price-period">masa aktif 7 hari</div>
+            <ul class="price-features">
+              <li><span class="price-check">✓</span><span><strong>100M</strong> token quota</span></li>
+              <li><span class="price-check">✓</span><span>Akses <strong>Grok 4.5</strong></span></li>
+              <li><span class="price-check">✓</span><span>Rate limit <strong>50 RPM</strong></span></li>
+              <li><span class="price-check">✓</span><span>API key pribadi</span></li>
+              <li><span class="price-check">✓</span><span>Cocok buat coba / light use</span></li>
+            </ul>
+            <a class="price-cta" href="https://t.me/routers9" target="_blank" rel="noopener">Order via Telegram</a>
+          </div>
+
+          <div class="price-card featured">
+            <div class="price-badge">Paling Laris</div>
+            <div class="price-tier" style="color:#c4b5fd">Pro</div>
+            <div class="price-amount"><span>Rp</span>200.000</div>
+            <div class="price-period">masa aktif 14 hari</div>
+            <ul class="price-features">
+              <li><span class="price-check">✓</span><span><strong>250M</strong> token quota</span></li>
+              <li><span class="price-check">✓</span><span>Akses <strong>Grok 4.5</strong></span></li>
+              <li><span class="price-check">✓</span><span>Rate limit <strong>50 RPM</strong></span></li>
+              <li><span class="price-check">✓</span><span>API key pribadi</span></li>
+              <li><span class="price-check">✓</span><span>Best value buat daily use</span></li>
+            </ul>
+            <a class="price-cta primary" href="https://t.me/routers9" target="_blank" rel="noopener">Order Pro Sekarang</a>
+          </div>
+
+          <div class="price-card">
+            <div class="price-tier">Ultra</div>
+            <div class="price-amount"><span>Rp</span>300.000</div>
+            <div class="price-period">masa aktif 28 hari</div>
+            <ul class="price-features">
+              <li><span class="price-check">✓</span><span><strong>500M</strong> token quota</span></li>
+              <li><span class="price-check">✓</span><span>Akses <strong>Grok 4.5</strong></span></li>
+              <li><span class="price-check">✓</span><span>Rate limit <strong>50 RPM</strong></span></li>
+              <li><span class="price-check">✓</span><span>API key pribadi</span></li>
+              <li><span class="price-check">✓</span><span>Paling hemat per token</span></li>
+            </ul>
+            <a class="price-cta" href="https://t.me/routers9" target="_blank" rel="noopener">Order via Telegram</a>
+          </div>
+        </div>
+
+        <div class="prices-note">
+          <strong>Cara order:</strong> chat Telegram
+          <a href="https://t.me/routers9" target="_blank" rel="noopener">@routers9</a>
+          → sebut paket (Starter / Pro / Ultra) → bayar → key dikirim instant.<br/>
+          Semua paket: endpoint OpenAI-compatible, akses <strong>Grok 4.5</strong>, rate limit <strong>50 request/menit</strong>.
+        </div>
       </div>
     </main>
   </div>
@@ -1013,6 +1624,7 @@ function publicDashboardPage(): string {
       else if (page === 'live') { loadLive(); liveInterval = setInterval(loadLive, 10000); }
       else if (page === 'usage') { loadUsage(); loadChart('1d'); }
       else if (page === 'models') loadModels();
+      // prices page is static HTML — no fetch needed
 
       // Scroll to top on page switch
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1044,15 +1656,26 @@ function publicDashboardPage(): string {
     let lbData = [];
     let lbSortKey = 'total_requests';
     let lbSortDir = 'desc';
+    let lbSearchQ = '';
+    let lbSearchTimer = null;
 
-    async function loadLeaderboard() {
+    async function loadLeaderboard(q) {
       try {
-        const [lbRes, overviewRes] = await Promise.all([
-          fetchAPI('/public/leaderboard'),
-          fetchAPI('/public/overview').catch(() => null)
-        ]);
+        const query = (q == null ? lbSearchQ : q).trim();
+        lbSearchQ = query;
         const loading = document.getElementById('lb-loading');
         const content = document.getElementById('lb-content');
+        const meta = document.getElementById('lb-search-meta');
+        loading.style.display = 'block';
+        content.style.display = 'none';
+
+        const lbPath = query
+          ? '/public/leaderboard?q=' + encodeURIComponent(query)
+          : '/public/leaderboard';
+        const [lbRes, overviewRes] = await Promise.all([
+          fetchAPI(lbPath),
+          fetchAPI('/public/overview').catch(() => null)
+        ]);
         loading.style.display = 'none';
         content.style.display = 'block';
 
@@ -1064,16 +1687,56 @@ function publicDashboardPage(): string {
         }
 
         lbData = lbRes.rows || [];
+        if (meta) {
+          if (query) {
+            meta.textContent = 'Hasil pencarian "' + query + '": ' + lbData.length + ' key';
+          } else {
+            meta.textContent = '';
+          }
+        }
         if (lbData.length === 0) {
-          content.innerHTML = '<div class="empty">No usage data yet</div>';
+          content.innerHTML = '<div class="empty">' + (query ? 'Tidak ketemu untuk "' + query + '"' : 'No usage data yet') + '</div>';
           return;
         }
 
         renderLeaderboardTable();
       } catch (e) {
+        document.getElementById('lb-loading').style.display = 'none';
+        document.getElementById('lb-content').style.display = 'block';
         document.getElementById('lb-content').innerHTML = '<div class="empty">Failed to load data</div>';
       }
     }
+
+    function runLeaderboardSearch() {
+      const input = document.getElementById('lb-search');
+      const q = input ? input.value.trim() : '';
+      loadLeaderboard(q);
+    }
+
+    function clearLeaderboardSearch() {
+      const input = document.getElementById('lb-search');
+      if (input) input.value = '';
+      lbSearchQ = '';
+      loadLeaderboard('');
+    }
+
+    function scheduleLeaderboardSearch() {
+      if (lbSearchTimer) clearTimeout(lbSearchTimer);
+      lbSearchTimer = setTimeout(runLeaderboardSearch, 350);
+    }
+
+    // Bind search events (script is at end of body, so nodes already exist)
+    (function bindLeaderboardSearch() {
+      const input = document.getElementById('lb-search');
+      if (!input) return;
+      input.addEventListener('input', scheduleLeaderboardSearch);
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          runLeaderboardSearch();
+        }
+      });
+    })();
 
     function sortLeaderboard(key) {
       if (lbSortKey === key) {
@@ -1089,7 +1752,7 @@ function publicDashboardPage(): string {
       const sorted = [...lbData].sort((a, b) => {
         let valA = a[lbSortKey];
         let valB = b[lbSortKey];
-        if (lbSortKey === 'total_tokens') {
+        if (lbSortKey === 'total_tokens' || lbSortKey === 'used_tokens' || lbSortKey === 'quota_tokens') {
           valA = Number(valA);
           valB = Number(valB);
         }
@@ -1103,14 +1766,34 @@ function publicDashboardPage(): string {
         return lbSortDir === 'asc' ? '<span class="sort-arrow">▲</span>' : '<span class="sort-arrow">▼</span>';
       };
 
-      let html = '<div class="table-wrapper"><table><thead><tr><th>#</th><th>User</th><th class="sortable" onclick="sortLeaderboard(&apos;total_requests&apos;)">Requests ' + arrow('total_requests') + '</th><th class="sortable" onclick="sortLeaderboard(&apos;total_tokens&apos;)">Tokens ' + arrow('total_tokens') + '</th><th>Remaining Days</th><th>Last Active</th></tr></thead><tbody>';
+      const formatQuotaCell = (row) => {
+        const used = Number(row.used_tokens) || 0;
+        const quota = row.quota_tokens == null || row.quota_tokens === '' ? null : Number(row.quota_tokens);
+        if (quota == null || Number.isNaN(quota)) {
+          return formatTokens(used) + ' / ∞';
+        }
+        const pct = Math.min(100, Math.round((used / Math.max(quota, 1)) * 100));
+        const barColor = pct >= 90 ? '#ef4444' : pct >= 70 ? '#f59e0b' : '#22c55e';
+        return '<div style="min-width:120px">' +
+          '<div style="font-variant-numeric:tabular-nums">' + formatTokens(used) + ' / ' + formatTokens(quota) + '</div>' +
+          '<div style="margin-top:4px;height:4px;background:#1e293b;border-radius:999px;overflow:hidden">' +
+          '<div style="height:100%;width:' + pct + '%;background:' + barColor + '"></div></div>' +
+          '<div style="font-size:11px;color:#94a3b8;margin-top:2px">' + pct + '%</div></div>';
+      };
+
+      let html = '<div class="table-wrapper"><table><thead><tr><th>#</th><th>User</th><th class="sortable" onclick="sortLeaderboard(&apos;total_requests&apos;)">Requests ' + arrow('total_requests') + '</th><th class="sortable" onclick="sortLeaderboard(&apos;total_tokens&apos;)">Usage Tokens ' + arrow('total_tokens') + '</th><th class="sortable" onclick="sortLeaderboard(&apos;used_tokens&apos;)">Token Quota ' + arrow('used_tokens') + '</th><th>Remaining Days</th><th>Last Active</th></tr></thead><tbody>';
       sorted.forEach((row, i) => {
         const rankClass = i < 3 ? ' rank-' + (i + 1) : '';
+        const topRowClass = i < 3 ? ' class="top-row top-' + (i + 1) + '"' : '';
         const daysText = row.remaining_days !== null ? row.remaining_days + 'd' : '∞';
         const daysClass = row.remaining_days !== null ? (row.remaining_days <= 3 ? 'badge-red' : row.remaining_days <= 7 ? 'badge-yellow' : 'badge-green') : 'badge-blue';
-        const nameStyle = row.is_vip ? ' style="color:#fbbf24;font-weight:700"' : '';
-        const vipBadge = row.is_vip ? ' <span style="color:#fbbf24" title="VIP Unlimited">👑</span>' : '';
-        html += '<tr><td class="rank' + rankClass + '">' + (i + 1) + '</td><td' + nameStyle + '>' + (row.buyer_name || '-') + vipBadge + '</td><td>' + formatNum(row.total_requests) + '</td><td>' + formatTokens(row.total_tokens) + '</td><td><span class="badge ' + daysClass + '">' + daysText + '</span></td><td>' + formatTime(row.last_request_at) + '</td></tr>';
+        const nameStyle = (row.buyer_name || '').trim().toLowerCase() === 'super admin'
+          ? ' style="color:#c084fc;font-weight:700"'
+          : row.is_vip ? ' style="color:#fbbf24;font-weight:700"' : '';
+        const vipBadge = (row.buyer_name || '').trim().toLowerCase() === 'super admin'
+          ? ' <span style="color:#c084fc" title="Super Admin (unlimited)">👑</span>'
+          : row.is_vip ? ' <span style="color:#fbbf24" title="VIP (500M token quota)">👑</span>' : '';
+        html += '<tr' + topRowClass + '><td class="rank' + rankClass + '">' + (i + 1) + '</td><td' + nameStyle + '>' + (row.buyer_name || '-') + vipBadge + '</td><td>' + formatNum(row.total_requests) + '</td><td>' + formatTokens(row.total_tokens) + '</td><td>' + formatQuotaCell(row) + '</td><td><span class="badge ' + daysClass + '">' + daysText + '</span></td><td>' + formatTime(row.last_request_at) + '</td></tr>';
       });
       html += '</tbody></table></div>';
       document.getElementById('lb-content').innerHTML = html;
@@ -1135,8 +1818,12 @@ function publicDashboardPage(): string {
         let html = '<div class="table-wrapper"><table><thead><tr><th>User</th><th>Requests</th><th>Tokens</th><th>Models</th><th>Last Request</th></tr></thead><tbody>';
         data.active.forEach(row => {
           const models = (row.models_used || []).map(m => '<span class="model-tag">' + m + '</span>').join('');
-          const nameStyle = row.is_vip ? ' style="color:#fbbf24;font-weight:700"' : '';
-          const vipBadge = row.is_vip ? ' <span style="color:#fbbf24" title="VIP Unlimited">👑</span>' : '';
+          const nameStyle = (row.buyer_name || '').trim().toLowerCase() === 'super admin'
+            ? ' style="color:#c084fc;font-weight:700"'
+            : row.is_vip ? ' style="color:#fbbf24;font-weight:700"' : '';
+          const vipBadge = (row.buyer_name || '').trim().toLowerCase() === 'super admin'
+            ? ' <span style="color:#c084fc" title="Super Admin (unlimited)">👑</span>'
+            : row.is_vip ? ' <span style="color:#fbbf24" title="VIP Unlimited">👑</span>' : '';
           html += '<tr><td' + nameStyle + '>' + (row.buyer_name || '-') + vipBadge + '</td><td>' + formatNum(row.request_count) + '</td><td>' + formatTokens(row.total_tokens) + '</td><td>' + models + '</td><td>' + formatTime(row.last_request_at) + '</td></tr>';
         });
         html += '</tbody></table></div>';
@@ -1165,8 +1852,12 @@ function publicDashboardPage(): string {
           const statusBadge = row.success ? '<span class="badge badge-green">200</span>' : '<span class="badge badge-red">' + (row.status_code || 'ERR') + '</span>';
           const tokens = formatTokens(row.total_tokens);
           const latency = row.latency_ms ? row.latency_ms + 'ms' : '-';
-          const nameStyle = row.is_vip ? ' style="color:#fbbf24;font-weight:700"' : '';
-          const vipBadge = row.is_vip ? ' <span style="color:#fbbf24" title="VIP Unlimited">👑</span>' : '';
+          const nameStyle = (row.buyer_name || '').trim().toLowerCase() === 'super admin'
+            ? ' style="color:#c084fc;font-weight:700"'
+            : row.is_vip ? ' style="color:#fbbf24;font-weight:700"' : '';
+          const vipBadge = (row.buyer_name || '').trim().toLowerCase() === 'super admin'
+            ? ' <span style="color:#c084fc" title="Super Admin (unlimited)">👑</span>'
+            : row.is_vip ? ' <span style="color:#fbbf24" title="VIP Unlimited">👑</span>' : '';
           html += '<tr><td>' + formatTime(row.created_at) + '</td><td' + nameStyle + '>' + (row.buyer_name || '-') + vipBadge + '</td><td class="model-tag">' + (row.model_id || '-') + '</td><td>' + statusBadge + '</td><td>' + tokens + '</td><td>' + latency + '</td></tr>';
         });
         html += '</tbody></table></div>';

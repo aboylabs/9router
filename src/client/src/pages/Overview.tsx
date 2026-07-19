@@ -3,7 +3,7 @@ import { MetricCard } from "../components/MetricCard";
 import { Card, CardHeader, CardTitle } from "../components/ui/Card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from "../components/ui/Table";
 import { Badge } from "../components/ui/Badge";
-import { formatDateShort, formatNumber, formatTokens } from "../lib/utils";
+import { formatDateShort, formatNumber, formatTokens, buyerNameClassName } from "../lib/utils";
 import type { Overview as OverviewData, ChartPoint, Key as KeyType } from "../hooks/useDashboard";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
@@ -40,8 +40,8 @@ export function Overview({ overview, chartData, chartRange, setChartRange, keys 
       {/* Metrics */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
         <MetricCard
-          label="Buyers"
-          value={overview.buyers}
+          label="Total API Keys"
+          value={overview.totalKeys ?? overview.activeKeys}
           icon={<Users className="h-4 w-4" />}
         />
         <MetricCard
@@ -168,7 +168,7 @@ export function Overview({ overview, chartData, chartRange, setChartRange, keys 
               return (
                 <div key={key.id} className="border border-border rounded-lg p-3 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="font-medium text-text-primary text-sm">{key.buyer_name}</span>
+                    <span className={`font-medium text-sm ${buyerNameClassName(key.buyer_name, key.is_vip)}`}>{key.buyer_name}</span>
                     {key.revoked_at ? (
                       <Badge variant="danger">Revoked</Badge>
                     ) : key.expires_at && new Date(key.expires_at) < new Date() ? (
@@ -180,7 +180,7 @@ export function Overview({ overview, chartData, chartRange, setChartRange, keys 
                   <code className="text-xs bg-surface-tertiary px-1.5 py-0.5 rounded">{key.key_prefix}</code>
                   <div className="flex items-center justify-between text-xs text-text-muted">
                     <span>{formatTokens(key.used_tokens)} / {key.quota_tokens ? formatTokens(key.quota_tokens) : "unlimited"}</span>
-                    <span>{formatDateShort(key.expires_at)}</span>
+                    <span>{key.expires_at ? formatDateShort(key.expires_at) : "No expiry"}</span>
                   </div>
                   {key.quota_tokens && (
                     <div className="w-full h-1.5 bg-surface-tertiary rounded-full">
@@ -212,7 +212,7 @@ export function Overview({ overview, chartData, chartRange, setChartRange, keys 
             ) : (
               recentKeys.map((key) => (
                 <TableRow key={key.id}>
-                  <TableCell className="font-medium text-text-primary">{key.buyer_name}</TableCell>
+                  <TableCell className={`font-medium ${buyerNameClassName(key.buyer_name, key.is_vip)}`}>{key.buyer_name}</TableCell>
                   <TableCell>
                     <code className="text-xs bg-surface-tertiary px-1.5 py-0.5 rounded">{key.key_prefix}</code>
                   </TableCell>
@@ -234,7 +234,7 @@ export function Overview({ overview, chartData, chartRange, setChartRange, keys 
                         </div>
                       );
                     })()}</TableCell>
-                  <TableCell>{formatDateShort(key.expires_at)}</TableCell>
+                  <TableCell>{key.expires_at ? formatDateShort(key.expires_at) : "No expiry"}</TableCell>
                   <TableCell>
                     {key.revoked_at ? (
                       <Badge variant="danger">Revoked</Badge>

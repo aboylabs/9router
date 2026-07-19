@@ -60,9 +60,8 @@ export function apiKeyIsUsable(record: ApiKeyRecord) {
   if (record.expires_at && new Date(record.expires_at).getTime() <= Date.now()) {
     return { ok: false, code: "key_expired", message: "API key has expired" };
   }
-  // VIP keys bypass all quota checks
-  if (record.is_vip) return { ok: true as const };
-  if (record.quota_requests !== null && Number(record.used_requests) >= Number(record.quota_requests)) {
+  // Request quota still applies to non-VIP keys only
+  if (!record.is_vip && record.quota_requests !== null && Number(record.used_requests) >= Number(record.quota_requests)) {
     return { ok: false, code: "request_quota_exceeded", message: "Request quota exceeded" };
   }
   // Daily reset keys: check used_tokens against daily_quota_tokens
@@ -71,6 +70,7 @@ export function apiKeyIsUsable(record: ApiKeyRecord) {
       return { ok: false, code: "daily_quota_exceeded", message: "Daily token quota exceeded. Resets at 00:00 WIB." };
     }
   } else if (record.quota_tokens !== null && Number(record.used_tokens) >= Number(record.quota_tokens)) {
+    // VIP and non-VIP both enforce token quota when set (VIP typically 500M, non-VIP 100M)
     return { ok: false, code: "token_quota_exceeded", message: "Token quota exceeded" };
   }
   return { ok: true as const };
@@ -84,11 +84,12 @@ export async function modelForKey(apiKeyId: string, requestedModel: string) {
   const result = await query<{
     id: string;
     upstream_model: string;
+    upstream_id: string | null;
     display_name: string;
     input_cost_per_million: string | null;
     output_cost_per_million: string | null;
   }>(
-    `select m.id, m.upstream_model, m.display_name, m.input_cost_per_million, m.output_cost_per_million
+    `select m.id, m.upstream_model, m.upstream_id, m.display_name, m.input_cost_per_million, m.output_cost_per_million
      from models m
      join buyer_model_access bma on bma.model_id = m.id
      where bma.api_key_id = $1 and m.id = $2 and m.active = true
@@ -100,10 +101,10 @@ export async function modelForKey(apiKeyId: string, requestedModel: string) {
 
 export async function publicModelsForKey(apiKeyId: string) {
   const result = await query<{ id: string; created: number; owned_by: string }>(
-    `select m.id, extract(epoch from m.created_at)::integer as created, '9router' as owned_by
+    `select m.id, extract(epoch from m.created_at)::integer as created, 'routers9' as owned_by
      from models m
      join buyer_model_access bma on bma.model_id = m.id
-     where bma.api_key_id = $1 and m.active = true and (m.id like '9router/%' or m.id like 'brand/%')
+     where bma.api_key_id = $1 and m.active = true and (m.id like 'routers9/%' or m.id like 'brand/%')
      order by m.display_name asc`,
     [apiKeyId]
   );
