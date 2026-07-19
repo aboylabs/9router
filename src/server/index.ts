@@ -1752,7 +1752,7 @@ function publicDashboardPage(): string {
       const sorted = [...lbData].sort((a, b) => {
         let valA = a[lbSortKey];
         let valB = b[lbSortKey];
-        if (lbSortKey === 'total_tokens' || lbSortKey === 'used_tokens' || lbSortKey === 'quota_tokens') {
+        if (lbSortKey === 'used_tokens' || lbSortKey === 'quota_tokens') {
           valA = Number(valA);
           valB = Number(valB);
         }
@@ -1781,7 +1781,9 @@ function publicDashboardPage(): string {
           '<div style="font-size:11px;color:#94a3b8;margin-top:2px">' + pct + '%</div></div>';
       };
 
-      let html = '<div class="table-wrapper"><table><thead><tr><th>#</th><th>User</th><th class="sortable" onclick="sortLeaderboard(&apos;total_requests&apos;)">Requests ' + arrow('total_requests') + '</th><th class="sortable" onclick="sortLeaderboard(&apos;total_tokens&apos;)">Usage Tokens ' + arrow('total_tokens') + '</th><th class="sortable" onclick="sortLeaderboard(&apos;used_tokens&apos;)">Token Quota ' + arrow('used_tokens') + '</th><th>Remaining Days</th><th>Last Active</th></tr></thead><tbody>';
+      // Columns: rank, user, requests, token quota (used/limit), remaining days, last active.
+      // "Usage Tokens" (lifetime sum from usage_events) removed — redundant with Token Quota.
+      let html = '<div class="table-wrapper"><table><thead><tr><th>#</th><th>User</th><th class="sortable" onclick="sortLeaderboard(&apos;total_requests&apos;)">Requests ' + arrow('total_requests') + '</th><th class="sortable" onclick="sortLeaderboard(&apos;used_tokens&apos;)">Token Quota ' + arrow('used_tokens') + '</th><th>Remaining Days</th><th>Last Active</th></tr></thead><tbody>';
       sorted.forEach((row, i) => {
         const rankClass = i < 3 ? ' rank-' + (i + 1) : '';
         const topRowClass = i < 3 ? ' class="top-row top-' + (i + 1) + '"' : '';
@@ -1793,7 +1795,7 @@ function publicDashboardPage(): string {
         const vipBadge = (row.buyer_name || '').trim().toLowerCase() === 'super admin'
           ? ' <span style="color:#c084fc" title="Super Admin (unlimited)">👑</span>'
           : row.is_vip ? ' <span style="color:#fbbf24" title="VIP (500M token quota)">👑</span>' : '';
-        html += '<tr' + topRowClass + '><td class="rank' + rankClass + '">' + (i + 1) + '</td><td' + nameStyle + '>' + (row.buyer_name || '-') + vipBadge + '</td><td>' + formatNum(row.total_requests) + '</td><td>' + formatTokens(row.total_tokens) + '</td><td>' + formatQuotaCell(row) + '</td><td><span class="badge ' + daysClass + '">' + daysText + '</span></td><td>' + formatTime(row.last_request_at) + '</td></tr>';
+        html += '<tr' + topRowClass + '><td class="rank' + rankClass + '">' + (i + 1) + '</td><td' + nameStyle + '>' + (row.buyer_name || '-') + vipBadge + '</td><td>' + formatNum(row.total_requests) + '</td><td>' + formatQuotaCell(row) + '</td><td><span class="badge ' + daysClass + '">' + daysText + '</span></td><td>' + formatTime(row.last_request_at) + '</td></tr>';
       });
       html += '</tbody></table></div>';
       document.getElementById('lb-content').innerHTML = html;
