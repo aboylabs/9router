@@ -14,6 +14,8 @@ export type Buyer = {
   created_at: string;
 };
 
+export type ModelAccessRole = "dev" | "supporter" | "ultra";
+
 export type Model = {
   id: string;
   upstream_model: string;
@@ -21,6 +23,12 @@ export type Model = {
   active: boolean;
   input_cost_per_million?: string;
   output_cost_per_million?: string;
+  /** When true: usage is logged but does not consume key token quota. */
+  quota_exempt?: boolean;
+  /** Legacy: true when access_roles is non-empty. */
+  privileged_only?: boolean;
+  /** Independent role allowlist. Empty = all keys. */
+  access_roles?: ModelAccessRole[] | string[];
 };
 
 export type Key = {
@@ -42,13 +50,13 @@ export type Key = {
   daily_quota_tokens: string | null;
   package_id: string | null;
   rate_limit_rpm: number | null;
-  is_vip: boolean;
 };
 
 export type UsageEvent = {
   created_at: string;
   buyer_name: string | null;
   key_prefix: string | null;
+  quota_tokens?: string | null;
   agent_id: string;
   model_id: string | null;
   status_code: number;

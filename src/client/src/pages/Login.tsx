@@ -1,5 +1,5 @@
 import { FormEvent, useState } from "react";
-import { KeyRound, Loader2 } from "lucide-react";
+import { KeyRound } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 
@@ -23,26 +23,31 @@ export function Login({ onLogin, error }: LoginProps) {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-surface-secondary p-6">
-      <div className="w-full max-w-sm">
+    <main className="min-h-screen flex items-center justify-center bg-surface-secondary p-6 relative overflow-hidden">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-primary-500/15 blur-3xl" />
+        <div className="absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-fuchsia-500/10 blur-3xl" />
+      </div>
+
+      <div className="w-full max-w-sm relative page-enter">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center h-12 w-12 rounded-xl bg-primary-600 mb-4">
-            <KeyRound className="h-6 w-6 text-white" />
+          <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-700 mb-4 shadow-lg shadow-primary-900/25">
+            <KeyRound className="h-7 w-7 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-text-primary">9router</h1>
+          <h1 className="text-2xl font-bold text-text-primary tracking-tight">Routers9</h1>
           <p className="text-sm text-text-muted mt-1">Admin Panel</p>
         </div>
 
         <form
           onSubmit={handleSubmit}
-          className="bg-surface border border-border rounded-xl p-6 shadow-lg space-y-4"
+          className="bg-surface/90 backdrop-blur border border-border rounded-2xl p-6 shadow-xl space-y-4"
         >
           <Input
             id="email"
             name="email"
             type="text"
             label="Username"
-            placeholder="9router"
+            placeholder="admin"
             autoComplete="username"
             required
           />
@@ -57,7 +62,7 @@ export function Login({ onLogin, error }: LoginProps) {
           />
 
           {error && (
-            <p className="text-sm text-danger bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-md px-3 py-2">
+            <p className="text-sm text-danger bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800/60 rounded-lg px-3 py-2">
               {error}
             </p>
           )}

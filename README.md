@@ -4,20 +4,19 @@
 
 It fronts one or more upstream providers, issues buyer API keys with quotas + rate limits, meters usage 1:1 with upstream token counts, and exposes both an admin dashboard and a public read-only panel.
 
-Current release: **v1.3.0**
+Current release: **v1.3.1**
 
 ---
 
 ## Features
 
 - OpenAI-compatible proxy: `POST /v1/chat/completions`, `GET /v1/models`
-- Multi-upstream load balancing with weighted round-robin, failover, and on/off toggle
+- Multi-upstream routing with per-model pinning, multi API-key round-robin, and automatic failover
 - Per-model upstream pinning (`models.upstream_id`) for preferred routing
-- Branded catalog IDs with prefix `routers9/` (example: `routers9/grok/grok-4.5`)
-- API key lifecycle: create, extend, add quota, VIP/Super Admin, soft-delete, bulk RPM/request limits
+- Branded catalog IDs with prefix `routers9/` (example: `routers9/grok-4.5`)
+- API key lifecycle: create, extend, add quota, Super Admin, soft-delete, bulk RPM/request limits
 - Create-key defaults: token quota **100M / 250M / 500M**, fixed **50 RPM**
-- VIP: token quota enforced (typically 500M); request quota skipped
-- Super Admin: purple UI styling, unlimited token quota preserved on VIP toggle
+- Super Admin: developer special UI (Code2 + DEV chip, gradient purple/pink), unlimited token quota, no expiry
 - Token billing multiplier = **1** (matches upstream usage; no 2x)
 - Public dashboard: Leaderboard (search `?q=`), Live, Usage (success-only 200), Models, Prices
 - Admin dashboard: Overview, Keys, Leaderboard, Live, Usage, Models, Sales, Settings
@@ -32,8 +31,8 @@ Current release: **v1.3.0**
 | Role | URL |
 |------|-----|
 | Public dashboard | https://routers9.web.id |
-| Admin panel + API | http://43.128.67.88 |
-| OpenAI base URL | `http://43.128.67.88/v1` |
+| Admin panel | https://routers9.web.id/admin (also http://43.128.67.88/admin) |
+| OpenAI base URL | `https://routers9.web.id/v1` |
 | Telegram orders | https://t.me/routers9 |
 
 Stack in production:
@@ -143,8 +142,7 @@ routers9/<upstream-model-path>
 ```
 
 Examples:
-- `routers9/grok/grok-4.5`
-- `routers9/claude-sonnet-4.6`
+- `routers9/grok-4.5`
 
 Breaking change in v1.3.0: old `9router/...` IDs no longer match the brand allowlist. Clients must use `routers9/...`.
 
@@ -174,11 +172,11 @@ Emails are masked. Full API keys / key prefixes are not exposed on public endpoi
 
 Example:
 ```bash
-curl http://43.128.67.88/v1/chat/completions \
-  -H "Authorization: Bearer 9r-YOUR_KEY" \
+curl https://routers9.web.id/v1/chat/completions \
+  -H "Authorization: Bearer ***" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "routers9/grok/grok-4.5",
+    "model": "routers9/grok-4.5",
     "messages": [{"role":"user","content":"Hello!"}]
   }'
 ```
@@ -191,36 +189,38 @@ curl http://43.128.67.88/v1/chat/completions \
 | GET | `/admin/keys` | List keys |
 | POST | `/admin/create-key` | Create buyer + key (`quotaTokens`, fixed 50 RPM) |
 | PATCH | `/admin/keys/:keyId/rate-limit` | Per-key RPM |
-| PATCH | `/admin/keys/:keyId/vip` | Toggle VIP (+ quota tier, Super Admin exempt) |
+| PATCH | `/admin/keys/:keyId/daily-reset` | Toggle daily reset (00:00 WIB) |
 | PATCH | `/admin/keys/bulk-rate-limit` | Bulk RPM |
 | PATCH | `/admin/keys/bulk-request-limit` | Bulk request quota |
+| PATCH | `/admin/keys/bulk-daily-reset` | Bulk daily reset |
 | GET/POST/PATCH/DELETE | `/admin/upstreams` | Multi-upstream CRUD |
 | POST | `/admin/upstreams/:id/sync` | Sync models for one upstream (scoped delete) |
 | POST | `/admin/models/sync` | Global free-tier sync (scoped) |
-| GET/PUT | `/admin/settings/round-robin` | RR on/off flag |
 | GET | `/admin/sessions` | Active admin sessions |
 | DELETE | `/admin/sessions/:id` | Revoke session |
 
 ---
 
-## Quotas & VIP
+## Quotas & Super Admin
 
 | Kind | Default / behavior |
 |------|--------------------|
 | New key token quota | 100M (choices: 100M / 250M / 500M) |
 | New key RPM | 50 (fixed on create; editable later) |
-| Non-VIP | Enforces `quota_tokens` + optional `quota_requests` |
-| VIP | Enforces `quota_tokens` (typically 500M); skips `quota_requests` |
-| Super Admin buyer | Unlimited token quota; VIP toggle does not overwrite to 100M/500M |
+| Standard key | Enforces `quota_tokens` + optional `quota_requests` |
+| Daily reset key | Uses `daily_quota_tokens`; resets `used_tokens` at 00:00 WIB |
+| Super Admin buyer | Unlimited token quota (`quota_tokens = NULL`), no expiry; special developer UI |
 
 Billing: `TOKEN_MULTIPLIER = 1` — logged/charged tokens match upstream usage.
+
+> **VIP removed (2026-07-20):** product VIP is gone. Column `api_keys.is_vip` is dormant. Existing VIP-era keys kept their `quota_tokens` as plain lifetime quota.
 
 ---
 
 ## Multi-upstream routing
 
 1. If the requested model has `upstream_id`, route to that upstream first.
-2. Else if round-robin is **on** (default): weighted RR across active upstreams.
+2. Else primary (first active upstream by created_at).
 3. Else: always primary (first active by `created_at`).
 4. On retriable failure (429 / 5xx / timeout / connection): failover to next active upstream.
 
@@ -242,17 +242,35 @@ Response header `x-9router-upstream` shows which upstream handled the request.
 
 ## Changelog
 
+### v1.4.0 (2026-07-26)
+- **feat**: Per-model access roles (Dev / Supporter / Ultra) — `models.access_roles`, Access modal in admin Models, snapshot rewrite of `buyer_model_access`; restricted models stay publicly visible with role badges
+- **feat**: Shared role rosters `src/shared/buyer-roles.ts` (client+server); Ultra = exact 500M quota keys
+- **feat**: Multi API-key round-robin per upstream (`upstream_api_keys` table, admin manage-keys UI, failover on 429/5xx)
+- **feat**: Per-key daily reset quota (00:00 WIB cron) + unlimited↔finite token quota toggle
+- **feat**: Public panel — Claude model tags/cards with amber glow + shimmer effect (Usage, Live, Models)
+- **feat**: Public leaderboard — Top-3 podium (crown/medals), inactive-key collapse toggle, 45s quiet auto-refresh
+- **feat**: Public polish — favicon + OG/meta tags, skeleton loading, footer with live /health status pill, custom scrollbar, relative timestamps, new-row flash on Live/Usage, chart gradient fills + draw animation, stat-card icons + count-up
+- **feat**: Supporter / Helper / Ultra name badges on public + admin leaderboards
+- **fix**: Display names strip channel prefixes (`ag`/`hs`/`op`/`sf`)
+- **chore**: Sidebar tagline → "Multi-Model LLM API"; page title gradient unified purple→blue
+
 ### v1.3.0 (2026-07-19)
 - **feat**: Model brand prefix rebrand `9router/` → `routers9/`
 - **feat**: Per-model upstream pinning with preferred-upstream proxy routing
 - **feat**: Round-robin on/off toggle (`system_settings.round_robin_enabled` + Settings UI)
 - **feat**: Create-key token quota choices 100M / 250M / 500M; fixed default RPM = 50
-- **feat**: Super Admin special-case (purple UI, unlimited quota preserved on VIP toggle)
-- **feat**: VIP enforces token quota (typically 500M) while still skipping request quota
+- **feat**: Super Admin special-case (developer UI, unlimited quota, no expiry)
 - **feat**: Public leaderboard search (`?q=`) by buyer name / API key; shows used/quota
 - **fix**: Public Usage is success-only (`success=true` and `status_code=200`)
 - **fix**: Token billing multiplier set to `1` (match upstream, no 2x)
 - **chore**: Ignore local backup dumps; drop obsolete tracked `.json.gz` backups
+
+### v1.3.1 (2026-07-20)
+- **feat**: Super Admin developer badge (Code2 + DEV chip, gradient purple/pink) replaces crown
+- **fix**: Public `/models` curl examples use live model `routers9/grok-4.5` + base URL `https://routers9.web.id/v1`
+- **fix**: Legacy upstream defaults aligned with active `upstreams` row (dead fallback hosts removed)
+- **chore**: Product VIP removed from docs/UI; `is_vip` column left dormant
+- **chore**: Cleanup orphan buyers with no keys/usage
 
 ### v1.2.0 (2026-06-11)
 - **feat**: Public dashboard at `routers9.web.id` (Leaderboard, Live, Usage, Models)

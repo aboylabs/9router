@@ -43,7 +43,16 @@ const loginRateLimiter = {
 };
 import { clearUpstreamCache, fetchUpstreamModels, getUpstreams } from "./upstream.js";
 import {
+  MODEL_ACCESS_ROLES,
+  normalizeAccessRoles,
+  type ModelAccessRole,
+  ULTRA_QUOTA_TOKENS,
+} from "../shared/buyer-roles.js";
+import {
+  CREATE_KEY_PACKAGE_IDS,
+  CREATE_KEY_PACKAGES_BY_ID,
   CREATABLE_PACKAGE_IDS,
+  DEFAULT_CREATE_KEY_PACKAGE_ID,
   DEFAULT_PACKAGE_ID,
   PRESET_PACKAGES_BY_ID,
   salesBucketForPackageId,
@@ -72,14 +81,37 @@ const buyerSchema = z.object({
   notes: z.string().optional().nullable()
 });
 
+const modelAccessRoleSchema = z.enum(MODEL_ACCESS_ROLES);
+
 const modelSchema = z.object({
   id: z.string().min(1),
   upstream_model: z.string().min(1),
   display_name: z.string().min(1),
   active: z.boolean().default(true),
   input_cost_per_million: z.number().optional().nullable(),
-  output_cost_per_million: z.number().optional().nullable()
+  output_cost_per_million: z.number().optional().nullable(),
+  quota_exempt: z.boolean().optional().default(false),
+  // Restricted roles that may use this model. Empty = all keys.
+  // Each role can be toggled independently: dev | supporter | ultra.
+  access_roles: z.array(modelAccessRoleSchema).optional().default([]),
+  // Legacy mirror of access_roles.length > 0 (kept for older clients).
+  privileged_only: z.boolean().optional()
 });
+
+const modelPatchSchema = z.object({
+  display_name: z.string().min(1).optional(),
+  active: z.boolean().optional(),
+  quota_exempt: z.boolean().optional(),
+  access_roles: z.array(modelAccessRoleSchema).optional(),
+  // Legacy: true → dev+supporter; false → open to all. Prefer access_roles.
+  privileged_only: z.boolean().optional(),
+  input_cost_per_million: z.number().optional().nullable(),
+  output_cost_per_million: z.number().optional().nullable(),
+  upstream_model: z.string().min(1).optional()
+}).refine(
+  (body) => Object.keys(body).length > 0,
+  { message: "At least one field required" }
+);
 
 const keySchema = z.object({
   label: z.string().min(1),
@@ -103,17 +135,12 @@ const buyerPackageSchema = z.object({
   package_id: z.enum(CREATABLE_PACKAGE_IDS).default(DEFAULT_PACKAGE_ID),
 });
 
+// Create API Key from public Prices packages (Starter/Pro/Business/Ultra).
+// packageId drives quota_tokens + rate_limit_rpm; days defaults to package.defaultDays (28).
 const createKeySchema = z.object({
   name: z.string().min(1),
-  days: z.number().int().positive(),
-  // Default 50 RPM for new keys; form no longer exposes this field
-  rateLimitRpm: z.number().int().positive().optional().nullable().default(50),
-  // Token quota choices for newly created keys (default 100M)
-  quotaTokens: z.union([
-    z.literal(100_000_000),
-    z.literal(250_000_000),
-    z.literal(500_000_000),
-  ]).default(100_000_000),
+  days: z.number().int().positive().optional(),
+  packageId: z.enum(CREATE_KEY_PACKAGE_IDS).default(DEFAULT_CREATE_KEY_PACKAGE_ID),
 });
 
 const upstreamModelSchema = z.object({
@@ -128,15 +155,157 @@ function generateBuyerPassword(): string {
   return crypto.randomBytes(8).toString("base64url").slice(0, 12);
 }
 
+/** Active models auto-granted to new keys. Excludes role-restricted models. */
 async function activeAllowedModelIds() {
   const result = await query<{ id: string }>(
     `select id
      from models
      where active = true
        and id like 'routers9/%'
+       and cardinality(coalesce(access_roles, '{}'::text[])) = 0
      order by display_name asc`
   );
   return result.rows.map((row) => row.id);
+}
+
+/** Key ids matching one or more access roles (union). */
+async function keyIdsForAccessRoles(roles: ModelAccessRole[]): Promise<string[]> {
+  const normalized = normalizeAccessRoles(roles);
+  if (!normalized.length) return [];
+
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+  let i = 1;
+
+  if (normalized.includes("dev")) {
+    conditions.push(`lower(trim(b.name)) = $${i++}`);
+    params.push("super admin");
+  }
+  if (normalized.includes("supporter")) {
+    conditions.push(`lower(trim(b.name)) = any($${i++}::text[])`);
+    params.push(["gilbert arias", "yuop"]);
+  }
+  if (normalized.includes("ultra")) {
+    conditions.push(`k.quota_tokens = $${i++}`);
+    params.push(ULTRA_QUOTA_TOKENS);
+  }
+
+  const result = await query<{ id: string }>(
+    `select distinct k.id
+     from api_keys k
+     left join buyers b on b.id = k.buyer_id
+     where k.deleted_at is null
+       and (${conditions.join(" or ")})`,
+    params
+  );
+  return result.rows.map((row) => row.id);
+}
+
+/**
+ * Apply buyer_model_access for a model based on access_roles.
+ * - Empty roles: open to all non-deleted keys.
+ * - Non-empty: grant only matching role keys; strip everyone else.
+ * Also keeps privileged_only mirror in sync.
+ */
+async function applyModelAccessRoles(modelId: string, rolesInput: unknown) {
+  const roles = normalizeAccessRoles(rolesInput);
+  const restricted = roles.length > 0;
+
+  await query(
+    `update models
+     set access_roles = $2::text[],
+         privileged_only = $3
+     where id = $1`,
+    [modelId, roles, restricted]
+  );
+
+  if (!restricted) {
+    await query(
+      `insert into buyer_model_access (api_key_id, model_id)
+       select id, $1 from api_keys
+       where deleted_at is null
+       on conflict do nothing`,
+      [modelId]
+    );
+    return roles;
+  }
+
+  const keyIds = await keyIdsForAccessRoles(roles);
+  if (keyIds.length) {
+    await query(
+      `insert into buyer_model_access (api_key_id, model_id)
+       select unnest($1::uuid[]), $2
+       on conflict do nothing`,
+      [keyIds, modelId]
+    );
+  }
+
+  if (keyIds.length) {
+    await query(
+      `delete from buyer_model_access
+       where model_id = $1
+         and not (api_key_id = any($2::uuid[]))`,
+      [modelId, keyIds]
+    );
+  } else {
+    // No matching keys yet — strip all access until someone qualifies.
+    await query(`delete from buyer_model_access where model_id = $1`, [modelId]);
+  }
+
+  return roles;
+}
+
+/** Re-apply access for a model using its current DB access_roles. */
+async function reapplyModelAccessFromDb(modelId: string) {
+  const row = await query<{ access_roles: string[] | null; privileged_only: boolean }>(
+    `select access_roles, coalesce(privileged_only, false) as privileged_only
+     from models where id = $1`,
+    [modelId]
+  );
+  const current = row.rows[0];
+  if (!current) return;
+  let roles = normalizeAccessRoles(current.access_roles);
+  // Legacy fallback: privileged_only without roles → dev+supporter
+  if (!roles.length && current.privileged_only) {
+    roles = ["dev", "supporter"];
+  }
+  await applyModelAccessRoles(modelId, roles);
+}
+
+/** Restricted models that include a given role (for create-key / quota change). */
+async function modelIdsWithAccessRole(role: ModelAccessRole): Promise<string[]> {
+  const result = await query<{ id: string }>(
+    `select id from models
+     where active = true
+       and $1 = any(coalesce(access_roles, '{}'::text[]))`,
+    [role]
+  );
+  return result.rows.map((r) => r.id);
+}
+
+/** After key role changes (e.g. become Ultra), re-sync restricted model grants for that key. */
+async function syncKeyRestrictedModelAccess(apiKeyId: string) {
+  // Grant any restricted model whose roles match this key; strip ones that no longer match.
+  const models = await query<{ id: string; access_roles: string[] | null }>(
+    `select id, access_roles from models
+     where cardinality(coalesce(access_roles, '{}'::text[])) > 0`
+  );
+  for (const m of models.rows) {
+    const roles = normalizeAccessRoles(m.access_roles);
+    const allowedIds = await keyIdsForAccessRoles(roles);
+    if (allowedIds.includes(apiKeyId)) {
+      await query(
+        `insert into buyer_model_access (api_key_id, model_id) values ($1, $2)
+         on conflict do nothing`,
+        [apiKeyId, m.id]
+      );
+    } else {
+      await query(
+        `delete from buyer_model_access where api_key_id = $1 and model_id = $2`,
+        [apiKeyId, m.id]
+      );
+    }
+  }
 }
 
 export async function registerAdminRoutes(app: FastifyInstance) {
@@ -200,7 +369,21 @@ export async function registerAdminRoutes(app: FastifyInstance) {
   // --- Create API Key ---
   app.post("/admin/create-key", async (request, reply) => {
     const parsed = createKeySchema.safeParse(request.body);
-    if (!parsed.success) return reply.code(400).send({ error: "Invalid payload. Requires name (string) and days (number)" });
+    if (!parsed.success) {
+      return reply.code(400).send({
+        error: "Invalid payload. Requires name (string) and packageId (starter|pro|business|ultra); days optional positive int"
+      });
+    }
+
+    const pkg = CREATE_KEY_PACKAGES_BY_ID[parsed.data.packageId];
+    if (!pkg) {
+      return reply.code(400).send({ error: "Unknown packageId" });
+    }
+
+    const days = parsed.data.days ?? pkg.defaultDays;
+    if (!Number.isInteger(days) || days <= 0) {
+      return reply.code(400).send({ error: "days must be a positive integer" });
+    }
 
     const keyTag = crypto.randomBytes(4).toString("hex");
     const email = `key-${keyTag}@9router.local`;
@@ -213,10 +396,17 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     const buyerId = buyerResult.rows[0].id;
 
     const apiKey = generateApiKey();
-    const expiresAt = new Date(Date.now() + parsed.data.days * 24 * 60 * 60 * 1000).toISOString();
-    const label = `${parsed.data.days} hari`;
+    const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+    const label = `${pkg.label} · ${days} hari`;
 
     const modelIds = await activeAllowedModelIds();
+    // Ultra package also gets models restricted to ultra role.
+    if (pkg.quotaTokens === ULTRA_QUOTA_TOKENS) {
+      const ultraModels = await modelIdsWithAccessRole("ultra");
+      for (const id of ultraModels) {
+        if (!modelIds.includes(id)) modelIds.push(id);
+      }
+    }
     if (!modelIds.length) {
       return reply.code(500).send({ error: "No active white-label models are configured" });
     }
@@ -226,13 +416,13 @@ export async function registerAdminRoutes(app: FastifyInstance) {
       label,
       apiKey,
       expiresAt,
-      quotaTokens: parsed.data.quotaTokens,
+      quotaTokens: pkg.quotaTokens,
       quotaRequests: null,
       modelIds,
       dailyReset: false,
       dailyQuotaTokens: null,
-      packageId: null,
-      rateLimitRpm: parsed.data.rateLimitRpm ?? 50
+      packageId: pkg.id,
+      rateLimitRpm: pkg.rateLimitRpm
     });
     invalidateApiKeyCache();
 
@@ -248,13 +438,14 @@ export async function registerAdminRoutes(app: FastifyInstance) {
       keyId: keyRecord.id,
       keyPrefix: keyRecord.key_prefix,
       created_at: createdAt,
-      days: parsed.data.days,
+      days,
       package: {
-        id: null,
-        label,
-        quota_tokens: parsed.data.quotaTokens,
+        id: pkg.id,
+        label: pkg.label,
+        quota_tokens: pkg.quotaTokens,
         daily_quota_tokens: null,
         daily_reset: false,
+        rate_limit_rpm: pkg.rateLimitRpm,
         expires_at: expiresAt
       }
     });
@@ -357,20 +548,29 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     }
 
     let result;
-    const baseFilter = `deleted_at IS NULL AND revoked_at IS NULL AND expires_at > NOW() AND is_hidden = false AND (daily_reset = false OR daily_reset IS NULL)`;
+    // Only finite-quota keys. Unlimited (quota_tokens IS NULL) must stay unlimited —
+    // COALESCE(NULL,0)+N would silently demote them to a tiny cap.
+    // Daily-reset keys also bump daily_quota_tokens.
+    const baseFilter = `deleted_at IS NULL AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > NOW()) AND is_hidden = false AND quota_tokens IS NOT NULL`;
+    const setClause = `quota_tokens = COALESCE(quota_tokens, 0) + $1,
+                       daily_quota_tokens = CASE
+                         WHEN daily_reset = true THEN COALESCE(daily_quota_tokens, quota_tokens, 0) + $1
+                         ELSE daily_quota_tokens
+                       END`;
 
     if (all) {
       result = await query(
-        `UPDATE api_keys SET quota_tokens = COALESCE(quota_tokens, 0) + $1 WHERE ${baseFilter}`,
+        `UPDATE api_keys SET ${setClause} WHERE ${baseFilter}`,
         [tokens]
       );
     } else {
       result = await query(
-        `UPDATE api_keys SET quota_tokens = COALESCE(quota_tokens, 0) + $1 WHERE id = ANY($2) AND ${baseFilter}`,
+        `UPDATE api_keys SET ${setClause} WHERE id = ANY($2) AND ${baseFilter}`,
         [tokens, keyIds]
       );
     }
 
+    invalidateApiKeyCache();
     return { updated: result.rowCount || 0, tokens_added: tokens };
   });
 
@@ -482,16 +682,23 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     if (!parsed.success) return reply.code(400).send({ error: "Invalid model payload" });
 
     const model = parsed.data;
+    const roles = normalizeAccessRoles(
+      model.access_roles ??
+        (model.privileged_only ? (["dev", "supporter"] as ModelAccessRole[]) : [])
+    );
     const result = await query(
       `insert into models
-       (id, upstream_model, display_name, active, input_cost_per_million, output_cost_per_million)
-       values ($1, $2, $3, $4, $5, $6)
+       (id, upstream_model, display_name, active, input_cost_per_million, output_cost_per_million, quota_exempt, privileged_only, access_roles)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9::text[])
        on conflict (id) do update set
         upstream_model = excluded.upstream_model,
         display_name = excluded.display_name,
         active = excluded.active,
         input_cost_per_million = excluded.input_cost_per_million,
-        output_cost_per_million = excluded.output_cost_per_million
+        output_cost_per_million = excluded.output_cost_per_million,
+        quota_exempt = excluded.quota_exempt,
+        privileged_only = excluded.privileged_only,
+        access_roles = excluded.access_roles
        returning *`,
       [
         model.id,
@@ -499,10 +706,94 @@ export async function registerAdminRoutes(app: FastifyInstance) {
         model.display_name,
         model.active,
         model.input_cost_per_million ?? null,
-        model.output_cost_per_million ?? null
+        model.output_cost_per_million ?? null,
+        model.quota_exempt ?? false,
+        roles.length > 0,
+        roles
       ]
     );
+    await applyModelAccessRoles(model.id, roles);
+    const refreshed = await query(`select * from models where id = $1`, [model.id]);
+    return { model: refreshed.rows[0] ?? result.rows[0] };
+  });
+
+  app.patch("/admin/models/*", async (request, reply) => {
+    const star = (request.params as { "*": string })["*"];
+    const modelId = decodeURIComponent(star || "").replace(/^\/+/, "");
+    if (!modelId) return reply.code(400).send({ error: "Invalid model id" });
+
+    const body = modelPatchSchema.safeParse(request.body);
+    if (!body.success) {
+      return reply.code(400).send({ error: "Invalid model patch", details: body.error.flatten() });
+    }
+
+    const existing = await query<{ access_roles: string[] | null; privileged_only: boolean }>(
+      `SELECT id, access_roles, coalesce(privileged_only, false) as privileged_only FROM models WHERE id = $1 LIMIT 1`,
+      [modelId]
+    );
+    if (!existing.rows[0]) return reply.code(404).send({ error: "Model not found" });
+
+    // Resolve access_roles from explicit list or legacy privileged_only toggle.
+    let nextRoles: ModelAccessRole[] | undefined;
+    if (body.data.access_roles !== undefined) {
+      nextRoles = normalizeAccessRoles(body.data.access_roles);
+    } else if (body.data.privileged_only !== undefined) {
+      if (body.data.privileged_only) {
+        const current = normalizeAccessRoles(existing.rows[0].access_roles);
+        nextRoles = current.length ? current : (["dev", "supporter"] as ModelAccessRole[]);
+      } else {
+        nextRoles = [];
+      }
+    }
+
+    const fields: string[] = [];
+    const values: unknown[] = [];
+    let i = 1;
+    for (const [key, value] of Object.entries(body.data)) {
+      if (value === undefined) continue;
+      // access_roles / privileged_only applied via applyModelAccessRoles below
+      if (key === "access_roles" || key === "privileged_only") continue;
+      fields.push(`${key} = $${i++}`);
+      values.push(value);
+    }
+
+    if (fields.length) {
+      values.push(modelId);
+      await query(
+        `UPDATE models SET ${fields.join(", ")} WHERE id = $${i}`,
+        values
+      );
+    } else if (nextRoles === undefined) {
+      return reply.code(400).send({ error: "No fields to update" });
+    }
+
+    if (nextRoles !== undefined) {
+      await applyModelAccessRoles(modelId, nextRoles);
+    }
+
+    const result = await query(`SELECT * FROM models WHERE id = $1`, [modelId]);
     return { model: result.rows[0] };
+  });
+
+  app.delete("/admin/models/*", async (request, reply) => {
+    const star = (request.params as { "*": string })["*"];
+    const modelId = decodeURIComponent(star || "").replace(/^\/+/, "");
+    if (!modelId) return reply.code(400).send({ error: "Invalid model id" });
+
+    const accessCount = await query<{ count: string }>(
+      `SELECT count(*)::text as count FROM buyer_model_access WHERE model_id = $1`,
+      [modelId]
+    );
+    const result = await query(`DELETE FROM models WHERE id = $1 RETURNING id, display_name`, [modelId]);
+    if (!result.rows[0]) return reply.code(404).send({ error: "Model not found" });
+
+    // usage_events / usage_rollups keep historical model_id text (no FK to models).
+    // buyer_model_access rows cascade-delete with the model.
+    return {
+      deleted: true,
+      model: result.rows[0],
+      access_removed: Number(accessCount.rows[0]?.count ?? 0)
+    };
   });
 
   app.post("/admin/models/sync", async (_request, reply) => {
@@ -549,13 +840,22 @@ export async function registerAdminRoutes(app: FastifyInstance) {
       );
       synced.push(result.rows[0]);
 
-      const grantResult = await query(
-        `insert into buyer_model_access (api_key_id, model_id)
-         select id, $1 from api_keys
-         on conflict do nothing`,
+      // Never auto-grant role-restricted models to every key.
+      await reapplyModelAccessFromDb(aliasId);
+      const priv = await query<{ restricted: boolean }>(
+        `select cardinality(coalesce(access_roles, '{}'::text[])) > 0 as restricted from models where id = $1`,
         [aliasId]
       );
-      granted += grantResult.rowCount ?? 0;
+      if (!priv.rows[0]?.restricted) {
+        const grantResult = await query(
+          `insert into buyer_model_access (api_key_id, model_id)
+           select id, $1 from api_keys
+           where deleted_at is null
+           on conflict do nothing`,
+          [aliasId]
+        );
+        granted += grantResult.rowCount ?? 0;
+      }
     }
 
     // Additive only: never auto-delete models missing from upstream.
@@ -592,7 +892,7 @@ export async function registerAdminRoutes(app: FastifyInstance) {
       `select k.id, k.buyer_id, b.name as buyer_name, b.email as buyer_email,
         k.label, k.key_prefix, k.key_plain, k.expires_at,
         k.revoked_at, k.deleted_at, k.quota_tokens, k.quota_requests, k.used_tokens, k.used_requests, k.created_at,
-        k.daily_reset, k.daily_quota_tokens, k.package_id, k.rate_limit_rpm, k.is_vip
+        k.daily_reset, k.daily_quota_tokens, k.package_id, k.rate_limit_rpm
        from api_keys k
        join buyers b on b.id = k.buyer_id
        where k.deleted_at is null and k.revoked_at is null and k.is_hidden = false
@@ -686,45 +986,166 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     return { ok: true, message: "Request limit updated for all active keys" };
   });
 
-  // --- Toggle VIP status for a key ---
-  app.patch("/admin/keys/:keyId/vip", async (request, reply) => {
+  // --- Set token quota: unlimited (null) or finite cap (e.g. 100M/200M/300M/500M) ---
+  app.patch("/admin/keys/:keyId/token-quota", async (request, reply) => {
+    const params = z.object({ keyId: z.string().uuid() }).safeParse(request.params);
+    if (!params.success) return reply.code(400).send({ error: "Invalid key id" });
+
+    const body = z
+      .object({
+        // null = unlimited lifetime token quota
+        quota_tokens: z.union([z.number().int().positive(), z.null()])
+      })
+      .safeParse(request.body);
+    if (!body.success) {
+      return reply.code(400).send({ error: "Invalid payload. Requires { quota_tokens: number | null }" });
+    }
+
+    const existing = await query<{ id: string; quota_tokens: string | null }>(
+      `SELECT id, quota_tokens FROM api_keys WHERE id = $1 AND deleted_at IS NULL LIMIT 1`,
+      [params.data.keyId]
+    );
+    if (!existing.rowCount) return reply.code(404).send({ error: "Key not found" });
+
+    // Unlimited: clear token cap + force daily-reset off (daily needs a finite max).
+    // Finite: set quota_tokens only; keep used_tokens (may immediately block if already over).
+    // expires_at is never touched here.
+    const result =
+      body.data.quota_tokens === null
+        ? await query(
+            `UPDATE api_keys
+             SET quota_tokens = NULL,
+                 daily_reset = false,
+                 daily_quota_tokens = NULL
+             WHERE id = $1 AND deleted_at IS NULL
+             RETURNING id, quota_tokens, daily_reset, daily_quota_tokens, used_tokens, expires_at`,
+            [params.data.keyId]
+          )
+        : await query(
+            `UPDATE api_keys
+             SET quota_tokens = $1
+             WHERE id = $2 AND deleted_at IS NULL
+             RETURNING id, quota_tokens, daily_reset, daily_quota_tokens, used_tokens, expires_at`,
+            [body.data.quota_tokens, params.data.keyId]
+          );
+
+    if (!result.rowCount) return reply.code(404).send({ error: "Key not found" });
+
+    // If daily reset stays ON after setting a finite quota, keep daily_quota_tokens in sync
+    // only when it was previously null (e.g. just left unlimited). Do not rewrite an existing daily max.
+    if (body.data.quota_tokens !== null) {
+      await query(
+        `UPDATE api_keys
+         SET daily_quota_tokens = quota_tokens
+         WHERE id = $1
+           AND deleted_at IS NULL
+           AND daily_reset = true
+           AND daily_quota_tokens IS NULL`,
+        [params.data.keyId]
+      );
+    }
+
+    invalidateApiKeyCache();
+    // Re-sync restricted models if key entered/left Ultra (or other role match).
+    await syncKeyRestrictedModelAccess(params.data.keyId);
+    const fresh = await query(
+      `SELECT id, quota_tokens, daily_reset, daily_quota_tokens, used_tokens, expires_at
+       FROM api_keys WHERE id = $1 LIMIT 1`,
+      [params.data.keyId]
+    );
+    return {
+      ok: true,
+      key: fresh.rows[0],
+      unlimited: body.data.quota_tokens === null
+    };
+  });
+
+  // --- Toggle daily reset for a key (quota resets at 00:00 WIB) ---
+  app.patch("/admin/keys/:keyId/daily-reset", async (request, reply) => {
     const params = z.object({ keyId: z.string().uuid() }).safeParse(request.params);
     if (!params.success) return reply.code(400).send({ error: "Invalid key id" });
 
     const body = z.object({
-      is_vip: z.boolean()
+      daily_reset: z.boolean()
     }).safeParse(request.body);
-    if (!body.success) return reply.code(400).send({ error: "Invalid payload. Requires { is_vip: boolean }" });
+    if (!body.success) return reply.code(400).send({ error: "Invalid payload. Requires { daily_reset: boolean }" });
 
-    // Super Admin keeps unlimited quota (NULL); never overwrite via VIP toggle
-    const owner = await query<{ buyer_name: string | null }>(
-      `SELECT b.name AS buyer_name
-       FROM api_keys k
-       LEFT JOIN buyers b ON b.id = k.buyer_id
-       WHERE k.id = $1 AND k.deleted_at IS NULL
-       LIMIT 1`,
+    const existing = await query<{ id: string; quota_tokens: string | null; daily_reset: boolean }>(
+      `SELECT id, quota_tokens, daily_reset FROM api_keys WHERE id = $1 AND deleted_at IS NULL LIMIT 1`,
       [params.data.keyId]
     );
-    if (!owner.rowCount) return reply.code(404).send({ error: "Key not found" });
-    const isSuperAdmin = (owner.rows[0].buyer_name || "").trim().toLowerCase() === "super admin";
+    if (!existing.rowCount) return reply.code(404).send({ error: "Key not found" });
 
+    const key = existing.rows[0];
+    if (body.data.daily_reset && key.quota_tokens === null) {
+      return reply.code(400).send({
+        error: "Key has unlimited quota (no max tokens). Set a token quota first before enabling daily reset."
+      });
+    }
+
+    // ON: use current quota_tokens as daily max and start a fresh day (used_tokens = 0).
+    // OFF: clear daily_quota_tokens; keep used_tokens as lifetime counter again.
     const result = await query(
-      isSuperAdmin
+      body.data.daily_reset
         ? `UPDATE api_keys
-           SET is_vip = $1
-           WHERE id = $2 AND deleted_at IS NULL
-           RETURNING id, is_vip, quota_tokens`
+           SET daily_reset = true,
+               daily_quota_tokens = quota_tokens,
+               used_tokens = 0
+           WHERE id = $1 AND deleted_at IS NULL
+           RETURNING id, daily_reset, daily_quota_tokens, quota_tokens, used_tokens`
         : `UPDATE api_keys
-           SET is_vip = $1,
-               quota_tokens = CASE WHEN $1 THEN 500000000 ELSE 100000000 END
-           WHERE id = $2 AND deleted_at IS NULL
-           RETURNING id, is_vip, quota_tokens`,
-      [body.data.is_vip, params.data.keyId]
+           SET daily_reset = false,
+               daily_quota_tokens = NULL
+           WHERE id = $1 AND deleted_at IS NULL
+           RETURNING id, daily_reset, daily_quota_tokens, quota_tokens, used_tokens`,
+      [params.data.keyId]
     );
     if (!result.rowCount) return reply.code(404).send({ error: "Key not found" });
 
     invalidateApiKeyCache();
     return { ok: true, key: result.rows[0] };
+  });
+
+  // --- Bulk enable/disable daily reset for all keys that have max token ---
+  app.patch("/admin/keys/bulk-daily-reset", async (request, reply) => {
+    const body = z.object({
+      daily_reset: z.boolean()
+    }).safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ error: "Invalid payload. Requires { daily_reset: boolean }" });
+
+    let result;
+    if (body.data.daily_reset) {
+      // Only keys with a finite token quota (skip Super Admin / unlimited)
+      // Fresh day: zero used_tokens so they don't start already near limit
+      result = await query(
+        `UPDATE api_keys
+         SET daily_reset = true,
+             daily_quota_tokens = quota_tokens,
+             used_tokens = 0
+         WHERE deleted_at IS NULL
+           AND is_hidden = false
+           AND quota_tokens IS NOT NULL`
+      );
+    } else {
+      result = await query(
+        `UPDATE api_keys
+         SET daily_reset = false,
+             daily_quota_tokens = NULL
+         WHERE deleted_at IS NULL
+           AND is_hidden = false
+           AND daily_reset = true`
+      );
+    }
+
+    invalidateApiKeyCache();
+    return {
+      ok: true,
+      updated: result.rowCount || 0,
+      daily_reset: body.data.daily_reset,
+      message: body.data.daily_reset
+        ? "Daily reset enabled for all keys with max token (resets 00:00 WIB)"
+        : "Daily reset disabled for all keys"
+    };
   });
 
   app.get("/admin/usage/chart", async (request) => {
@@ -770,7 +1191,7 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     const result = await query(
       `select ue.created_at, ue.agent_id, ue.endpoint, ue.model_id, ue.status_code, ue.success,
         ue.prompt_tokens, ue.completion_tokens, ue.total_tokens, ue.estimated, ue.cost_estimate, ue.latency_ms,
-        b.name as buyer_name, k.key_prefix
+        b.name as buyer_name, k.key_prefix, k.quota_tokens
        from usage_events ue
        left join buyers b on b.id = ue.buyer_id
        left join api_keys k on k.id = ue.api_key_id
@@ -827,6 +1248,7 @@ export async function registerAdminRoutes(app: FastifyInstance) {
       `select 
         k.key_prefix,
         k.id as key_id,
+        k.quota_tokens,
         b.name as buyer_name,
         b.email as buyer_email,
         count(ue.id)::int as request_count,
@@ -838,7 +1260,7 @@ export async function registerAdminRoutes(app: FastifyInstance) {
        join buyers b on b.id = k.buyer_id
        where ue.created_at > now() - interval '5 minutes'
          and k.is_hidden = false
-       group by k.id, k.key_prefix, b.name, b.email
+       group by k.id, k.key_prefix, k.quota_tokens, b.name, b.email
        order by max(ue.created_at) desc`
     );
     return { active: result.rows };
@@ -856,7 +1278,7 @@ export async function registerAdminRoutes(app: FastifyInstance) {
         k.key_prefix,
         k.expires_at,
         k.created_at as key_created_at,
-        k.is_vip,
+        k.quota_tokens,
         COUNT(ue.id)::int as total_requests,
         COALESCE(SUM(ue.total_tokens), 0)::bigint as total_tokens,
         COALESCE(SUM(ue.prompt_tokens), 0)::bigint as prompt_tokens,
@@ -866,7 +1288,7 @@ export async function registerAdminRoutes(app: FastifyInstance) {
       JOIN api_keys k ON k.id = ue.api_key_id
       JOIN buyers b ON b.id = k.buyer_id
       WHERE k.is_hidden = false
-      GROUP BY b.id, b.name, b.email, k.id, k.label, k.key_prefix, k.expires_at, k.created_at, k.is_vip
+      GROUP BY b.id, b.name, b.email, k.id, k.label, k.key_prefix, k.expires_at, k.created_at, k.quota_tokens
       HAVING COUNT(ue.id) > 0
       ORDER BY total_requests DESC
       LIMIT 100`
@@ -952,33 +1374,6 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
-  // --- Settings: Round-Robin toggle ---
-  app.get("/admin/settings/round-robin", async () => {
-    const result = await query<{ value: string }>(
-      `SELECT value FROM system_settings WHERE key = 'round_robin_enabled'`
-    );
-    const raw = result.rows[0]?.value;
-    const enabled = raw === undefined ? true : raw === "true" || raw === "1";
-    return { round_robin_enabled: enabled };
-  });
-
-  app.put("/admin/settings/round-robin", async (request, reply) => {
-    const parsed = z
-      .object({ enabled: z.boolean() })
-      .safeParse(request.body);
-    if (!parsed.success) {
-      return reply.code(400).send({ error: "Invalid payload. Requires { enabled: boolean }" });
-    }
-    const value = parsed.data.enabled ? "true" : "false";
-    await query(
-      `INSERT INTO system_settings (key, value, updated_at) VALUES ('round_robin_enabled', $1, now())
-       ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = now()`,
-      [value]
-    );
-    clearUpstreamCache();
-    return { ok: true, round_robin_enabled: parsed.data.enabled };
-  });
-
   // --- Settings: Upstream ---
   app.get("/admin/settings/upstream", async () => {
     const result = await query<{ key: string; value: string }>(
@@ -1053,12 +1448,21 @@ export async function registerAdminRoutes(app: FastifyInstance) {
           upstream_id = excluded.upstream_id`,
         [aliasId, model.id, displayName, primaryUpstreamId]
       );
-      await query(
-        `insert into buyer_model_access (api_key_id, model_id)
-         select id, $1 from api_keys
-         on conflict do nothing`,
+      const priv = await query<{ restricted: boolean }>(
+        `select cardinality(coalesce(access_roles, '{}'::text[])) > 0 as restricted from models where id = $1`,
         [aliasId]
       );
+      if (priv.rows[0]?.restricted) {
+        await reapplyModelAccessFromDb(aliasId);
+      } else {
+        await query(
+          `insert into buyer_model_access (api_key_id, model_id)
+           select id, $1 from api_keys
+           where deleted_at is null
+           on conflict do nothing`,
+          [aliasId]
+        );
+      }
       synced++;
     }
 
@@ -1078,14 +1482,19 @@ export async function registerAdminRoutes(app: FastifyInstance) {
       base_url: z.string().url(),
       api_key: z.string().min(1),
       is_active: z.boolean().default(true),
-      weight: z.number().int().min(1).default(1),
     }).safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: "Invalid payload" });
 
     const result = await query<{ id: string }>(
-      `INSERT INTO upstreams (name, base_url, api_key, is_active, weight)
-       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-      [parsed.data.name, parsed.data.base_url, parsed.data.api_key, parsed.data.is_active, parsed.data.weight]
+      `INSERT INTO upstreams (name, base_url, api_key, is_active)
+       VALUES ($1, $2, $3, $4) RETURNING id`,
+      [parsed.data.name, parsed.data.base_url, parsed.data.api_key, parsed.data.is_active]
+    );
+    await query(
+      `INSERT INTO upstream_api_keys (upstream_id, label, api_key, is_active)
+       VALUES ($1, 'primary', $2, true)
+       ON CONFLICT DO NOTHING`,
+      [result.rows[0].id, parsed.data.api_key]
     );
     clearUpstreamCache();
 
@@ -1110,7 +1519,6 @@ export async function registerAdminRoutes(app: FastifyInstance) {
       base_url: z.string().url().optional(),
       api_key: z.string().min(1).optional(),
       is_active: z.boolean().optional(),
-      weight: z.number().int().min(1).optional(),
     }).safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: "Invalid payload" });
 
@@ -1122,7 +1530,6 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     if (parsed.data.base_url !== undefined) { updates.push(`base_url = $${idx++}`); values.push(parsed.data.base_url); }
     if (parsed.data.api_key !== undefined) { updates.push(`api_key = $${idx++}`); values.push(parsed.data.api_key); }
     if (parsed.data.is_active !== undefined) { updates.push(`is_active = $${idx++}`); values.push(parsed.data.is_active); }
-    if (parsed.data.weight !== undefined) { updates.push(`weight = $${idx++}`); values.push(parsed.data.weight); }
 
     if (updates.length === 0) return reply.code(400).send({ error: "No fields to update" });
 
@@ -1133,6 +1540,25 @@ export async function registerAdminRoutes(app: FastifyInstance) {
       `UPDATE upstreams SET ${updates.join(", ")} WHERE id = $${idx}`,
       values
     );
+    if (parsed.data.api_key !== undefined) {
+      // Keep multi-key table in sync: if no keys yet, insert primary; else update first active or insert new primary
+      const existing = await query<{ id: string }>(
+        `SELECT id FROM upstream_api_keys WHERE upstream_id = $1 ORDER BY created_at ASC LIMIT 1`,
+        [params.data.id]
+      );
+      if (existing.rows[0]) {
+        await query(
+          `UPDATE upstream_api_keys SET api_key = $1, updated_at = NOW() WHERE id = $2`,
+          [parsed.data.api_key, existing.rows[0].id]
+        );
+      } else {
+        await query(
+          `INSERT INTO upstream_api_keys (upstream_id, label, api_key, is_active)
+           VALUES ($1, 'primary', $2, true)`,
+          [params.data.id, parsed.data.api_key]
+        );
+      }
+    }
     clearUpstreamCache();
     return { ok: true, message: "Upstream updated" };
   });
@@ -1156,6 +1582,157 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     await query(`DELETE FROM upstreams WHERE id = $1`, [params.data.id]);
     clearUpstreamCache();
     return { ok: true, message: "Upstream deleted" };
+  });
+
+  // --- Upstream multi API keys (round-robin within one upstream) ---
+  async function syncUpstreamPrimaryKey(upstreamId: string) {
+    const active = await query<{ api_key: string }>(
+      `SELECT api_key FROM upstream_api_keys
+       WHERE upstream_id = $1 AND is_active = true
+       ORDER BY created_at ASC LIMIT 1`,
+      [upstreamId]
+    );
+    const anyKey = active.rows[0]?.api_key
+      ?? (await query<{ api_key: string }>(
+        `SELECT api_key FROM upstream_api_keys WHERE upstream_id = $1 ORDER BY created_at ASC LIMIT 1`,
+        [upstreamId]
+      )).rows[0]?.api_key
+      ?? "";
+    if (anyKey) {
+      await query(
+        `UPDATE upstreams SET api_key = $1, updated_at = NOW() WHERE id = $2`,
+        [anyKey, upstreamId]
+      );
+    }
+  }
+
+  app.get("/admin/upstreams/:id/keys", async (request, reply) => {
+    const params = z.object({ id: z.string().uuid() }).safeParse(request.params);
+    if (!params.success) return reply.code(400).send({ error: "Invalid upstream ID" });
+    const result = await query<{
+      id: string;
+      label: string;
+      api_key: string;
+      is_active: boolean;
+      created_at: string;
+    }>(
+      `SELECT id, label, api_key, is_active, created_at
+       FROM upstream_api_keys
+       WHERE upstream_id = $1
+       ORDER BY created_at ASC`,
+      [params.data.id]
+    );
+    return {
+      keys: result.rows.map((r) => ({
+        id: r.id,
+        label: r.label,
+        apiKey: r.api_key,
+        isActive: r.is_active,
+        createdAt: r.created_at,
+        masked: r.api_key.length > 10
+          ? r.api_key.slice(0, 6) + "..." + r.api_key.slice(-4)
+          : r.api_key,
+      })),
+    };
+  });
+
+  app.post("/admin/upstreams/:id/keys", async (request, reply) => {
+    const params = z.object({ id: z.string().uuid() }).safeParse(request.params);
+    if (!params.success) return reply.code(400).send({ error: "Invalid upstream ID" });
+    const parsed = z.object({
+      api_key: z.string().min(1),
+      label: z.string().max(255).optional().default(""),
+      is_active: z.boolean().optional().default(true),
+    }).safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "Invalid payload. Requires api_key" });
+
+    const exists = await query<{ id: string }>(`SELECT id FROM upstreams WHERE id = $1`, [params.data.id]);
+    if (!exists.rows[0]) return reply.code(404).send({ error: "Upstream not found" });
+
+    try {
+      const result = await query<{ id: string }>(
+        `INSERT INTO upstream_api_keys (upstream_id, label, api_key, is_active)
+         VALUES ($1, $2, $3, $4) RETURNING id`,
+        [params.data.id, parsed.data.label || "", parsed.data.api_key, parsed.data.is_active]
+      );
+      await syncUpstreamPrimaryKey(params.data.id);
+      clearUpstreamCache();
+      return { id: result.rows[0].id, message: "API key added" };
+    } catch (err: any) {
+      if (String(err?.message || "").includes("uq_upstream_api_keys_upstream_key")) {
+        return reply.code(409).send({ error: "API key already exists for this upstream" });
+      }
+      throw err;
+    }
+  });
+
+  app.put("/admin/upstreams/:id/keys/:keyId", async (request, reply) => {
+    const params = z.object({ id: z.string().uuid(), keyId: z.string().uuid() }).safeParse(request.params);
+    if (!params.success) return reply.code(400).send({ error: "Invalid ids" });
+    const parsed = z.object({
+      api_key: z.string().min(1).optional(),
+      label: z.string().max(255).optional(),
+      is_active: z.boolean().optional(),
+    }).safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "Invalid payload" });
+
+    const updates: string[] = [];
+    const values: any[] = [];
+    let idx = 1;
+    if (parsed.data.api_key !== undefined) { updates.push(`api_key = $${idx++}`); values.push(parsed.data.api_key); }
+    if (parsed.data.label !== undefined) { updates.push(`label = $${idx++}`); values.push(parsed.data.label); }
+    if (parsed.data.is_active !== undefined) { updates.push(`is_active = $${idx++}`); values.push(parsed.data.is_active); }
+    if (updates.length === 0) return reply.code(400).send({ error: "No fields to update" });
+    updates.push(`updated_at = NOW()`);
+    values.push(params.data.keyId, params.data.id);
+    const result = await query(
+      `UPDATE upstream_api_keys SET ${updates.join(", ")}
+       WHERE id = $${idx} AND upstream_id = $${idx + 1}
+       RETURNING id`,
+      values
+    );
+    if (result.rowCount === 0) return reply.code(404).send({ error: "Key not found" });
+    await syncUpstreamPrimaryKey(params.data.id);
+    clearUpstreamCache();
+    return { ok: true, message: "API key updated" };
+  });
+
+  app.patch("/admin/upstreams/:id/keys/:keyId/toggle", async (request, reply) => {
+    const params = z.object({ id: z.string().uuid(), keyId: z.string().uuid() }).safeParse(request.params);
+    if (!params.success) return reply.code(400).send({ error: "Invalid ids" });
+    const result = await query(
+      `UPDATE upstream_api_keys
+       SET is_active = NOT is_active, updated_at = NOW()
+       WHERE id = $1 AND upstream_id = $2
+       RETURNING id, is_active`,
+      [params.data.keyId, params.data.id]
+    );
+    if (result.rowCount === 0) return reply.code(404).send({ error: "Key not found" });
+    await syncUpstreamPrimaryKey(params.data.id);
+    clearUpstreamCache();
+    return { ok: true, is_active: result.rows[0].is_active };
+  });
+
+  app.delete("/admin/upstreams/:id/keys/:keyId", async (request, reply) => {
+    const params = z.object({ id: z.string().uuid(), keyId: z.string().uuid() }).safeParse(request.params);
+    if (!params.success) return reply.code(400).send({ error: "Invalid ids" });
+
+    const count = await query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM upstream_api_keys WHERE upstream_id = $1`,
+      [params.data.id]
+    );
+    if (Number(count.rows[0]?.count || 0) <= 1) {
+      return reply.code(400).send({ error: "Cannot delete the last API key. Add another key first." });
+    }
+
+    const result = await query(
+      `DELETE FROM upstream_api_keys WHERE id = $1 AND upstream_id = $2 RETURNING id`,
+      [params.data.keyId, params.data.id]
+    );
+    if (result.rowCount === 0) return reply.code(404).send({ error: "Key not found" });
+    await syncUpstreamPrimaryKey(params.data.id);
+    clearUpstreamCache();
+    return { ok: true, message: "API key deleted" };
   });
 
   app.post("/admin/upstreams/:id/sync", async (request, reply) => {
@@ -1188,11 +1765,20 @@ export async function registerAdminRoutes(app: FastifyInstance) {
           upstream_id = excluded.upstream_id`,
         [aliasId, model.id, displayName, params.data.id]
       );
-      await query(
-        `INSERT INTO buyer_model_access (api_key_id, model_id)
-         SELECT id, $1 FROM api_keys ON CONFLICT DO NOTHING`,
+      // Preserve role-restricted grants if the row already has access_roles.
+      const priv = await query<{ restricted: boolean }>(
+        `select cardinality(coalesce(access_roles, '{}'::text[])) > 0 as restricted from models where id = $1`,
         [aliasId]
       );
+      if (priv.rows[0]?.restricted) {
+        await reapplyModelAccessFromDb(aliasId);
+      } else {
+        await query(
+          `INSERT INTO buyer_model_access (api_key_id, model_id)
+           SELECT id, $1 FROM api_keys WHERE deleted_at IS NULL ON CONFLICT DO NOTHING`,
+          [aliasId]
+        );
+      }
       synced++;
     }
 
@@ -1326,7 +1912,36 @@ export async function seedUpstreamsTable() {
       ["Default", baseUrl, apiKey, true, 1]
     );
   }
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS upstream_api_keys (
+      id uuid primary key default gen_random_uuid(),
+      upstream_id uuid not null references upstreams(id) on delete cascade,
+      label varchar(255) not null default '',
+      api_key text not null,
+      is_active boolean not null default true,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_upstream_api_keys_upstream ON upstream_api_keys(upstream_id)`);
+  await query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_upstream_api_keys_upstream_key
+    ON upstream_api_keys(upstream_id, api_key)
+  `);
+  // Migrate legacy single-key column into multi-key table
+  await query(`
+    INSERT INTO upstream_api_keys (upstream_id, label, api_key, is_active)
+    SELECT u.id, 'primary', u.api_key, true
+    FROM upstreams u
+    WHERE u.api_key is not null and length(trim(u.api_key)) > 0
+      AND NOT EXISTS (
+        SELECT 1 FROM upstream_api_keys k
+        WHERE k.upstream_id = u.id AND k.api_key = u.api_key
+      )
+  `);
 }
+
 
 export async function seedHiddenKeySchema() {
   await query(`ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS is_hidden BOOLEAN NOT NULL DEFAULT false`);

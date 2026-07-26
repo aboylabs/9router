@@ -3,7 +3,7 @@ import { z } from "zod";
 import { config } from "./config.js";
 import { chatRateLimiter } from "./rate-limiter.js";
 import { bearerToken } from "./security.js";
-import { apiKeyIsUsable, findApiKey, modelForKey, publicModelsForKey, recordUsage } from "./repositories.js";
+import { apiKeyIsUsable, checkTokenQuota, findApiKey, modelForKey, publicModelsForKey, recordUsage } from "./repositories.js";
 import { callUpstream, streamUpstream } from "./upstream.js";
 import { costEstimate, estimateUsage, usageFromResponse } from "./usage.js";
 
@@ -122,6 +122,16 @@ export async function registerProxyRoutes(app: FastifyInstance) {
       });
     }
 
+    // Token quota is per-key, but quota_exempt models skip both the deny check and used_tokens billing.
+    // RPM + request-quota still apply (checked earlier in requireBuyerKey / rate limiter).
+    if (!access.quota_exempt && !apiKey.is_hidden) {
+      const tokenQuota = checkTokenQuota(apiKey);
+      if (!tokenQuota.ok) {
+        return reply.code(403).send({ error: { message: tokenQuota.message, code: tokenQuota.code } });
+      }
+    }
+
+    const countTowardTokenQuota = !access.quota_exempt;
     const upstreamBody = {
       ...parsed.data,
       model: access.upstream_model,
@@ -168,7 +178,8 @@ export async function registerProxyRoutes(app: FastifyInstance) {
             estimated: usage.estimated,
             costEstimate: 0,
             latencyMs: Date.now() - started,
-            errorCode: upstreamErrorCode
+            errorCode: upstreamErrorCode,
+            countTowardTokenQuota
           }).catch((err) => {
             request.log.error({ err, buyerId: apiKey.buyer_id, apiKeyId: apiKey.id }, "Failed to record usage");
           });
@@ -275,7 +286,8 @@ export async function registerProxyRoutes(app: FastifyInstance) {
             estimated: billedUsage.estimated,
             costEstimate: estimatedCost,
             latencyMs: Date.now() - started,
-            errorCode: upstream.status >= 400 ? "upstream_error" : null
+            errorCode: upstream.status >= 400 ? "upstream_error" : null,
+            countTowardTokenQuota
           }).catch((err) => {
             request.log.error({ err, buyerId: apiKey.buyer_id, apiKeyId: apiKey.id }, "Failed to record usage");
           });
@@ -327,7 +339,8 @@ export async function registerProxyRoutes(app: FastifyInstance) {
         estimated: usageForLog.estimated,
         costEstimate: estimatedCost,
         latencyMs: Date.now() - started,
-        errorCode: success ? null : upstream.errorCode ?? "upstream_error"
+        errorCode: success ? null : upstream.errorCode ?? "upstream_error",
+        countTowardTokenQuota
       }).catch((err) => {
         request.log.error({ err, buyerId: apiKey.buyer_id, apiKeyId: apiKey.id }, "Failed to record usage");
       });
@@ -364,7 +377,8 @@ async function requireBuyerKey(authorization: string | undefined, reply: Fastify
     return null;
   }
 
-  const usable = apiKeyIsUsable(apiKey);
+  // Skip token-quota here: it is re-checked after model resolution so quota_exempt models can still be used.
+  const usable = apiKeyIsUsable(apiKey, { skipTokenQuota: true });
   if (!usable.ok) {
     reply.code(403).send({ error: { message: usable.message, code: usable.code } });
     return null;

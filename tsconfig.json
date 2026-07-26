@@ -7,6 +7,10 @@
     "jsx": "react-jsx",
     "outDir": "dist",
     "rootDir": "src",
+    "baseUrl": ".",
+    "paths": {
+      "@shared/*": ["src/shared/*"]
+    },
     "strict": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,

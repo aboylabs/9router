@@ -1,10 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { KeyRound } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/Dialog";
 import { Button } from "./ui/Button";
 import { useToast } from "./ui/Toast";
 import { api } from "../lib/api";
 import { SuccessModal } from "./SuccessModal";
+import {
+  CREATE_KEY_PACKAGES,
+  DEFAULT_CREATE_KEY_PACKAGE_ID,
+  type CreateKeyPackageId,
+} from "@shared/package-catalog";
 
 interface CreateKeyModalProps {
   open: boolean;
@@ -26,8 +31,17 @@ interface CreateKeyResult {
     quota_tokens: number | null;
     daily_quota_tokens: number | null;
     daily_reset: boolean;
+    rate_limit_rpm?: number | null;
     expires_at: string;
   };
+}
+
+function formatQuotaM(tokens: number): string {
+  return `${Math.round(tokens / 1_000_000)}M`;
+}
+
+function formatPriceId(rp: number): string {
+  return `Rp ${rp.toLocaleString("id-ID")}`;
 }
 
 export function CreateKeyModal({ open, onOpenChange, onSuccess }: CreateKeyModalProps) {
@@ -35,26 +49,29 @@ export function CreateKeyModal({ open, onOpenChange, onSuccess }: CreateKeyModal
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<CreateKeyResult | null>(null);
   const [userName, setUserName] = useState("");
-  const [days, setDays] = useState("");
-  const [quotaTokens, setQuotaTokens] = useState<number>(100_000_000);
+  const [packageId, setPackageId] = useState<CreateKeyPackageId>(DEFAULT_CREATE_KEY_PACKAGE_ID);
+  const [days, setDays] = useState(String(CREATE_KEY_PACKAGES.find((p) => p.id === DEFAULT_CREATE_KEY_PACKAGE_ID)?.defaultDays ?? 28));
 
-  // Fixed default RPM for new keys (no longer configurable in this form)
-  const DEFAULT_RATE_LIMIT_RPM = 50;
-
-  const QUOTA_OPTIONS = [
-    { value: 100_000_000, label: "100M tokens" },
-    { value: 250_000_000, label: "250M tokens" },
-    { value: 500_000_000, label: "500M tokens" },
-  ] as const;
+  const selectedPkg = useMemo(
+    () => CREATE_KEY_PACKAGES.find((p) => p.id === packageId) ?? CREATE_KEY_PACKAGES[0],
+    [packageId]
+  );
 
   useEffect(() => {
     if (open) {
       setResult(null);
       setUserName("");
-      setDays("");
-      setQuotaTokens(100_000_000);
+      setPackageId(DEFAULT_CREATE_KEY_PACKAGE_ID);
+      const def = CREATE_KEY_PACKAGES.find((p) => p.id === DEFAULT_CREATE_KEY_PACKAGE_ID);
+      setDays(String(def?.defaultDays ?? 28));
     }
   }, [open]);
+
+  // When package changes, reset days to that package's default (admin can still edit after).
+  useEffect(() => {
+    if (!open) return;
+    setDays(String(selectedPkg.defaultDays));
+  }, [packageId]); // eslint-disable-line react-hooks/exhaustive-deps -- intentional: only on package switch
 
   const daysNum = parseInt(days, 10);
   const daysValid = !isNaN(daysNum) && daysNum > 0;
@@ -76,8 +93,7 @@ export function CreateKeyModal({ open, onOpenChange, onSuccess }: CreateKeyModal
         body: JSON.stringify({
           name: userName.trim(),
           days: daysNum,
-          rateLimitRpm: DEFAULT_RATE_LIMIT_RPM,
-          quotaTokens
+          packageId
         })
       });
       setResult(data);
@@ -110,7 +126,7 @@ export function CreateKeyModal({ open, onOpenChange, onSuccess }: CreateKeyModal
         <DialogHeader>
           <DialogTitle>Create API Key</DialogTitle>
           <DialogDescription>
-            Enter buyer name, active days, and token quota
+            Pilih paket (kuota + RPM otomatis). Hari aktif default 28, bisa diubah.
           </DialogDescription>
         </DialogHeader>
 
@@ -128,13 +144,37 @@ export function CreateKeyModal({ open, onOpenChange, onSuccess }: CreateKeyModal
           </div>
 
           <div>
+            <label className="block text-sm font-medium text-text-secondary mb-1.5">Paket</label>
+            <select
+              value={packageId}
+              onChange={(e) => setPackageId(e.target.value as CreateKeyPackageId)}
+              className="w-full px-3 py-2 rounded-md border border-border-primary bg-surface-primary text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            >
+              {CREATE_KEY_PACKAGES.map((pkg) => (
+                <option key={pkg.id} value={pkg.id}>
+                  {pkg.label} · {formatQuotaM(pkg.quotaTokens)} · {pkg.rateLimitRpm} RPM · {formatPriceId(pkg.priceRp)}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-text-muted mt-1.5 leading-relaxed">
+              <span className="font-medium text-text-secondary">{selectedPkg.label}</span>
+              {" · "}
+              {formatQuotaM(selectedPkg.quotaTokens)} tokens
+              {" · "}
+              {selectedPkg.rateLimitRpm} RPM
+              {" · "}
+              {formatPriceId(selectedPkg.priceRp)}
+            </p>
+          </div>
+
+          <div>
             <label className="block text-sm font-medium text-text-secondary mb-1.5">Aktif (hari)</label>
             <input
               type="number"
               min="1"
               value={days}
               onChange={(e) => setDays(e.target.value)}
-              placeholder="Contoh: 14"
+              placeholder="28"
               className="w-full px-3 py-2 rounded-md border border-border-primary bg-surface-primary text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
             {days && daysValid && (
@@ -142,24 +182,6 @@ export function CreateKeyModal({ open, onOpenChange, onSuccess }: CreateKeyModal
                 Expired: {new Date(Date.now() + daysNum * 24 * 60 * 60 * 1000).toLocaleDateString("id-ID", { year: "numeric", month: "long", day: "numeric" })}
               </p>
             )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1.5">Token Quota</label>
-            <select
-              value={quotaTokens}
-              onChange={(e) => setQuotaTokens(Number(e.target.value))}
-              className="w-full px-3 py-2 rounded-md border border-border-primary bg-surface-primary text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            >
-              {QUOTA_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-text-muted mt-1">
-              Batas total token untuk key ini. Default 100M. Rate limit fixed 50 RPM.
-            </p>
           </div>
 
           <div className="flex justify-end gap-3 pt-2">

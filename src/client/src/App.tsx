@@ -62,8 +62,8 @@ function Dashboard({ adminEmail, page, onNavigate, onLogout }: {
         onLogout={onLogout}
       />
 
-      <main className="flex-1 lg:ml-0 p-4 lg:p-8 pt-14 lg:pt-8 overflow-auto">
-        <div className="max-w-[1600px] mx-auto">
+      <main className="flex-1 lg:ml-0 p-4 lg:p-8 pt-16 lg:pt-8 overflow-auto min-h-screen">
+        <div className="max-w-[1600px] mx-auto page-enter">
           {loading ? (
             <div className="flex items-center justify-center py-20">
               <svg className="animate-spin h-6 w-6 text-primary-500" viewBox="0 0 24 24" fill="none">

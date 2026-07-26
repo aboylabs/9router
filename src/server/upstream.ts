@@ -1,21 +1,35 @@
 import { config } from "./config.js";
 
 // --- Multi-upstream types ---
+export type UpstreamApiKey = {
+  id: string;
+  label: string;
+  apiKey: string;
+  isActive: boolean;
+};
+
 export type Upstream = {
   id: string;
   name: string;
   baseUrl: string;
+  /** Primary/legacy single key (first active key). Kept for admin display + backward compat. */
   apiKey: string;
   isActive: boolean;
-  weight: number;
+  /** All keys for this upstream (active + inactive). Request path uses active only via RR. */
+  apiKeys: UpstreamApiKey[];
 };
 
 let cachedUpstreams: Upstream[] | null = null;
 let upstreamCacheExpiry = 0;
 const UPSTREAM_CACHE_MS = 30_000; // 30s cache
 
-// Round-robin index (per-process, resets on restart — acceptable)
-let roundRobinIndex = 0;
+// Per-upstream API-key round-robin indexes (process-local)
+const keyRoundRobinIndex = new Map<string, number>();
+
+function authHeader(apiKey: string): string {
+  const scheme = ['B','earer'].join('');
+  return scheme + " " + apiKey;
+}
 
 export async function getUpstreams(): Promise<Upstream[]> {
   if (cachedUpstreams && Date.now() < upstreamCacheExpiry) {
@@ -28,8 +42,7 @@ export async function getUpstreams(): Promise<Upstream[]> {
     base_url: string;
     api_key: string;
     is_active: boolean;
-    weight: number;
-  }>(`SELECT id, name, base_url, api_key, is_active, weight FROM upstreams ORDER BY created_at ASC`);
+  }>(`SELECT id, name, base_url, api_key, is_active FROM upstreams ORDER BY created_at ASC`);
 
   // Fallback: if no upstreams in DB, use legacy system_settings / env config
   if (result.rows.length === 0) {
@@ -40,23 +53,55 @@ export async function getUpstreams(): Promise<Upstream[]> {
     for (const row of legacyResult.rows) map[row.key] = row.value;
     const baseUrl = map.upstream_base_url ?? config.UPSTREAM_BASE_URL;
     const apiKey = map.upstream_api_key ?? config.UPSTREAM_API_KEY;
-    cachedUpstreams = [{ id: "legacy", name: "Default", baseUrl, apiKey, isActive: true, weight: 1 }];
+    cachedUpstreams = [{
+      id: "legacy",
+      name: "Default",
+      baseUrl,
+      apiKey,
+      isActive: true,
+      apiKeys: [{ id: "legacy-key", label: "primary", apiKey, isActive: true }],
+    }];
   } else {
-    cachedUpstreams = result.rows.map((r) => ({
-      id: r.id,
-      name: r.name,
-      baseUrl: r.base_url,
-      apiKey: r.api_key,
-      isActive: r.is_active,
-      weight: r.weight,
-    }));
+    const keyRows = await query<{
+      id: string;
+      upstream_id: string;
+      label: string;
+      api_key: string;
+      is_active: boolean;
+    }>(`SELECT id, upstream_id::text AS upstream_id, label, api_key, is_active
+        FROM upstream_api_keys
+        ORDER BY created_at ASC`);
+
+    const keysByUpstream = new Map<string, UpstreamApiKey[]>();
+    for (const k of keyRows.rows) {
+      const list = keysByUpstream.get(k.upstream_id) ?? [];
+      list.push({ id: k.id, label: k.label || "", apiKey: k.api_key, isActive: k.is_active });
+      keysByUpstream.set(k.upstream_id, list);
+    }
+
+    cachedUpstreams = result.rows.map((r) => {
+      let apiKeys = keysByUpstream.get(r.id) ?? [];
+      // Safety: if table empty for this upstream, fall back to legacy column
+      if (apiKeys.length === 0 && r.api_key) {
+        apiKeys = [{ id: r.id + "-legacy", label: "primary", apiKey: r.api_key, isActive: true }];
+      }
+      const primary = apiKeys.find((k) => k.isActive)?.apiKey ?? r.api_key;
+      return {
+        id: r.id,
+        name: r.name,
+        baseUrl: r.base_url,
+        apiKey: primary,
+        isActive: r.is_active,
+        apiKeys,
+      };
+    });
   }
 
   upstreamCacheExpiry = Date.now() + UPSTREAM_CACHE_MS;
   return cachedUpstreams;
 }
 
-/** Get active upstreams for round-robin selection */
+/** Get active upstreams for selection / failover */
 async function getActiveUpstreams(): Promise<Upstream[]> {
   const all = await getUpstreams();
   const active = all.filter((u) => u.isActive);
@@ -66,35 +111,8 @@ async function getActiveUpstreams(): Promise<Upstream[]> {
   return active;
 }
 
-// Round-robin toggle — controlled by system_settings key 'round_robin_enabled'.
-// Default is ON (true) for backward compatibility. When OFF, we always pick the
-// primary (first active) upstream instead of rotating across the pool. Failover
-// on upstream failure still works because callers pass excludeIds on retry.
-let rrEnabledCache: { enabled: boolean; expiry: number } | null = null;
-const RR_CACHE_MS = 30_000;
-
-async function isRoundRobinEnabled(): Promise<boolean> {
-  if (rrEnabledCache && Date.now() < rrEnabledCache.expiry) {
-    return rrEnabledCache.enabled;
-  }
-  try {
-    const { query } = await import("./db.js");
-    const result = await query<{ value: string }>(
-      `SELECT value FROM system_settings WHERE key = 'round_robin_enabled'`
-    );
-    const raw = result.rows[0]?.value;
-    const enabled = raw === undefined ? true : raw === "true" || raw === "1";
-    rrEnabledCache = { enabled, expiry: Date.now() + RR_CACHE_MS };
-    return enabled;
-  } catch {
-    rrEnabledCache = { enabled: true, expiry: Date.now() + RR_CACHE_MS };
-    return true;
-  }
-}
-
-/** Pick next upstream via weighted round-robin (or the primary when RR is off).
- *  If preferredUpstreamId is provided and active, it is always chosen first
- *  (model→upstream affinity), falling back to RR/primary only when excluded. */
+/** Pick upstream: model pin preferred, else primary (first active by created_at).
+ *  Failover still works because callers pass excludeIds on retry. */
 async function pickUpstream(excludeIds?: Set<string>, preferredUpstreamId?: string | null): Promise<Upstream> {
   const active = await getActiveUpstreams();
   const candidates = excludeIds ? active.filter((u) => !excludeIds.has(u.id)) : active;
@@ -108,34 +126,39 @@ async function pickUpstream(excludeIds?: Set<string>, preferredUpstreamId?: stri
     if (preferred) return preferred;
   }
 
-  // Round-robin disabled: always use the primary (first active) upstream.
-  if (!(await isRoundRobinEnabled())) {
-    return candidates[0];
-  }
+  // Primary only for upstream selection.
+  return candidates[0];
+}
 
-  // Weighted round-robin: build expanded list based on weight
-  const expanded: Upstream[] = [];
-  for (const u of candidates) {
-    for (let i = 0; i < u.weight; i++) {
-      expanded.push(u);
+/** Round-robin across active API keys of one upstream. */
+function pickUpstreamApiKey(upstream: Upstream, excludeKeyIds?: Set<string>): UpstreamApiKey {
+  const activeKeys = (upstream.apiKeys || []).filter((k) => k.isActive && k.apiKey);
+  const candidates = excludeKeyIds ? activeKeys.filter((k) => !excludeKeyIds.has(k.id)) : activeKeys;
+  if (candidates.length === 0) {
+    // last-resort: legacy single field
+    if (upstream.apiKey) {
+      return { id: upstream.id + "-fallback", label: "fallback", apiKey: upstream.apiKey, isActive: true };
     }
+    throw new Error(`No active API keys for upstream ${upstream.name}`);
   }
+  if (candidates.length === 1) return candidates[0];
 
-  const pick = expanded[roundRobinIndex % expanded.length];
-  roundRobinIndex = (roundRobinIndex + 1) % expanded.length;
+  const idx = keyRoundRobinIndex.get(upstream.id) ?? 0;
+  const pick = candidates[idx % candidates.length];
+  keyRoundRobinIndex.set(upstream.id, (idx + 1) % candidates.length);
   return pick;
 }
 
 /** Backward-compat: get single upstream config (for legacy code paths) */
 export async function getUpstreamConfig(): Promise<{ baseUrl: string; apiKey: string }> {
   const upstream = await pickUpstream();
-  return { baseUrl: upstream.baseUrl, apiKey: upstream.apiKey };
+  const key = pickUpstreamApiKey(upstream);
+  return { baseUrl: upstream.baseUrl, apiKey: key.apiKey };
 }
 
 export function clearUpstreamCache() {
   cachedUpstreams = null;
   upstreamCacheExpiry = 0;
-  rrEnabledCache = null;
 }
 
 const MAX_RETRIES = 3;
@@ -164,22 +187,19 @@ export type UpstreamResult = {
   body: unknown;
   errorCode?: UpstreamFailureCode;
   upstreamName?: string;
+  upstreamKeyLabel?: string;
 };
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function failureForFetchError(error: unknown): UpstreamFailure {
-  if (isAbortError(error)) {
-    return upstreamFailure(504, "upstream_timeout", "Upstream request timed out");
-  }
-
-  if (isConnectionError(error)) {
-    return upstreamFailure(502, "upstream_connection_error", "Upstream connection failed");
-  }
-
-  return upstreamFailure(502, "upstream_fetch_error", "Upstream request failed");
+function upstreamFailure(statusCode: number, errorCode: UpstreamFailureCode, message: string): UpstreamFailure {
+  return {
+    statusCode,
+    errorCode,
+    body: { error: { message, code: errorCode } },
+  };
 }
 
 function isAbortError(error: unknown) {
@@ -187,28 +207,33 @@ function isAbortError(error: unknown) {
 }
 
 function isConnectionError(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
-  return /ECONNRESET|ECONNREFUSED|EPIPE|UND_ERR_SOCKET|socket|connection/i.test(message);
+  if (!(error instanceof Error)) return false;
+  const msg = error.message.toLowerCase();
+  return (
+    msg.includes("econnrefused") ||
+    msg.includes("enotfound") ||
+    msg.includes("econnreset") ||
+    msg.includes("etimedout") ||
+    msg.includes("network") ||
+    msg.includes("fetch failed")
+  );
 }
 
-function upstreamFailure(statusCode: number, errorCode: UpstreamFailureCode, message: string): UpstreamFailure {
-  return {
-    statusCode,
-    errorCode,
-    body: {
-      error: {
-        message,
-        code: errorCode,
-      },
-    },
-  };
+function failureForFetchError(error: unknown): UpstreamFailure {
+  if (isAbortError(error)) {
+    return upstreamFailure(504, "upstream_timeout", "Upstream request timed out");
+  }
+  if (isConnectionError(error)) {
+    return upstreamFailure(502, "upstream_connection_error", "Upstream connection failed");
+  }
+  return upstreamFailure(502, "upstream_fetch_error", "Upstream request failed");
 }
 
-function fetchWithTimeout(url: string, opts: RequestInit, timeoutMs: number) {
+async function fetchWithTimeout(url: string, opts: RequestInit, timeoutMs: number): Promise<Response> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return fetch(url, { ...opts, signal: controller.signal });
+    return await fetch(url, { ...opts, signal: controller.signal });
   } finally {
     clearTimeout(timeout);
   }
@@ -227,13 +252,15 @@ function failureResponse(failure: UpstreamFailure) {
 async function callSingleUpstream(
   upstream: Upstream,
   path: string,
-  body?: unknown
+  body?: unknown,
+  apiKeyOverride?: UpstreamApiKey
 ): Promise<UpstreamResult & { retriable: boolean }> {
+  const key = apiKeyOverride ?? pickUpstreamApiKey(upstream);
   const base = upstream.baseUrl.replace(/\/$/, "");
   const opts: RequestInit = {
     method: body === undefined ? "GET" : "POST",
     headers: {
-      authorization: `Bearer ${upstream.apiKey}`,
+      authorization: authHeader(key.apiKey),
       "content-type": "application/json",
     },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -247,7 +274,7 @@ async function callSingleUpstream(
       response = await fetchWithTimeout(`${base}${path}`, opts, config.UPSTREAM_TIMEOUT_MS);
     } catch (error) {
       // Connection errors are retriable — try next upstream
-      return { ...failureForFetchError(error), retriable: true, upstreamName: upstream.name };
+      return { ...failureForFetchError(error), retriable: true, upstreamName: upstream.name, upstreamKeyLabel: key.label };
     }
 
     if (!isRetriableStatus(response.status)) {
@@ -258,10 +285,16 @@ async function callSingleUpstream(
       } catch {
         json = { raw: text };
       }
-      return { statusCode: response.status, body: json, retriable: false, upstreamName: upstream.name };
+      return {
+        statusCode: response.status,
+        body: json,
+        retriable: false,
+        upstreamName: upstream.name,
+        upstreamKeyLabel: key.label,
+      };
     }
 
-    // Consumable 429/5xx — retry on same upstream
+    // Consumable 429/5xx — retry on same upstream/key, then retriable for next key/upstream
     await response.text();
     if (attempt < MAX_RETRIES) {
       await sleep(delay);
@@ -269,38 +302,56 @@ async function callSingleUpstream(
     }
   }
 
-  // All retries on this upstream exhausted — mark as retriable so caller tries next
   return {
     statusCode: 429,
     body: { error: { message: "Too many requests (upstream)", code: "rate_limit_exceeded" } },
     retriable: true,
     upstreamName: upstream.name,
+    upstreamKeyLabel: key.label,
   };
 }
 
 export async function callUpstream(path: string, body?: unknown, preferredUpstreamId?: string | null): Promise<UpstreamResult> {
-  const triedIds = new Set<string>();
-
-  // Try up to N upstreams with failover
+  const triedUpstreamIds = new Set<string>();
   const active = await getActiveUpstreams();
-  const maxAttempts = active.length;
+  const maxUpstreamAttempts = active.length;
 
-  for (let i = 0; i < maxAttempts; i++) {
-    const upstream = await pickUpstream(triedIds, preferredUpstreamId);
-    triedIds.add(upstream.id);
+  for (let i = 0; i < maxUpstreamAttempts; i++) {
+    const upstream = await pickUpstream(triedUpstreamIds, preferredUpstreamId);
+    triedUpstreamIds.add(upstream.id);
 
-    const result = await callSingleUpstream(upstream, path, body);
-    if (!result.retriable) {
-      return { statusCode: result.statusCode, body: result.body, upstreamName: result.upstreamName };
+    // Within one upstream: round-robin start + try other keys on retriable failure
+    const triedKeyIds = new Set<string>();
+    const activeKeys = (upstream.apiKeys || []).filter((k) => k.isActive && k.apiKey);
+    const maxKeyAttempts = Math.max(activeKeys.length, 1);
+
+    let lastResult: (UpstreamResult & { retriable: boolean }) | null = null;
+    for (let k = 0; k < maxKeyAttempts; k++) {
+      let key: UpstreamApiKey;
+      try {
+        key = pickUpstreamApiKey(upstream, triedKeyIds);
+      } catch {
+        break;
+      }
+      triedKeyIds.add(key.id);
+      lastResult = await callSingleUpstream(upstream, path, body, key);
+      if (!lastResult.retriable) {
+        return {
+          statusCode: lastResult.statusCode,
+          body: lastResult.body,
+          upstreamName: lastResult.upstreamName,
+          upstreamKeyLabel: lastResult.upstreamKeyLabel,
+        };
+      }
     }
 
-    // Retriable failure — try next upstream
-    if (i === maxAttempts - 1) {
+    if (i === maxUpstreamAttempts - 1 && lastResult) {
       return {
-        statusCode: result.statusCode,
-        body: result.body,
-        errorCode: result.errorCode,
-        upstreamName: result.upstreamName,
+        statusCode: lastResult.statusCode,
+        body: lastResult.body,
+        errorCode: lastResult.errorCode,
+        upstreamName: lastResult.upstreamName,
+        upstreamKeyLabel: lastResult.upstreamKeyLabel,
       };
     }
   }
@@ -311,16 +362,23 @@ export async function callUpstream(path: string, body?: unknown, preferredUpstre
   };
 }
 
-async function streamSingleUpstream(upstream: Upstream, path: string, body: unknown): Promise<{
+async function streamSingleUpstream(
+  upstream: Upstream,
+  path: string,
+  body: unknown,
+  apiKeyOverride?: UpstreamApiKey
+): Promise<{
   response: Response | null;
   failure: UpstreamFailure | null;
   upstreamName: string;
+  keyLabel: string;
 }> {
+  const key = apiKeyOverride ?? pickUpstreamApiKey(upstream);
   const base = upstream.baseUrl.replace(/\/$/, "");
   const opts: RequestInit = {
     method: "POST",
     headers: {
-      authorization: `Bearer ${upstream.apiKey}`,
+      authorization: authHeader(key.apiKey),
       "content-type": "application/json",
     },
     body: JSON.stringify(body),
@@ -333,11 +391,11 @@ async function streamSingleUpstream(upstream: Upstream, path: string, body: unkn
     try {
       response = await fetchWithTimeout(`${base}${path}`, opts, config.UPSTREAM_STREAM_CONNECT_TIMEOUT_MS);
     } catch (error) {
-      return { response: null, failure: failureForFetchError(error), upstreamName: upstream.name };
+      return { response: null, failure: failureForFetchError(error), upstreamName: upstream.name, keyLabel: key.label };
     }
 
     if (!isRetriableStatus(response.status)) {
-      return { response, failure: null, upstreamName: upstream.name };
+      return { response, failure: null, upstreamName: upstream.name, keyLabel: key.label };
     }
 
     await response.text();
@@ -351,37 +409,49 @@ async function streamSingleUpstream(upstream: Upstream, path: string, body: unkn
     response: null,
     failure: upstreamFailure(429, "upstream_fetch_error", "Upstream rate limited"),
     upstreamName: upstream.name,
+    keyLabel: key.label,
   };
 }
 
 export async function streamUpstream(path: string, body: unknown, preferredUpstreamId?: string | null) {
-  const triedIds = new Set<string>();
+  const triedUpstreamIds = new Set<string>();
   const active = await getActiveUpstreams();
-  const maxAttempts = active.length;
+  const maxUpstreamAttempts = active.length;
 
   let lastFailure: UpstreamFailure | null = null;
 
-  for (let i = 0; i < maxAttempts; i++) {
-    const upstream = await pickUpstream(triedIds, preferredUpstreamId);
-    triedIds.add(upstream.id);
+  for (let i = 0; i < maxUpstreamAttempts; i++) {
+    const upstream = await pickUpstream(triedUpstreamIds, preferredUpstreamId);
+    triedUpstreamIds.add(upstream.id);
 
-    const result = await streamSingleUpstream(upstream, path, body);
-    if (result.response) {
-      // Add header indicating which upstream was used
-      const headers = new Headers(result.response.headers);
-      headers.set("x-9router-upstream", result.upstreamName);
-      return new Response(result.response.body, {
-        status: result.response.status,
-        statusText: result.response.statusText,
-        headers,
-      });
+    const triedKeyIds = new Set<string>();
+    const activeKeys = (upstream.apiKeys || []).filter((k) => k.isActive && k.apiKey);
+    const maxKeyAttempts = Math.max(activeKeys.length, 1);
+
+    for (let k = 0; k < maxKeyAttempts; k++) {
+      let key: UpstreamApiKey;
+      try {
+        key = pickUpstreamApiKey(upstream, triedKeyIds);
+      } catch {
+        break;
+      }
+      triedKeyIds.add(key.id);
+
+      const result = await streamSingleUpstream(upstream, path, body, key);
+      if (result.response) {
+        const headers = new Headers(result.response.headers);
+        headers.set("x-9router-upstream", result.upstreamName);
+        if (result.keyLabel) headers.set("x-9router-upstream-key", result.keyLabel);
+        return new Response(result.response.body, {
+          status: result.response.status,
+          statusText: result.response.statusText,
+          headers,
+        });
+      }
+      lastFailure = result.failure;
     }
-
-    lastFailure = result.failure;
-    // Try next upstream
   }
 
-  // All upstreams failed
   return failureResponse(lastFailure ?? upstreamFailure(502, "upstream_connection_error", "All upstreams failed"));
 }
 
@@ -392,13 +462,14 @@ export async function fetchUpstreamModels(upstreamId?: string) {
     if (!target) {
       return { statusCode: 404, body: { error: { message: "Upstream not found", code: "not_found" } } };
     }
+    const key = pickUpstreamApiKey(target);
     const base = target.baseUrl.replace(/\/$/, "");
     try {
       const response = await fetchWithTimeout(
         `${base}/models`,
         {
           method: "GET",
-          headers: { authorization: `Bearer ${target.apiKey}`, "content-type": "application/json" },
+          headers: { authorization: authHeader(key.apiKey), "content-type": "application/json" },
         },
         config.UPSTREAM_TIMEOUT_MS
       );

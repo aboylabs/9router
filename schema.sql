@@ -63,7 +63,16 @@ CREATE TABLE IF NOT EXISTS models (
   active BOOLEAN DEFAULT TRUE,
   input_cost_per_million NUMERIC,
   output_cost_per_million NUMERIC,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  upstream_id TEXT,
+  -- When true: requests are logged but do not consume api_keys.used_tokens;
+  -- token-quota checks are skipped for this model (RPM/request-quota still apply).
+  quota_exempt BOOLEAN NOT NULL DEFAULT FALSE,
+  -- Legacy mirror: true when access_roles is non-empty.
+  privileged_only BOOLEAN NOT NULL DEFAULT FALSE,
+  -- Role allowlist for this model (empty = all keys). Independent toggles:
+  -- 'dev' (Super Admin), 'supporter' (name roster), 'ultra' (quota_tokens = 500M).
+  access_roles TEXT[] NOT NULL DEFAULT '{}'
 );
 
 CREATE TABLE IF NOT EXISTS buyer_model_access (
@@ -102,10 +111,23 @@ CREATE TABLE IF NOT EXISTS upstreams (
   base_url VARCHAR(1024) NOT NULL,
   api_key TEXT NOT NULL,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
-  weight INTEGER NOT NULL DEFAULT 1,
+  weight INTEGER NOT NULL DEFAULT 1, -- dormant: RR/weight removed; column retained for compat
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+
+CREATE TABLE IF NOT EXISTS upstream_api_keys (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  upstream_id UUID NOT NULL REFERENCES upstreams(id) ON DELETE CASCADE,
+  label VARCHAR(255) NOT NULL DEFAULT '',
+  api_key TEXT NOT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_upstream_api_keys_upstream ON upstream_api_keys(upstream_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_upstream_api_keys_upstream_key ON upstream_api_keys(upstream_id, api_key);
 
 CREATE TABLE IF NOT EXISTS usage_rollups (
   day DATE NOT NULL,

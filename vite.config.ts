@@ -16,7 +16,14 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "@": path.resolve("src/client/src")
+      "@": path.resolve("src/client/src"),
+      "@shared": path.resolve("src/shared")
+    }
+  },
+  // Allow importing shared catalog from outside Vite root (src/client)
+  server: {
+    fs: {
+      allow: [path.resolve(".")]
     }
   }
 });

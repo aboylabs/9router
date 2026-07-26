@@ -5,13 +5,26 @@ import { Badge } from "../components/ui/Badge";
 import { Card, CardHeader, CardTitle } from "../components/ui/Card";
 import { CopyButton } from "../components/CopyButton";
 import { api } from "../lib/api";
-import { formatDateShort, formatTokens } from "../lib/utils";
+import { SuperAdminBadge } from "../components/SuperAdminBadge";
+import { SupporterBadge } from "../components/SupporterBadge";
+import { HelperBadge } from "../components/HelperBadge";
+import { UltraBadge } from "../components/UltraBadge";
+import {
+  formatDateShort,
+  formatTokens,
+  buyerNameClassName,
+  isSuperAdminName,
+  isSupporterName,
+  isHelperName,
+  isUltraQuota
+} from "../lib/utils";
 
 type LiveEntry = {
   key_prefix: string;
   key_id: string;
   buyer_name: string;
   buyer_email: string;
+  quota_tokens?: string | null;
   request_count: number;
   last_request_at: string;
   total_tokens: string;
@@ -45,11 +58,11 @@ export function Live() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-text-primary flex items-center gap-2">
+          <h2 className="text-xl font-semibold tracking-tight text-text-primary flex items-center gap-2">
             <Radio className="h-5 w-5 text-green-500 animate-pulse" />
             Live Usage
           </h2>
-          <p className="text-sm text-text-muted">Active API keys in the last 5 minutes</p>
+          <p className="text-sm text-text-muted mt-0.5">Active API keys in the last 5 minutes</p>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-xs text-text-muted">
@@ -101,10 +114,16 @@ export function Live() {
           {active.map((entry) => (
             <Card key={entry.key_id}>
               <div className="p-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                    <span className="font-medium text-text-primary text-sm">{entry.buyer_name}</span>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse shrink-0" />
+                    <span className={`font-medium text-sm truncate ${buyerNameClassName(entry.buyer_name, entry.quota_tokens)}`}>
+                      {entry.buyer_name}
+                    </span>
+                    {isSuperAdminName(entry.buyer_name) ? <SuperAdminBadge /> : null}
+                    {isSupporterName(entry.buyer_name) ? <SupporterBadge /> : null}
+                    {isHelperName(entry.buyer_name) ? <HelperBadge /> : null}
+                    {!isSuperAdminName(entry.buyer_name) && !isSupporterName(entry.buyer_name) && !isHelperName(entry.buyer_name) && isUltraQuota(entry.quota_tokens) ? <UltraBadge /> : null}
                   </div>
                   <Badge variant="info">{entry.request_count} req</Badge>
                 </div>

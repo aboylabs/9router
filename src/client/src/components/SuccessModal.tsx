@@ -19,6 +19,7 @@ interface SuccessModalProps {
       quota_tokens: number | null;
       daily_quota_tokens: number | null;
       daily_reset: boolean;
+      rate_limit_rpm?: number | null;
       expires_at: string;
     };
     created_at?: string;
@@ -63,7 +64,11 @@ export function SuccessModal({ open, onOpenChange, data }: SuccessModalProps) {
           {data.name && <InfoRow label="Nama User" value={data.name} />}
           <InfoRow label="Base URL" value="https://routers9.web.id/v1" />
           <div className="border-t border-border my-3" />
+          {data.package.label ? <InfoRow label="Paket" value={data.package.label} /> : null}
           <InfoRow label="Quota" value={quotaDisplay} />
+          {data.package.rate_limit_rpm != null ? (
+            <InfoRow label="RPM" value={`${data.package.rate_limit_rpm} req/min`} />
+          ) : null}
           <InfoRow label="Created" value={formatDateMY(data.created_at ?? "")} />
           <InfoRow label="Expired" value={formatDateMY(data.package.expires_at)} />
         </div>

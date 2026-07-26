@@ -18,6 +18,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export async function buildApp() {
   const app = Fastify({
     logger: true,
+    trustProxy: true,
     bodyLimit: 10 * 1024 * 1024,
     keepAliveTimeout: 72000,
     requestTimeout: 0,
@@ -34,30 +35,73 @@ export async function buildApp() {
     }
   });
 
+  // Production CORS: allowlist only. No-origin requests (curl/server) stay allowed.
+  const corsAllowlist = new Set(
+    [
+      "https://routers9.web.id",
+      "http://43.128.67.88",
+      "http://localhost:3000",
+      "http://127.0.0.1:3000",
+      config.PUBLIC_BASE_URL
+    ].filter(Boolean)
+  );
   await app.register(fastifyCors, {
-    origin: true,
+    origin(origin, cb) {
+      if (!origin) return cb(null, true);
+      if (corsAllowlist.has(origin)) return cb(null, true);
+      return cb(null, false);
+    },
     credentials: true
   });
   await app.register(fastifyCookie);
-  await app.register(fastifySwagger, {
-    openapi: {
-      info: {
-        title: `${config.PUBLIC_BRAND_NAME} API`,
-        version: "0.1.0"
+
+  // Swagger only in non-production (reduces public recon surface)
+  if (!isProduction) {
+    await app.register(fastifySwagger, {
+      openapi: {
+        info: {
+          title: `${config.PUBLIC_BRAND_NAME} API`,
+          version: "0.1.0"
+        }
       }
-    }
-  });
-  await app.register(fastifySwaggerUi, { routePrefix: "/docs" });
+    });
+    await app.register(fastifySwaggerUi, { routePrefix: "/docs" });
+  }
 
   app.get("/health", async () => ({ ok: true, brand: config.PUBLIC_BRAND_NAME }));
 
-  // Public models API (no auth required, for landing page)
+  // Public models API (no auth required, for landing page + public dashboard)
   app.get("/public/models", async () => {
     const { query: dbQuery } = await import("./db.js");
-    const result = await dbQuery<{ id: string; display_name: string }>(
-      `SELECT id, display_name FROM models WHERE active = true AND id LIKE 'routers9/%' ORDER BY id`
+    const result = await dbQuery<{
+      id: string;
+      display_name: string;
+      quota_exempt: boolean;
+      privileged_only: boolean;
+      access_roles: string[] | null;
+    }>(
+      // Restricted models are VISIBLE publicly with role badges, but only
+      // matching roles can call them (buyer_model_access).
+      `SELECT id, display_name,
+              coalesce(quota_exempt, false) as quota_exempt,
+              coalesce(privileged_only, false) as privileged_only,
+              coalesce(access_roles, '{}'::text[]) as access_roles
+       FROM models
+       WHERE active = true
+         AND id LIKE 'routers9/%'
+       ORDER BY cardinality(coalesce(access_roles, '{}'::text[])) DESC,
+                coalesce(quota_exempt, false) DESC,
+                display_name ASC, id ASC`
     );
-    return { models: result.rows };
+    return {
+      models: result.rows.map((row) => ({
+        ...row,
+        access_roles: Array.isArray(row.access_roles) ? row.access_roles : [],
+        privileged_only:
+          row.privileged_only ||
+          (Array.isArray(row.access_roles) && row.access_roles.length > 0),
+      })),
+    };
   });
 
   await registerPublicRoutes(app);
@@ -87,10 +131,20 @@ export async function buildApp() {
       return reply.type("text/html").send(publicDashboardPage());
     });
     app.setNotFoundHandler((request, reply) => {
-      if (request.url.startsWith("/admin/") || request.url.startsWith("/v1/")) {
+      // Admin SPA deep-links (no file extension) still serve index.html
+      if (request.url === "/admin" || request.url.startsWith("/admin/")) {
+        const url = new URL(request.url, "http://localhost");
+        const filePath = url.pathname.replace(/^\/admin\/?/, "");
+        if (filePath && filePath.includes(".")) {
+          return reply.code(404).send({ error: "Not found" });
+        }
+        return reply.sendFile("index.html");
+      }
+      if (request.url.startsWith("/v1/") || request.url.startsWith("/public/")) {
         return reply.code(404).send({ error: "Not found" });
       }
-      return reply.sendFile("index.html");
+      // Do not leak admin SPA HTML for random recon paths (/.env, /package.json, etc.)
+      return reply.code(404).type("text/plain").send("Not found");
     });
   }
 
@@ -401,16 +455,16 @@ function modelsLandingPage(): string {
           <div class="base-url-card">
             <div>
               <div class="label">Base URL</div>
-              <div class="url">http://43.128.67.88/v1</div>
+              <div class="url">https://routers9.web.id/v1</div>
             </div>
-            <button class="copy-btn" onclick="copyToClip(this, 'http://43.128.67.88/v1')">Copy</button>
+            <button class="copy-btn" onclick="copyToClip(this, 'https://routers9.web.id/v1')">Copy</button>
           </div>
 
           <div class="pro-tips">
             <h3>Pro Tips</h3>
             <ul>
               <li><span class="tip-icon">&#9679;</span>Your API key starts with <code>9r-xxxx</code></li>
-              <li><span class="tip-icon">&#9679;</span>Base URL: <code>http://43.128.67.88/v1</code></li>
+              <li><span class="tip-icon">&#9679;</span>Base URL: <code>https://routers9.web.id/v1</code></li>
               <li><span class="tip-icon">&#9679;</span>Click any model ID to copy it to clipboard</li>
               <li><span class="tip-icon">&#9679;</span>Works with any OpenAI-compatible client (Cursor, Continue, OpenRouter, etc.)</li>
               <li><span class="tip-icon">&#9679;</span>Supports streaming, function calling, and vision</li>
@@ -440,8 +494,8 @@ function modelsLandingPage(): string {
           <div class="api-card">
             <div class="api-card-title">Base URL</div>
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
-              <div class="url" style="font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.9rem; color: #60a5fa;">http://43.128.67.88/v1</div>
-              <button class="copy-btn" onclick="copyToClip(this, 'http://43.128.67.88/v1')">Copy</button>
+              <div class="url" style="font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.9rem; color: #60a5fa;">https://routers9.web.id/v1</div>
+              <button class="copy-btn" onclick="copyToClip(this, 'https://routers9.web.id/v1')">Copy</button>
             </div>
           </div>
 
@@ -468,19 +522,19 @@ function modelsLandingPage(): string {
           <div class="api-card">
             <div class="api-card-title">Example: Chat Completion</div>
             <div class="code-block" id="code-nonstream"><button class="code-copy" onclick="copyCurl(this, 'nonstream')">Copy</button><span class="comment"># Non-streaming</span>
-curl http://43.128.67.88/v1/chat/completions \
+curl https://routers9.web.id/v1/chat/completions \
   -H <span class="string">"Authorization: Bearer ***"</span> \
   -H <span class="string">"Content-Type: application/json"</span> \
   -d <span class="string">'{
-  "model": "routers9/claude-sonnet-4.6",
+  "model": "routers9/grok-4.5",
   "messages": [{"role": "user", "content": "Hello!"}]
 }'</span></div>
             <div class="code-block" id="code-stream"><button class="code-copy" onclick="copyCurl(this, 'stream')">Copy</button><span class="comment"># Streaming</span>
-curl http://43.128.67.88/v1/chat/completions \
+curl https://routers9.web.id/v1/chat/completions \
   -H <span class="string">"Authorization: Bearer ***"</span> \
   -H <span class="string">"Content-Type: application/json"</span> \
   -d <span class="string">'{
-  "model": "routers9/claude-sonnet-4.6",
+  "model": "routers9/grok-4.5",
   "messages": [{"role": "user", "content": "Hello!"}],
   "stream": true
 }'</span></div>
@@ -588,9 +642,9 @@ curl http://43.128.67.88/v1/chat/completions \
     function copyCurl(btn, type) {
       var text = '';
       if (type === 'nonstream') {
-        text = "curl http://43.128.67.88/v1/chat/completions \\\\n  -H \\"Authorization: Bearer 9r-xxxx\\" \\\\n  -H \\"Content-Type: application/json\\" \\\\n  -d '{\\n  \\"model\\": \\"routers9/claude-sonnet-4.6\\",\\n  \\"messages\\": [{\\"role\\": \\"user\\", \\"content\\": \\"Hello!\\"}]\\n}'";
+        text = "curl https://routers9.web.id/v1/chat/completions \\\\n  -H \\"Authorization: Bearer 9r-xxxx\\" \\\\n  -H \\"Content-Type: application/json\\" \\\\n  -d '{\\n  \\"model\\": \\"routers9/grok-4.5\\",\\n  \\"messages\\": [{\\"role\\": \\"user\\", \\"content\\": \\"Hello!\\"}]\\n}'";
       } else {
-        text = "curl http://43.128.67.88/v1/chat/completions \\\\n  -H \\"Authorization: Bearer 9r-xxxx\\" \\\\n  -H \\"Content-Type: application/json\\" \\\\n  -d '{\\n  \\"model\\": \\"routers9/claude-sonnet-4.6\\",\\n  \\"messages\\": [{\\"role\\": \\"user\\", \\"content\\": \\"Hello!\\"}],\\n  \\"stream\\": true\\n}'";
+        text = "curl https://routers9.web.id/v1/chat/completions \\\\n  -H \\"Authorization: Bearer 9r-xxxx\\" \\\\n  -H \\"Content-Type: application/json\\" \\\\n  -d '{\\n  \\"model\\": \\"routers9/grok-4.5\\",\\n  \\"messages\\": [{\\"role\\": \\"user\\", \\"content\\": \\"Hello!\\"}],\\n  \\"stream\\": true\\n}'";
       }
       navigator.clipboard.writeText(text);
       btn.textContent = 'Copied!';
@@ -610,10 +664,22 @@ function publicDashboardPage(): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Routers9 Public</title>
+  <title>Routers9 — Public Dashboard · LLM API Gateway</title>
+  <meta name="description" content="Routers9 public dashboard — live leaderboard, usage stats, and model catalog for the Routers9 LLM API gateway. Grok, Claude, and more via one OpenAI-compatible endpoint.">
+  <meta name="theme-color" content="#070b16">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%237c3aed'/%3E%3Cstop offset='100%25' stop-color='%232563eb'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E%3Ctext x='32' y='42' text-anchor='middle' font-family='Arial,sans-serif' font-size='26' font-weight='800' fill='white'%3ER9%3C/text%3E%3C/svg%3E">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Routers9">
+  <meta property="og:title" content="Routers9 — Public Dashboard">
+  <meta property="og:description" content="Live leaderboard, usage stats, and model catalog. Grok, Claude, and more via one OpenAI-compatible API.">
+  <meta property="og:url" content="https://routers9.web.id/">
+  <meta name="twitter:card" content="summary">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { -webkit-tap-highlight-color: transparent; }
+    html { -webkit-tap-highlight-color: transparent; scroll-behavior: smooth; }
     body {
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background:
@@ -624,7 +690,68 @@ function publicDashboardPage(): string {
       color: #e2e8f0;
       min-height: 100vh;
       overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
     }
+    ::selection { background: rgba(124,58,237,0.35); color: #f8fafc; }
+
+    /* === CUSTOM SCROLLBAR (dark, thin) === */
+    * { scrollbar-width: thin; scrollbar-color: rgba(148,163,184,0.28) transparent; }
+    ::-webkit-scrollbar { width: 9px; height: 9px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148,163,184,0.22);
+      border-radius: 999px;
+      border: 2px solid #070b16;
+    }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(167,139,250,0.4); }
+
+    /* === SKELETON LOADING === */
+    .skeleton-wrap { display: flex; flex-direction: column; gap: 0.6rem; padding: 0.4rem 0; }
+    .skeleton {
+      position: relative; overflow: hidden;
+      background: rgba(148,163,184,0.08);
+      border-radius: 10px; height: 44px;
+    }
+    .skeleton.sk-lg { height: 92px; border-radius: 16px; }
+    .skeleton::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(148,163,184,0.10), transparent);
+      transform: translateX(-100%);
+      animation: skShimmer 1.4s ease-in-out infinite;
+    }
+    @keyframes skShimmer { 100% { transform: translateX(100%); } }
+    @media (prefers-reduced-motion: reduce) { .skeleton::after { animation: none; } }
+
+    /* === NUMERIC ALIGNMENT === */
+    td, .stat-value, .podium-stat { font-variant-numeric: tabular-nums; }
+
+    /* === PUBLIC FOOTER === */
+    .pub-footer {
+      margin-top: 2.6rem; padding-top: 1.15rem;
+      border-top: 1px solid rgba(148,163,184,0.1);
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 0.8rem; flex-wrap: wrap;
+      font-size: 0.78rem; color: #64748b;
+    }
+    .pub-footer a { color: #94a3b8; text-decoration: none; font-weight: 600; }
+    .pub-footer a:hover { color: #c4b5fd; }
+    .status-pill {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      font-weight: 700; color: #86efac;
+      background: rgba(22,163,74,0.1); border: 1px solid rgba(74,222,128,0.2);
+      padding: 0.28rem 0.65rem; border-radius: 999px;
+    }
+    .status-pill::before {
+      content: ''; width: 7px; height: 7px; border-radius: 999px; background: #4ade80;
+      box-shadow: 0 0 0 0 rgba(74,222,128,0.55); animation: livePulse 1.6s infinite;
+    }
+    .status-pill.down { color: #fca5a5; background: rgba(220,38,38,0.1); border-color: rgba(248,113,113,0.25); }
+    .status-pill.down::before { background: #f87171; animation: none; }
+
+    /* === EMPTY STATE ICON === */
+    .empty svg { width: 34px; height: 34px; display: block; margin: 0 auto 0.7rem; color: #475569; }
     .layout { display: flex; min-height: 100vh; position: relative; }
 
     /* === DESKTOP SIDEBAR === */
@@ -732,7 +859,8 @@ function publicDashboardPage(): string {
       flex: 1;
       margin-left: 232px;
       padding: 2rem 2.5rem 3rem;
-      max-width: 1400px;
+      max-width: 1480px;
+      width: 100%;
       position: relative;
       z-index: 1;
     }
@@ -744,17 +872,18 @@ function publicDashboardPage(): string {
     }
     .page-header {
       display: flex; align-items: flex-start; justify-content: space-between;
-      gap: 1rem; flex-wrap: wrap; margin-bottom: 1.25rem;
+      gap: 1rem; flex-wrap: wrap; margin-bottom: 1.4rem;
+      padding-bottom: 0.15rem;
     }
     .page-title {
-      font-size: 1.65rem; font-weight: 800; letter-spacing: -0.03em;
-      color: #f8fafc; margin-bottom: 0.35rem;
+      font-size: 1.7rem; font-weight: 800; letter-spacing: -0.035em;
+      color: #f8fafc; margin-bottom: 0.4rem;
     }
     .page-title span.grad {
-      background: linear-gradient(90deg, #c4b5fd, #60a5fa, #34d399);
+      background: linear-gradient(90deg, #c4b5fd, #818cf8, #60a5fa);
       -webkit-background-clip: text; background-clip: text; color: transparent;
     }
-    .page-desc { font-size: 0.9rem; color: #94a3b8; margin-bottom: 0; line-height: 1.5; max-width: 48rem; }
+    .page-desc { font-size: 0.92rem; color: #94a3b8; margin-bottom: 0; line-height: 1.55; max-width: 48rem; }
     .live-dot {
       display: inline-flex; align-items: center; gap: 0.45rem;
       font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
@@ -802,9 +931,9 @@ function publicDashboardPage(): string {
     /* === TABLES === */
     .table-wrapper {
       overflow-x: auto; -webkit-overflow-scrolling: touch;
-      background: rgba(15,23,42,0.55);
+      background: linear-gradient(180deg, rgba(15,23,42,0.72), rgba(15,23,42,0.55));
       border: 1px solid rgba(148,163,184,0.12);
-      border-radius: 16px;
+      border-radius: 18px;
       box-shadow: 0 10px 30px rgba(0,0,0,0.18);
     }
     table { width: 100%; border-collapse: collapse; min-width: 700px; }
@@ -814,19 +943,21 @@ function publicDashboardPage(): string {
       color: #94a3b8;
       text-transform: uppercase;
       letter-spacing: 0.06em;
-      padding: 0.9rem 1rem;
+      padding: 0.95rem 1.05rem;
       border-bottom: 1px solid rgba(148,163,184,0.12);
       position: sticky;
       top: 0;
-      background: rgba(15,23,42,0.95);
-      backdrop-filter: blur(8px);
+      background: rgba(11,16,32,0.96);
+      backdrop-filter: blur(10px);
       z-index: 10;
       font-weight: 700;
+      white-space: nowrap;
     }
     td {
       font-size: 0.875rem;
-      padding: 0.95rem 1rem;
+      padding: 0.95rem 1.05rem;
       border-bottom: 1px solid rgba(148,163,184,0.07);
+      vertical-align: middle;
     }
     tr:last-child td { border-bottom: none; }
     tr:hover td { background: rgba(96,165,250,0.05); }
@@ -844,6 +975,183 @@ function publicDashboardPage(): string {
     .badge-blue { background: rgba(37,99,235,0.15); color: #60a5fa; border-color: rgba(96,165,250,0.2); }
     .badge-yellow { background: rgba(202,138,4,0.15); color: #fbbf24; border-color: rgba(251,191,36,0.2); }
     .badge-red { background: rgba(220,38,38,0.15); color: #f87171; border-color: rgba(248,113,113,0.2); }
+
+    /* Super Admin developer badge */
+    .sa-name {
+      font-weight: 700;
+      background: linear-gradient(90deg, #d8b4fe 0%, #f0abfc 50%, #f9a8d4 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      text-shadow: 0 0 14px rgba(192,132,252,0.45);
+      filter: drop-shadow(0 0 8px rgba(192,132,252,0.35));
+    }
+    .sa-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.28rem;
+      margin-left: 0.4rem;
+      vertical-align: middle;
+      padding: 0.12rem 0.45rem 0.12rem 0.32rem;
+      border-radius: 0.375rem;
+      font-size: 0.62rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      line-height: 1;
+      color: #f5d0fe;
+      border: 1px solid rgba(232, 121, 249, 0.42);
+      background: linear-gradient(90deg, rgba(168,85,247,0.28), rgba(217,70,239,0.18), rgba(236,72,153,0.22));
+      box-shadow: 0 0 12px rgba(192,132,252,0.35);
+      white-space: nowrap;
+    }
+    .sa-badge svg {
+      width: 11px;
+      height: 11px;
+      flex-shrink: 0;
+      color: #e9d5ff;
+      stroke: currentColor;
+    }
+    .sa-badge .sa-dev {
+      background: linear-gradient(90deg, #d8b4fe, #f0abfc, #f9a8d4);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    /* Supporter / donatur badge — bright yellow */
+    .sp-name {
+      font-weight: 700;
+      background: linear-gradient(90deg, #fef9c3 0%, #fde047 45%, #fbbf24 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      text-shadow: 0 0 16px rgba(250,204,21,0.65);
+      filter: drop-shadow(0 0 10px rgba(250,204,21,0.55));
+    }
+    .sp-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.28rem;
+      margin-left: 0.4rem;
+      vertical-align: middle;
+      padding: 0.12rem 0.45rem 0.12rem 0.32rem;
+      border-radius: 0.375rem;
+      font-size: 0.62rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      line-height: 1;
+      color: #fef08a;
+      border: 1px solid rgba(250, 204, 21, 0.5);
+      background: linear-gradient(90deg, rgba(250,204,21,0.32), rgba(251,191,36,0.22), rgba(245,158,11,0.28));
+      box-shadow: 0 0 14px rgba(250,204,21,0.55);
+      white-space: nowrap;
+    }
+    .sp-badge svg {
+      width: 11px;
+      height: 11px;
+      flex-shrink: 0;
+      color: #fef08a;
+      stroke: currentColor;
+    }
+    .sp-badge .sp-label {
+      background: linear-gradient(90deg, #fef9c3, #fde047, #fbbf24);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    /* Helper / Builder badge — emerald */
+    .hp-name {
+      font-weight: 700;
+      background: linear-gradient(90deg, #a7f3d0 0%, #34d399 45%, #10b981 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      text-shadow: 0 0 16px rgba(52,211,153,0.55);
+      filter: drop-shadow(0 0 10px rgba(52,211,153,0.45));
+    }
+    .hp-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.28rem;
+      margin-left: 0.4rem;
+      vertical-align: middle;
+      padding: 0.12rem 0.45rem 0.12rem 0.32rem;
+      border-radius: 0.375rem;
+      font-size: 0.62rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      line-height: 1;
+      color: #a7f3d0;
+      border: 1px solid rgba(52, 211, 153, 0.5);
+      background: linear-gradient(90deg, rgba(16,185,129,0.28), rgba(45,212,191,0.18), rgba(34,197,94,0.24));
+      box-shadow: 0 0 14px rgba(52,211,153,0.45);
+      white-space: nowrap;
+    }
+    .hp-badge svg {
+      width: 11px;
+      height: 11px;
+      flex-shrink: 0;
+      color: #6ee7b7;
+      stroke: currentColor;
+    }
+    .hp-badge .hp-label {
+      background: linear-gradient(90deg, #a7f3d0, #34d399, #10b981);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    /* Ultra 500M badge — cyan/electric */
+    .ul-name {
+      font-weight: 700;
+      background: linear-gradient(90deg, #bae6fd 0%, #22d3ee 45%, #60a5fa 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      text-shadow: 0 0 16px rgba(34,211,238,0.55);
+      filter: drop-shadow(0 0 10px rgba(34,211,238,0.45));
+    }
+    .ul-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.28rem;
+      margin-left: 0.4rem;
+      vertical-align: middle;
+      padding: 0.12rem 0.45rem 0.12rem 0.32rem;
+      border-radius: 0.375rem;
+      font-size: 0.62rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      line-height: 1;
+      color: #a5f3fc;
+      border: 1px solid rgba(34, 211, 238, 0.5);
+      background: linear-gradient(90deg, rgba(14,165,233,0.28), rgba(34,211,238,0.2), rgba(59,130,246,0.26));
+      box-shadow: 0 0 14px rgba(34,211,238,0.5), 0 0 28px rgba(14,165,233,0.18);
+      white-space: nowrap;
+      animation: ultraPulse 2.4s ease-in-out infinite;
+    }
+    .ul-badge svg {
+      width: 11px;
+      height: 11px;
+      flex-shrink: 0;
+      color: #67e8f9;
+      stroke: currentColor;
+      fill: currentColor;
+    }
+    .ul-badge .ul-label {
+      background: linear-gradient(90deg, #bae6fd, #22d3ee, #60a5fa);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    @keyframes ultraPulse {
+      0%, 100% { box-shadow: 0 0 12px rgba(34,211,238,0.4), 0 0 22px rgba(14,165,233,0.12); }
+      50% { box-shadow: 0 0 18px rgba(34,211,238,0.7), 0 0 32px rgba(14,165,233,0.28); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .ul-badge { animation: none !important; }
+    }
 
     /* === RANK === */
     .rank { font-weight: 800; color: #64748b; font-size: 0.9rem; }
@@ -1040,24 +1348,355 @@ function publicDashboardPage(): string {
       transform: translateY(-1px);
     }
 
+    /* === CLAUDE MODEL TAG (glow pulse + shimmer sweep) === */
+    .model-tag.claude {
+      position: relative;
+      overflow: hidden;
+      color: #fbbf24;
+      border-color: rgba(245,158,11,0.45);
+      background: linear-gradient(135deg, rgba(120,53,15,0.35), rgba(15,23,42,0.7));
+      animation: claudeGlow 2.4s ease-in-out infinite;
+    }
+    .model-tag.claude::after {
+      content: '';
+      position: absolute;
+      top: 0; left: -150%;
+      width: 60%; height: 100%;
+      background: linear-gradient(105deg, transparent, rgba(255,236,179,0.32), transparent);
+      animation: claudeShimmer 2.8s ease-in-out infinite;
+      pointer-events: none;
+    }
+    .model-tag.claude .claude-spark {
+      color: #fcd34d;
+      margin-right: 0.3rem;
+      display: inline-block;
+      animation: claudeSpark 2.4s ease-in-out infinite;
+    }
+    .model-tag.claude:hover {
+      border-color: rgba(245,158,11,0.75);
+      background: linear-gradient(135deg, rgba(146,64,14,0.45), rgba(15,23,42,0.7));
+      color: #fde68a;
+      transform: translateY(-1px);
+    }
+    @keyframes claudeGlow {
+      0%, 100% { box-shadow: 0 0 6px rgba(245,158,11,0.22), 0 4px 12px rgba(0,0,0,0.12); }
+      50% { box-shadow: 0 0 16px rgba(245,158,11,0.55), 0 0 30px rgba(245,158,11,0.18), 0 4px 12px rgba(0,0,0,0.12); }
+    }
+    @keyframes claudeShimmer {
+      0% { left: -150%; }
+      55% { left: 150%; }
+      100% { left: 150%; }
+    }
+    @keyframes claudeSpark {
+      0%, 100% { transform: scale(1); opacity: 0.85; }
+      50% { transform: scale(1.25); opacity: 1; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .model-tag.claude, .model-tag.claude::after, .model-tag.claude .claude-spark { animation: none; }
+    }
+
+    /* === PODIUM TOP 3 === */
+    .podium {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 0.85rem;
+      align-items: end;
+      margin-bottom: 1.4rem;
+    }
+    .podium-card {
+      position: relative;
+      overflow: hidden;
+      text-align: center;
+      border-radius: 18px;
+      padding: 1.15rem 0.85rem 1rem;
+      background: linear-gradient(180deg, rgba(30,41,59,0.85), rgba(15,23,42,0.7));
+      border: 1px solid rgba(148,163,184,0.16);
+      animation: podiumRise 0.55s ease-out both;
+    }
+    .podium-card.p-1 { order: 2; padding-top: 1.6rem; padding-bottom: 1.35rem; animation-delay: 0.05s; }
+    .podium-card.p-2 { order: 1; animation-delay: 0.15s; }
+    .podium-card.p-3 { order: 3; animation-delay: 0.25s; }
+    @keyframes podiumRise {
+      from { opacity: 0; transform: translateY(18px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .podium-card.p-1 {
+      border-color: rgba(250,204,21,0.45);
+      background:
+        radial-gradient(130% 100% at 50% 0%, rgba(250,204,21,0.16), transparent 60%),
+        linear-gradient(180deg, rgba(30,41,59,0.9), rgba(15,23,42,0.72));
+      box-shadow: 0 0 24px rgba(250,204,21,0.12);
+    }
+    .podium-card.p-2 {
+      border-color: rgba(203,213,225,0.38);
+      background:
+        radial-gradient(130% 100% at 50% 0%, rgba(203,213,225,0.12), transparent 60%),
+        linear-gradient(180deg, rgba(30,41,59,0.88), rgba(15,23,42,0.7));
+    }
+    .podium-card.p-3 {
+      border-color: rgba(217,119,6,0.4);
+      background:
+        radial-gradient(130% 100% at 50% 0%, rgba(217,119,6,0.14), transparent 60%),
+        linear-gradient(180deg, rgba(30,41,59,0.88), rgba(15,23,42,0.7));
+    }
+    .podium-medal {
+      font-size: 1.5rem; line-height: 1; margin-bottom: 0.4rem;
+      display: inline-block;
+    }
+    .podium-card.p-1 .podium-medal { font-size: 1.9rem; animation: crownFloat 2.6s ease-in-out infinite; }
+    @keyframes crownFloat {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+    .podium-name { font-weight: 800; font-size: 0.92rem; margin-bottom: 0.35rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .podium-stat { font-size: 0.78rem; color: #94a3b8; font-variant-numeric: tabular-nums; }
+    .podium-stat strong { color: #e2e8f0; font-weight: 800; }
+    @media (max-width: 640px) {
+      .podium { grid-template-columns: 1fr; align-items: stretch; }
+      .podium-card.p-1 { order: 1; }
+      .podium-card.p-2 { order: 2; }
+      .podium-card.p-3 { order: 3; }
+    }
+
+    /* === ZEBRA + ROW HOVER === */
+    tbody tr:nth-child(even):not(.top-row) td { background: rgba(148,163,184,0.035); }
+    tbody tr:not(.top-row):hover td { background: rgba(124,58,237,0.08); transition: background 0.15s; }
+
+    /* === STAT CARD ICON + POLISH === */
+    .stat-card { position: relative; overflow: hidden; }
+    .stat-card .stat-icon {
+      position: absolute; top: 0.8rem; right: 0.9rem;
+      width: 30px; height: 30px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(124,58,237,0.14);
+      border: 1px solid rgba(167,139,250,0.25);
+      color: #c4b5fd;
+    }
+    .stat-card .stat-icon svg { width: 16px; height: 16px; }
+    .stat-card .stat-icon.blue { background: rgba(37,99,235,0.14); border-color: rgba(96,165,250,0.25); color: #93c5fd; }
+    .stat-card .stat-icon.amber { background: rgba(202,138,4,0.14); border-color: rgba(251,191,36,0.25); color: #fcd34d; }
+    .stat-card .stat-icon.green { background: rgba(22,163,74,0.14); border-color: rgba(74,222,128,0.25); color: #86efac; }
+
+    /* === SHOW INACTIVE TOGGLE === */
+    .lb-inactive-toggle {
+      display: block; width: 100%; text-align: center;
+      margin-top: 0.6rem; padding: 0.65rem 1rem;
+      background: rgba(15,23,42,0.55);
+      border: 1px dashed rgba(148,163,184,0.25);
+      border-radius: 12px;
+      color: #94a3b8; font-size: 0.85rem; font-weight: 700;
+      cursor: pointer; transition: all 0.2s;
+      font-family: inherit;
+    }
+    .lb-inactive-toggle:hover { color: #c4b5fd; border-color: rgba(167,139,250,0.4); background: rgba(124,58,237,0.08); }
+
+    /* === LIVE / USAGE ROW ANIMATIONS === */
+    @keyframes rowSlideIn {
+      from { opacity: 0; transform: translateX(-10px); background: rgba(74,222,128,0.14); }
+      to { opacity: 1; transform: translateX(0); background: transparent; }
+    }
+    tr.row-new td { animation: rowFlash 1.6s ease-out; }
+    @keyframes rowFlash {
+      0% { background: rgba(74,222,128,0.18); }
+      100% { background: transparent; }
+    }
+    tr.row-enter { animation: rowSlideIn 0.45s ease-out; }
+
+    /* === CHART DRAW ANIMATION === */
+    .chart-line-anim {
+      stroke-dasharray: 2400;
+      stroke-dashoffset: 2400;
+      animation: chartDraw 1.2s ease-out forwards;
+    }
+    @keyframes chartDraw { to { stroke-dashoffset: 0; } }
+    .chart-fade-in { animation: chartFade 0.9s ease-out both; }
+    @keyframes chartFade { from { opacity: 0; } to { opacity: 1; } }
+
+    /* === MODELS: CLAUDE CARD === */
+    .model-card.claude-card {
+      border-color: rgba(245,158,11,0.45);
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(245,158,11,0.16), transparent 55%),
+        linear-gradient(180deg, rgba(30,41,59,0.75), rgba(15,23,42,0.6));
+      animation: claudeGlow 2.8s ease-in-out infinite;
+    }
+    .model-card.claude-card:hover { border-color: rgba(245,158,11,0.7); }
+    .claude-badge {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      font-size: 0.68rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase;
+      color: #fcd34d; background: rgba(202,138,4,0.14);
+      border: 1px solid rgba(251,191,36,0.35);
+      padding: 0.22rem 0.55rem; border-radius: 999px;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .podium-card, .podium-card.p-1 .podium-medal, tr.row-new td, tr.row-enter,
+      .chart-line-anim, .chart-fade-in, .model-card.claude-card { animation: none !important; }
+      .chart-line-anim { stroke-dashoffset: 0; }
+    }
+
+    /* Public Models page cards */
+    .models-grid-public {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 0.85rem;
+    }
+    .model-card {
+      position: relative;
+      overflow: hidden;
+      background: rgba(15,23,42,0.55);
+      border: 1px solid rgba(148,163,184,0.14);
+      border-radius: 16px;
+      padding: 1rem 1.05rem;
+      transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+      cursor: pointer;
+    }
+    .model-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(167,139,250,0.35);
+      box-shadow: 0 10px 28px rgba(0,0,0,0.22);
+    }
+    .model-card.free {
+      border-color: rgba(56,189,248,0.45);
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(56,189,248,0.18), transparent 55%),
+        radial-gradient(90% 80% at 0% 100%, rgba(167,139,250,0.14), transparent 50%),
+        rgba(15,23,42,0.72);
+      box-shadow: 0 0 0 1px rgba(56,189,248,0.12), 0 12px 32px rgba(14,165,233,0.12);
+      animation: freeCardGlow 2.8s ease-in-out infinite;
+    }
+    .model-card.free:hover {
+      border-color: rgba(125,211,252,0.7);
+      box-shadow: 0 0 0 1px rgba(56,189,248,0.28), 0 16px 40px rgba(14,165,233,0.22);
+    }
+    .model-card.privileged {
+      border-color: rgba(251,191,36,0.5);
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(251,191,36,0.16), transparent 55%),
+        radial-gradient(90% 80% at 0% 100%, rgba(244,114,182,0.12), transparent 50%),
+        rgba(15,23,42,0.75);
+      box-shadow: 0 0 0 1px rgba(251,191,36,0.14), 0 12px 32px rgba(245,158,11,0.12);
+    }
+    .model-card.privileged:hover {
+      border-color: rgba(252,211,77,0.75);
+      box-shadow: 0 0 0 1px rgba(251,191,36,0.3), 0 16px 40px rgba(245,158,11,0.2);
+    }
+    @keyframes freeCardGlow {
+      0%, 100% { box-shadow: 0 0 0 1px rgba(56,189,248,0.12), 0 12px 32px rgba(14,165,233,0.10); }
+      50% { box-shadow: 0 0 0 1px rgba(56,189,248,0.28), 0 14px 36px rgba(167,139,250,0.16); }
+    }
+    .model-card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.6rem;
+      margin-bottom: 0.55rem;
+    }
+    .model-card-name {
+      font-weight: 700;
+      color: #f1f5f9;
+      font-size: 0.95rem;
+      line-height: 1.25;
+    }
+    .model-card-id {
+      font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace;
+      font-size: 0.72rem;
+      color: #93c5fd;
+      word-break: break-all;
+      line-height: 1.4;
+    }
+    .model-card.free .model-card-id { color: #7dd3fc; }
+    .model-card.privileged .model-card-id { color: #fcd34d; }
+    .model-card-meta {
+      margin-top: 0.7rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      align-items: center;
+    }
+    .free-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.22rem 0.55rem;
+      border-radius: 999px;
+      font-size: 0.65rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #082f49;
+      background: linear-gradient(135deg, #7dd3fc 0%, #a78bfa 55%, #f0abfc 100%);
+      box-shadow: 0 0 16px rgba(56,189,248,0.35);
+      animation: freeBadgePulse 2.2s ease-in-out infinite;
+      white-space: nowrap;
+    }
+    .free-badge svg { width: 11px; height: 11px; }
+    .free-badge span[aria-hidden="true"] { font-size: 0.9rem; line-height: 1; font-weight: 900; }
+    @keyframes freeBadgePulse {
+      0%, 100% { filter: brightness(1); transform: scale(1); }
+      50% { filter: brightness(1.08); transform: scale(1.03); }
+    }
+    .privileged-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.28rem;
+      padding: 0.22rem 0.55rem;
+      border-radius: 999px;
+      font-size: 0.62rem;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #422006;
+      background: linear-gradient(135deg, #fde047 0%, #fbbf24 45%, #f472b6 100%);
+      box-shadow: 0 0 16px rgba(251,191,36,0.35);
+      white-space: nowrap;
+    }
+    .metered-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.22rem 0.55rem;
+      border-radius: 999px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #cbd5e1;
+      background: rgba(148,163,184,0.12);
+      border: 1px solid rgba(148,163,184,0.18);
+    }
+    .model-hint {
+      margin-top: 0.85rem;
+      font-size: 0.78rem;
+      color: #94a3b8;
+    }
+    .model-hint strong { color: #7dd3fc; }
+    .model-hint .priv-strong { color: #fbbf24; }
+    .model-card.copied {
+      border-color: rgba(52,211,153,0.55) !important;
+      box-shadow: 0 0 0 1px rgba(52,211,153,0.25), 0 12px 28px rgba(16,185,129,0.15) !important;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .model-card.free, .free-badge { animation: none !important; }
+    }
+
     /* === SEARCH === */
     .search-box {
-      margin: 0 0 1rem 0;
+      margin: 0 0 1.1rem 0;
       display: flex;
       gap: 0.55rem;
       align-items: center;
       flex-wrap: wrap;
-      background: rgba(15,23,42,0.45);
+      background: linear-gradient(180deg, rgba(15,23,42,0.62), rgba(15,23,42,0.42));
       border: 1px solid rgba(148,163,184,0.12);
-      border-radius: 14px;
-      padding: 0.55rem;
+      border-radius: 16px;
+      padding: 0.6rem;
+      box-shadow: 0 8px 22px rgba(0,0,0,0.12);
     }
     .search-box input {
       flex: 1; min-width: 220px;
-      padding: 0.7rem 0.9rem;
-      border-radius: 10px;
+      padding: 0.72rem 0.95rem;
+      border-radius: 12px;
       border: 1px solid rgba(148,163,184,0.14);
-      background: rgba(7,11,22,0.75);
+      background: rgba(7,11,22,0.8);
       color: #f8fafc;
       font-size: 0.9rem;
       outline: none;
@@ -1068,8 +1707,8 @@ function publicDashboardPage(): string {
       box-shadow: 0 0 0 3px rgba(124,58,237,0.15);
     }
     .search-box button {
-      padding: 0.7rem 1rem;
-      border-radius: 10px;
+      padding: 0.72rem 1.05rem;
+      border-radius: 12px;
       border: 1px solid rgba(148,163,184,0.14);
       background: rgba(30,41,59,0.85);
       color: #e2e8f0;
@@ -1083,6 +1722,7 @@ function publicDashboardPage(): string {
       background: linear-gradient(90deg, #7c3aed, #2563eb);
       border-color: transparent;
       color: #fff;
+      box-shadow: 0 6px 16px rgba(37,99,235,0.22);
     }
     .search-box button.primary:hover { filter: brightness(1.08); }
 
@@ -1197,201 +1837,303 @@ function publicDashboardPage(): string {
 
     /* === PRICES === */
     .prices-hero {
-      background: linear-gradient(135deg, #1e293b 0%, #0f172a 55%, #1e1b4b 100%);
-      border: 1px solid #334155;
-      border-radius: 16px;
-      padding: 1.5rem 1.75rem;
-      margin-bottom: 1.5rem;
-      position: relative;
-      overflow: hidden;
-    }
-    .prices-hero::before {
-      content: '';
-      position: absolute;
-      top: -40px; right: -30px;
-      width: 160px; height: 160px;
-      background: radial-gradient(circle, rgba(168,85,247,0.25), transparent 70%);
-      pointer-events: none;
-    }
-    .prices-hero-title {
-      font-size: 1.15rem;
-      font-weight: 700;
-      color: #f8fafc;
-      margin-bottom: 0.35rem;
-    }
-    .prices-hero-sub {
-      font-size: 0.9rem;
-      color: #94a3b8;
-      line-height: 1.5;
-      max-width: 640px;
-    }
-    .prices-pills {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      margin-top: 1rem;
-    }
-    .price-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      padding: 0.4rem 0.75rem;
-      border-radius: 999px;
-      font-size: 0.78rem;
-      font-weight: 600;
-      border: 1px solid #334155;
-      background: rgba(15, 23, 42, 0.7);
-      color: #e2e8f0;
-    }
-    .price-pill.purple { border-color: #7c3aed; color: #c4b5fd; background: rgba(124, 58, 237, 0.15); }
-    .price-pill.blue { border-color: #2563eb; color: #93c5fd; background: rgba(37, 99, 235, 0.15); }
-    .price-pill.green { border-color: #16a34a; color: #86efac; background: rgba(22, 163, 74, 0.15); }
-    .price-pill.yellow { border-color: #ca8a04; color: #fde68a; background: rgba(202, 138, 4, 0.15); }
+          background:
+            radial-gradient(420px 180px at 100% 0%, rgba(124,58,237,0.22), transparent 60%),
+            radial-gradient(320px 160px at 0% 100%, rgba(37,99,235,0.16), transparent 55%),
+            linear-gradient(135deg, rgba(30,41,59,0.95) 0%, rgba(15,23,42,0.92) 55%, rgba(30,27,75,0.9) 100%);
+          border: 1px solid rgba(148,163,184,0.14);
+          border-radius: 18px;
+          padding: 1.5rem 1.75rem;
+          margin-bottom: 1.5rem;
+          position: relative;
+          overflow: hidden;
+          box-shadow: 0 12px 32px rgba(0,0,0,0.16);
+        }
+        .prices-hero::before {
+          content: '';
+          position: absolute;
+          top: -40px; right: -30px;
+          width: 160px; height: 160px;
+          background: radial-gradient(circle, rgba(168,85,247,0.25), transparent 70%);
+          pointer-events: none;
+        }
+        .prices-hero-title {
+          font-size: 1.2rem;
+          font-weight: 800;
+          letter-spacing: -0.02em;
+          color: #f8fafc;
+          margin-bottom: 0.4rem;
+        }
+        .prices-hero-sub {
+          font-size: 0.92rem;
+          color: #94a3b8;
+          line-height: 1.6;
+          max-width: 760px;
+        }
+        .prices-pills {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.5rem;
+          margin-top: 1.05rem;
+        }
+        .price-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.35rem;
+          padding: 0.4rem 0.8rem;
+          border-radius: 999px;
+          font-size: 0.78rem;
+          font-weight: 700;
+          border: 1px solid rgba(148,163,184,0.16);
+          background: rgba(15, 23, 42, 0.72);
+          color: #e2e8f0;
+        }
+        .price-pill.purple { border-color: rgba(124,58,237,0.45); color: #c4b5fd; background: rgba(124, 58, 237, 0.15); }
+        .price-pill.blue { border-color: rgba(37,99,235,0.45); color: #93c5fd; background: rgba(37, 99, 235, 0.15); }
+        .price-pill.green { border-color: rgba(22,163,74,0.45); color: #86efac; background: rgba(22, 163, 74, 0.15); }
+        .price-pill.yellow { border-color: rgba(202,138,4,0.45); color: #fde68a; background: rgba(202, 138, 4, 0.15); }
 
-    .pricing-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1rem;
-      margin-bottom: 1.5rem;
-    }
-    .price-card {
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 16px;
-      padding: 1.35rem 1.25rem 1.25rem;
-      display: flex;
-      flex-direction: column;
-      position: relative;
-      transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
-    }
-    .price-card:hover {
-      transform: translateY(-4px);
-      border-color: #475569;
-      box-shadow: 0 12px 30px rgba(0,0,0,0.25);
-    }
-    .price-card.featured {
-      border-color: #7c3aed;
-      background: linear-gradient(180deg, rgba(124,58,237,0.18) 0%, #1e293b 45%);
-      box-shadow: 0 0 0 1px rgba(124,58,237,0.25), 0 16px 40px rgba(124,58,237,0.12);
-    }
-    .price-card.featured:hover { border-color: #a78bfa; }
-    .price-badge {
-      position: absolute;
-      top: -11px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: linear-gradient(90deg, #7c3aed, #2563eb);
-      color: white;
-      font-size: 0.7rem;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      padding: 0.28rem 0.7rem;
-      border-radius: 999px;
-      white-space: nowrap;
-    }
-    .price-tier {
-      font-size: 0.8rem;
-      font-weight: 700;
-      color: #94a3b8;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      margin-bottom: 0.5rem;
-    }
-    .price-amount {
-      font-size: 1.85rem;
-      font-weight: 800;
-      color: #f8fafc;
-      line-height: 1.1;
-      margin-bottom: 0.2rem;
-    }
-    .price-amount span {
-      font-size: 0.95rem;
-      font-weight: 600;
-      color: #94a3b8;
-      margin-right: 0.15rem;
-    }
-    .price-period {
-      font-size: 0.82rem;
-      color: #64748b;
-      margin-bottom: 1rem;
-    }
-    .price-features {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 0.65rem;
-      margin: 0 0 1.25rem;
-      flex: 1;
-    }
-    .price-features li {
-      display: flex;
-      align-items: flex-start;
-      gap: 0.55rem;
-      font-size: 0.88rem;
-      color: #e2e8f0;
-      line-height: 1.35;
-    }
-    .price-check {
-      width: 18px;
-      height: 18px;
-      border-radius: 999px;
-      background: rgba(74, 222, 128, 0.15);
-      color: #4ade80;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      font-size: 0.7rem;
-      font-weight: 700;
-      margin-top: 1px;
-    }
-    .price-cta {
-      display: block;
-      text-align: center;
-      text-decoration: none;
-      padding: 0.8rem 1rem;
-      border-radius: 10px;
-      font-weight: 700;
-      font-size: 0.9rem;
-      transition: all 0.2s;
-      border: 1px solid #334155;
-      background: #0f172a;
-      color: #e2e8f0;
-    }
-    .price-cta:hover { border-color: #3b82f6; color: #fff; background: #1e293b; }
-    .price-cta.primary {
-      background: linear-gradient(90deg, #7c3aed, #2563eb);
-      border-color: transparent;
-      color: #fff;
-    }
-    .price-cta.primary:hover {
-      filter: brightness(1.08);
-      box-shadow: 0 8px 20px rgba(124,58,237,0.3);
-    }
-    .prices-note {
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 12px;
-      padding: 1.1rem 1.25rem;
-      color: #94a3b8;
-      font-size: 0.88rem;
-      line-height: 1.55;
-    }
-    .prices-note strong { color: #e2e8f0; }
-    .prices-note a { color: #60a5fa; text-decoration: none; font-weight: 600; }
-    .prices-note a:hover { text-decoration: underline; }
+        .pricing-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 1.1rem;
+          margin-bottom: 1.5rem;
+          max-width: 980px;
+        }
+        @media (min-width: 1280px) {
+          .pricing-grid {
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            max-width: none;
+            gap: 0.9rem;
+          }
+        }
+        .price-card {
+          background: linear-gradient(180deg, rgba(30,41,59,0.95), rgba(15,23,42,0.88));
+          border: 1px solid rgba(148,163,184,0.14);
+          border-radius: 18px;
+          padding: 1.45rem 1.25rem 1.25rem;
+          display: flex;
+          flex-direction: column;
+          position: relative;
+          transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+          min-height: 100%;
+          box-shadow: 0 10px 28px rgba(0,0,0,0.14);
+        }
+        .price-card:hover {
+          transform: translateY(-4px);
+          border-color: rgba(148,163,184,0.28);
+          box-shadow: 0 16px 36px rgba(0,0,0,0.24);
+        }
+        .price-card.featured {
+          border-color: rgba(124,58,237,0.55);
+          background: linear-gradient(180deg, rgba(124,58,237,0.2) 0%, rgba(30,41,59,0.95) 42%, rgba(15,23,42,0.9) 100%);
+          box-shadow: 0 0 0 1px rgba(124,58,237,0.22), 0 16px 40px rgba(124,58,237,0.14);
+        }
+        .price-card.featured:hover { border-color: #a78bfa; }
+        .price-card.ultra {
+          border-color: rgba(34,211,238,0.5);
+          background: linear-gradient(180deg, rgba(14,165,233,0.18) 0%, rgba(30,41,59,0.95) 42%, rgba(15,23,42,0.9) 100%);
+          box-shadow: 0 0 0 1px rgba(34,211,238,0.18), 0 16px 40px rgba(14,165,233,0.12);
+        }
+        .price-card.ultra:hover { border-color: #67e8f9; }
+        .price-card.ultra .price-badge {
+          background: linear-gradient(90deg, #0ea5e9, #22d3ee);
+          color: #082f49;
+        }
+        .price-card.ultra .price-cta {
+          border-color: rgba(34,211,238,0.55);
+          color: #a5f3fc;
+          background: rgba(14,165,233,0.1);
+        }
+        .price-card.ultra .price-cta:hover {
+          border-color: #67e8f9;
+          color: #fff;
+          background: rgba(14,165,233,0.22);
+        }
+        .price-card.supporter {
+          border-color: rgba(234,179,8,0.5);
+          background: linear-gradient(180deg, rgba(234,179,8,0.16) 0%, rgba(30,41,59,0.95) 42%, rgba(15,23,42,0.9) 100%);
+          box-shadow: 0 0 0 1px rgba(234,179,8,0.18), 0 16px 40px rgba(234,179,8,0.10);
+        }
+        .price-card.supporter:hover { border-color: #fde047; }
+        .price-card.supporter .price-badge {
+          background: linear-gradient(90deg, #ca8a04, #eab308);
+          color: #1c1917;
+        }
+        .price-card.supporter .price-cta {
+          border-color: rgba(202,138,4,0.55);
+          color: #fde68a;
+          background: rgba(202,138,4,0.08);
+        }
+        .price-card.supporter .price-cta:hover {
+          border-color: #facc15;
+          color: #fff;
+          background: rgba(202,138,4,0.2);
+        }
+        .price-badge {
+          position: absolute;
+          top: -11px;
+          left: 50%;
+          transform: translateX(-50%);
+          background: linear-gradient(90deg, #7c3aed, #2563eb);
+          color: white;
+          font-size: 0.7rem;
+          font-weight: 800;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          padding: 0.3rem 0.75rem;
+          border-radius: 999px;
+          white-space: nowrap;
+          box-shadow: 0 8px 18px rgba(37,99,235,0.25);
+        }
+        .price-tier {
+          font-size: 0.78rem;
+          font-weight: 800;
+          color: #94a3b8;
+          text-transform: uppercase;
+          letter-spacing: 0.07em;
+          margin-bottom: 0.55rem;
+        }
+        .price-amount {
+          font-size: 1.9rem;
+          font-weight: 800;
+          color: #f8fafc;
+          line-height: 1.1;
+          margin-bottom: 0.25rem;
+          letter-spacing: -0.03em;
+        }
+        .price-amount span {
+          font-size: 0.95rem;
+          font-weight: 700;
+          color: #94a3b8;
+          margin-right: 0.2rem;
+        }
+        .price-amount.contact {
+          font-size: 1.55rem;
+          letter-spacing: -0.02em;
+          color: #fde68a;
+        }
+        .price-amount.contact span {
+          font-size: 0.85rem;
+          margin-right: 0.35rem;
+          color: #fde68a;
+        }
+        .price-period {
+          font-size: 0.82rem;
+          color: #94a3b8;
+          margin-bottom: 1.05rem;
+          min-height: 1.2em;
+        }
+        .price-features {
+          list-style: none;
+          display: flex;
+          flex-direction: column;
+          gap: 0.68rem;
+          margin: 0 0 1.3rem;
+          flex: 1;
+        }
+        .price-features li {
+          display: flex;
+          align-items: flex-start;
+          gap: 0.55rem;
+          font-size: 0.88rem;
+          color: #e2e8f0;
+          line-height: 1.4;
+        }
+        .price-check {
+          width: 18px;
+          height: 18px;
+          border-radius: 999px;
+          background: rgba(74, 222, 128, 0.15);
+          color: #4ade80;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          font-size: 0.7rem;
+          font-weight: 700;
+          margin-top: 1px;
+        }
+        .price-cta {
+          display: block;
+          text-align: center;
+          text-decoration: none;
+          padding: 0.85rem 1rem;
+          border-radius: 12px;
+          font-weight: 700;
+          font-size: 0.9rem;
+          transition: all 0.2s;
+          border: 1px solid rgba(148,163,184,0.18);
+          background: rgba(7,11,22,0.7);
+          color: #e2e8f0;
+        }
+        .price-cta:hover { border-color: #3b82f6; color: #fff; background: #1e293b; }
+        .price-cta.primary {
+          background: linear-gradient(90deg, #7c3aed, #2563eb);
+          border-color: transparent;
+          color: #fff;
+          box-shadow: 0 8px 18px rgba(124,58,237,0.22);
+        }
+        .price-cta.primary:hover {
+          filter: brightness(1.08);
+          box-shadow: 0 10px 22px rgba(124,58,237,0.32);
+        }
+        .prices-note {
+          background: linear-gradient(180deg, rgba(30,41,59,0.88), rgba(15,23,42,0.78));
+          border: 1px solid rgba(148,163,184,0.14);
+          border-radius: 16px;
+          padding: 1.25rem 1.35rem;
+          color: #94a3b8;
+          font-size: 0.9rem;
+          line-height: 1.65;
+          box-shadow: 0 10px 28px rgba(0,0,0,0.12);
+          max-width: 980px;
+        }
+        .prices-note strong { color: #f1f5f9; }
+        .prices-note a { color: #60a5fa; text-decoration: none; font-weight: 700; }
+        .prices-note a:hover { text-decoration: underline; }
+        .prices-note-title {
+          display: flex;
+          align-items: center;
+          gap: 0.45rem;
+          font-size: 0.95rem;
+          font-weight: 800;
+          color: #f8fafc;
+          margin-bottom: 0.85rem;
+          letter-spacing: -0.01em;
+        }
+        .prices-note p {
+          margin: 0 0 0.75rem;
+          color: #94a3b8;
+        }
+        .prices-note p:last-child { margin-bottom: 0; }
+        .prices-note .warn {
+          color: #fde68a;
+          background: rgba(202,138,4,0.1);
+          border: 1px solid rgba(234,179,8,0.22);
+          border-radius: 12px;
+          padding: 0.75rem 0.9rem;
+          margin: 0.85rem 0;
+        }
+        .prices-note .order-line {
+          padding-top: 0.85rem;
+          border-top: 1px solid rgba(148,163,184,0.12);
+          margin-top: 0.9rem;
+        }
 
-    @media (max-width: 1024px) {
-      .pricing-grid { grid-template-columns: 1fr; max-width: 420px; }
-      .price-card.featured { order: -1; }
-    }
-    @media (max-width: 768px) {
-      .prices-hero { padding: 1.15rem 1rem; }
-      .price-amount { font-size: 1.6rem; }
-      .pricing-grid { max-width: none; }
-    }
-  </style>
+        @media (max-width: 1024px) {
+          .pricing-grid { grid-template-columns: 1fr; max-width: 460px; }
+          .price-card.featured { order: -1; }
+          .prices-note { max-width: 460px; }
+        }
+        @media (max-width: 768px) {
+          .prices-hero { padding: 1.15rem 1rem; border-radius: 16px; }
+          .prices-hero-title { font-size: 1.05rem; }
+          .price-amount { font-size: 1.65rem; }
+          .pricing-grid { max-width: none; gap: 0.95rem; }
+          .prices-note { max-width: none; padding: 1.1rem 1rem; font-size: 0.86rem; }
+        }
+      </style>
 </head>
 <body>
   <div class="layout">
@@ -1403,10 +2145,10 @@ function publicDashboardPage(): string {
             <h1>Routers9</h1>
           </div>
         </div>
-        <a href="https://t.me/grokapi_id" target="_blank" rel="noopener" class="tg-link" title="Telegram">
+        <a href="https://t.me/routers9_id" target="_blank" rel="noopener" class="tg-link" title="Telegram">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
         </a>
-        <p>Public Dashboard · Grok 4.5 API</p>
+        <p>Public Dashboard · Multi-Model LLM API</p>
       </div>
       <nav>
         <div class="nav-item active" data-page="leaderboard" onclick="switchPage('leaderboard')">
@@ -1438,7 +2180,7 @@ function publicDashboardPage(): string {
         <div class="page-header">
           <div>
             <h2 class="page-title"><span class="grad">Leaderboard</span></h2>
-            <p class="page-desc">Top API keys by request count and token usage</p>
+            <p class="page-desc">Top API keys by kuota token terpakai (klik header untuk urutkan: Requests / Kuota / Remaining / Last Active)</p>
           </div>
         </div>
         <div class="overview-stats" id="overview-stats"></div>
@@ -1463,7 +2205,7 @@ function publicDashboardPage(): string {
           >Reset</button>
         </div>
         <div id="lb-search-meta" style="font-size:0.8rem;color:#94a3b8;margin:-0.35rem 0 0.85rem 0;min-height:1.1em"></div>
-        <div class="loading pulse" id="lb-loading">Loading...</div>
+        <div class="loading" id="lb-loading"><div class="skeleton-wrap"><div class="skeleton sk-lg"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div></div>
         <div id="lb-content" style="display:none"></div>
       </div>
 
@@ -1479,7 +2221,8 @@ function publicDashboardPage(): string {
             <span class="updated-at" id="live-updated">-</span>
           </div>
         </div>
-        <div class="loading pulse" id="live-loading">Loading...</div>
+        <div class="overview-stats" id="live-stats"></div>
+        <div class="loading" id="live-loading"><div class="skeleton-wrap"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div></div>
         <div id="live-content" style="display:none"></div>
       </div>
 
@@ -1511,7 +2254,7 @@ function publicDashboardPage(): string {
             <div class="chart-legend-item"><div class="chart-dot" style="background:#fbbf24;color:#fbbf24"></div>Tokens</div>
           </div>
         </div>
-        <div class="loading pulse" id="usage-loading">Loading...</div>
+        <div class="loading" id="usage-loading"><div class="skeleton-wrap"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div></div>
         <div id="usage-content" style="display:none"></div>
       </div>
 
@@ -1520,10 +2263,10 @@ function publicDashboardPage(): string {
         <div class="page-header">
           <div>
             <h2 class="page-title"><span class="grad">Available Models</span></h2>
-            <p class="page-desc">Click any model ID to copy it</p>
+            <p class="page-desc">Klik kartu untuk copy model ID. Badge <strong style="color:#7dd3fc">Unlimited</strong> = tidak potong kuota token key.</p>
           </div>
         </div>
-        <div class="loading pulse" id="models-loading">Loading...</div>
+        <div class="loading" id="models-loading"><div class="skeleton-wrap"><div class="skeleton sk-lg"></div><div class="skeleton sk-lg"></div><div class="skeleton sk-lg"></div></div></div>
         <div id="models-content" style="display:none"></div>
       </div>
 
@@ -1532,81 +2275,131 @@ function publicDashboardPage(): string {
         <div class="page-header">
           <div>
             <h2 class="page-title"><span class="grad">Harga / Prices</span></h2>
-            <p class="page-desc">Paket akses Routers9 — bayar sekali, langsung pakai</p>
+            <p class="page-desc">Daftar harga token Grok 4.5 terbaru</p>
           </div>
         </div>
 
         <div class="prices-hero">
           <div class="prices-hero-title">Akses Grok 4.5 lewat API OpenAI-compatible</div>
           <div class="prices-hero-sub">
-            Semua paket sudah include model <strong style="color:#c4b5fd">Grok 4.5</strong>, rate limit
-            <strong style="color:#93c5fd">50 RPM</strong>, dan endpoint siap pakai. Order cepat via Telegram.
+            Semua paket include model <strong style="color:#c4b5fd">Grok 4.5</strong>, plus
+            <strong style="color:#86efac">semua model Unlimited</strong> bisa dipakai di semua paket.
+            Rate limit per paket: Starter <strong style="color:#93c5fd">10 RPM</strong>, Pro
+            <strong style="color:#93c5fd">20 RPM</strong>, Business <strong style="color:#93c5fd">30 RPM</strong>,
+            Ultra <strong style="color:#67e8f9">50 RPM</strong>.
+            Order via Telegram.
           </div>
           <div class="prices-pills">
             <span class="price-pill purple">Grok 4.5</span>
-            <span class="price-pill blue">50 RPM</span>
-            <span class="price-pill green">OpenAI Compatible</span>
+            <span class="price-pill green">Semua Unlimited Model</span>
+            <span class="price-pill blue">10 / 20 / 30 / 50 RPM</span>
             <span class="price-pill yellow">Aktif Instant</span>
           </div>
         </div>
 
         <div class="pricing-grid">
           <div class="price-card">
-            <div class="price-tier">Starter</div>
-            <div class="price-amount"><span>Rp</span>100.000</div>
-            <div class="price-period">masa aktif 7 hari</div>
+            <div class="price-tier" style="color:#6ee7b7">Starter</div>
+            <div class="price-amount"><span>Rp</span>150.000</div>
+            <div class="price-period">28-day active period</div>
             <ul class="price-features">
-              <li><span class="price-check">✓</span><span><strong>100M</strong> token quota</span></li>
-              <li><span class="price-check">✓</span><span>Akses <strong>Grok 4.5</strong></span></li>
-              <li><span class="price-check">✓</span><span>Rate limit <strong>50 RPM</strong></span></li>
-              <li><span class="price-check">✓</span><span>API key pribadi</span></li>
-              <li><span class="price-check">✓</span><span>Cocok buat coba / light use</span></li>
+              <li><span class="price-check">✓</span><span><strong>150M</strong> token quota</span></li>
+              <li><span class="price-check">✓</span><span>Access <strong>Grok 4.5</strong></span></li>
+              <li><span class="price-check">✓</span><span>All <strong>Unlimited</strong> models included</span></li>
+              <li><span class="price-check">✓</span><span>Rate limit <strong>10 RPM</strong></span></li>
+              <li><span class="price-check">✓</span><span>Tokens valid until expiry</span></li>
+              <li><span class="price-check">✓</span><span>Daily quota <strong>150M</strong> resets at <strong>00:00 WIB</strong></span></li>
             </ul>
             <a class="price-cta" href="https://t.me/routers9" target="_blank" rel="noopener">Order via Telegram</a>
           </div>
 
           <div class="price-card featured">
-            <div class="price-badge">Paling Laris</div>
-            <div class="price-tier" style="color:#c4b5fd">Pro</div>
-            <div class="price-amount"><span>Rp</span>200.000</div>
-            <div class="price-period">masa aktif 14 hari</div>
+            <div class="price-badge">Most Popular</div>
+            <div class="price-tier" style="color:#7dd3fc">Pro</div>
+            <div class="price-amount"><span>Rp</span>250.000</div>
+            <div class="price-period">28-day active period</div>
             <ul class="price-features">
               <li><span class="price-check">✓</span><span><strong>250M</strong> token quota</span></li>
-              <li><span class="price-check">✓</span><span>Akses <strong>Grok 4.5</strong></span></li>
-              <li><span class="price-check">✓</span><span>Rate limit <strong>50 RPM</strong></span></li>
-              <li><span class="price-check">✓</span><span>API key pribadi</span></li>
-              <li><span class="price-check">✓</span><span>Best value buat daily use</span></li>
+              <li><span class="price-check">✓</span><span>Access <strong>Grok 4.5</strong></span></li>
+              <li><span class="price-check">✓</span><span>All <strong>Unlimited</strong> models included</span></li>
+              <li><span class="price-check">✓</span><span>Rate limit <strong>20 RPM</strong></span></li>
+              <li><span class="price-check">✓</span><span>Tokens valid until expiry</span></li>
+              <li><span class="price-check">✓</span><span>Daily quota <strong>250M</strong> resets at <strong>00:00 WIB</strong></span></li>
             </ul>
-            <a class="price-cta primary" href="https://t.me/routers9" target="_blank" rel="noopener">Order Pro Sekarang</a>
+            <a class="price-cta primary" href="https://t.me/routers9" target="_blank" rel="noopener">Order Pro Now</a>
           </div>
 
           <div class="price-card">
-            <div class="price-tier">Ultra</div>
-            <div class="price-amount"><span>Rp</span>300.000</div>
-            <div class="price-period">masa aktif 28 hari</div>
+            <div class="price-tier" style="color:#c4b5fd">Business</div>
+            <div class="price-amount"><span>Rp</span>350.000</div>
+            <div class="price-period">28-day active period</div>
+            <ul class="price-features">
+              <li><span class="price-check">✓</span><span><strong>350M</strong> token quota</span></li>
+              <li><span class="price-check">✓</span><span>Access <strong>Grok 4.5</strong></span></li>
+              <li><span class="price-check">✓</span><span>All <strong>Unlimited</strong> models included</span></li>
+              <li><span class="price-check">✓</span><span>Rate limit <strong>30 RPM</strong></span></li>
+              <li><span class="price-check">✓</span><span>Tokens valid until expiry</span></li>
+              <li><span class="price-check">✓</span><span>Daily quota <strong>350M</strong> resets at <strong>00:00 WIB</strong></span></li>
+            </ul>
+            <a class="price-cta" href="https://t.me/routers9" target="_blank" rel="noopener">Order Business</a>
+          </div>
+
+          <div class="price-card ultra">
+            <div class="price-badge">500M</div>
+            <div class="price-tier" style="color:#67e8f9">Ultra</div>
+            <div class="price-amount"><span>Rp</span>500.000</div>
+            <div class="price-period">28-day active period</div>
             <ul class="price-features">
               <li><span class="price-check">✓</span><span><strong>500M</strong> token quota</span></li>
-              <li><span class="price-check">✓</span><span>Akses <strong>Grok 4.5</strong></span></li>
+              <li><span class="price-check">✓</span><span>Access <strong>Grok 4.5</strong></span></li>
+              <li><span class="price-check">✓</span><span>All <strong>Unlimited</strong> models included</span></li>
               <li><span class="price-check">✓</span><span>Rate limit <strong>50 RPM</strong></span></li>
-              <li><span class="price-check">✓</span><span>API key pribadi</span></li>
-              <li><span class="price-check">✓</span><span>Paling hemat per token</span></li>
+              <li><span class="price-check">✓</span><span>Tokens valid until expiry</span></li>
+              <li><span class="price-check">✓</span><span>Daily quota <strong>500M</strong> resets at <strong>00:00 WIB</strong></span></li>
             </ul>
-            <a class="price-cta" href="https://t.me/routers9" target="_blank" rel="noopener">Order via Telegram</a>
+            <a class="price-cta" href="https://t.me/routers9" target="_blank" rel="noopener">Order Ultra</a>
+          </div>
+
+          <div class="price-card supporter">
+            <div class="price-badge">3 slots left</div>
+            <div class="price-tier" style="color:#fde68a">Supporter</div>
+            <div class="price-amount contact">Via DM</div>
+            <div class="price-period">3 slots left · no public price · message admin</div>
+            <ul class="price-features">
+              <li><span class="price-check">✓</span><span><strong>Unlimited</strong> token quota</span></li>
+              <li><span class="price-check">✓</span><span><strong>Request RPM limit</strong></span></li>
+              <li><span class="price-check">✓</span><span><strong>No expiry</strong> key</span></li>
+              <li><span class="price-check">✓</span><span>Access <strong>Grok 4.5</strong></span></li>
+              <li><span class="price-check">✓</span><span>All <strong>Unlimited</strong> models included</span></li>
+              <li><span class="price-check">✓</span><span><strong>SUPPORTER</strong> badge on panel</span></li>
+            </ul>
+            <a class="price-cta" href="https://t.me/routers9" target="_blank" rel="noopener">DM Admin Now</a>
           </div>
         </div>
 
         <div class="prices-note">
-          <strong>Cara order:</strong> chat Telegram
+          <div class="prices-note-title">📢 Pemberitahuan</div>
+          <p>Paket AI di sini akan terus berubah mengikuti perkembangan dan tren model AI terbaru. Model yang tersedia akan selalu diperbarui, diganti, atau ditambahkan berdasarkan performa dan kualitas terbaik yang tersedia.</p>
+          <p>Tujuan kami adalah selalu menghadirkan AI terbaik, bukan mempertahankan model tertentu.</p>
+          <p class="warn"><strong>⚠️ Tidak ada garansi model tertentu akan tersedia selamanya.</strong> Model dapat berubah sewaktu-waktu tanpa pemberitahuan sebelumnya.</p>
+          <p class="order-line"><strong>Cara order:</strong> chat Telegram
           <a href="https://t.me/routers9" target="_blank" rel="noopener">@routers9</a>
-          → sebut paket (Starter / Pro / Ultra) → bayar → key dikirim instant.<br/>
-          Semua paket: endpoint OpenAI-compatible, akses <strong>Grok 4.5</strong>, rate limit <strong>50 request/menit</strong>.
+          → sebut paket (Starter / Pro / Business / Ultra / Supporter) → bayar → key dikirim instant.
+          Hubungi admin untuk pembelian, perpanjangan, atau donasi Supporter.</p>
         </div>
       </div>
+
+      <footer class="pub-footer">
+        <span>© 2026 Routers9 · Multi-Model LLM API Gateway</span>
+        <span class="status-pill" id="status-pill">Operational</span>
+        <a href="https://t.me/routers9_id" target="_blank" rel="noopener">t.me/routers9_id</a>
+      </footer>
     </main>
   </div>
 
   <script>
     let liveInterval = null;
+    let lbInterval = null;
     let currentPage = 'leaderboard';
 
     function switchPage(page) {
@@ -1616,11 +2409,12 @@ function publicDashboardPage(): string {
       document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
       document.getElementById('page-' + page).classList.add('active');
 
-      // Stop live polling if not on live page
+      // Stop page polling when switching
       if (liveInterval) { clearInterval(liveInterval); liveInterval = null; }
+      if (lbInterval) { clearInterval(lbInterval); lbInterval = null; }
 
       // Load data for the page
-      if (page === 'leaderboard') loadLeaderboard();
+      if (page === 'leaderboard') { loadLeaderboard(); lbInterval = setInterval(() => loadLeaderboard(null, true), 45000); }
       else if (page === 'live') { loadLive(); liveInterval = setInterval(loadLive, 10000); }
       else if (page === 'usage') { loadUsage(); loadChart('1d'); }
       else if (page === 'models') loadModels();
@@ -1628,6 +2422,27 @@ function publicDashboardPage(): string {
 
       // Scroll to top on page switch
       window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Footer status check (reuses /health, refresh tiap 60s)
+    async function checkStatus() {
+      const pill = document.getElementById('status-pill');
+      if (!pill) return;
+      try {
+        const res = await fetch('/health', { cache: 'no-store' });
+        if (res.ok) { pill.classList.remove('down'); pill.textContent = 'Operational'; }
+        else { pill.classList.add('down'); pill.textContent = 'Degraded'; }
+      } catch (e) {
+        pill.classList.add('down');
+        pill.textContent = 'Offline';
+      }
+    }
+    checkStatus();
+    setInterval(checkStatus, 60000);
+
+    const EMPTY_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>';
+    function emptyHtml(msg) {
+      return '<div class="empty">' + EMPTY_ICON + msg + '</div>';
     }
 
     function formatNum(n) {
@@ -1646,28 +2461,158 @@ function publicDashboardPage(): string {
       return formatNum(Number(n) || 0);
     }
 
+    function isSuperAdminName(name) {
+      return (name || '').trim().toLowerCase() === 'super admin';
+    }
+
+    function isSupporterName(name) {
+      const n = (name || '').trim().toLowerCase();
+      return n === 'gilbert arias' || n === 'yuop';
+    }
+
+    function isHelperName(name) {
+      return (name || '').trim().toLowerCase() === 'afiq';
+    }
+
+    // Code2-style SVG + DEV chip for Super Admin (developer special)
+    const SA_DEV_BADGE_HTML =
+      '<span class="sa-badge" title="Super Admin · Developer (unlimited)">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/>' +
+      '</svg><span class="sa-dev">DEV</span></span>';
+
+    // HeartHandshake-style SVG + SUPPORTER chip (donatur special)
+    const SP_BADGE_HTML =
+      '<span class="sp-badge" title="Supporter · Donatur (unlimited · no expiry)">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>' +
+      '<path d="M12 5 9.04 7.96a2.17 2.17 0 0 0 0 3.08c.82.82 2.13.85 3 .07l2.07-1.9a2.82 2.82 0 0 1 3.79 0l2.96 2.66"/>' +
+      '<path d="m18 15-2-2"/><path d="m15 18-2-2"/>' +
+      '</svg><span class="sp-label">SUPPORTER</span></span>';
+
+    // Wrench-style SVG + HELPER chip (builder special)
+    const HP_BADGE_HTML =
+      '<span class="hp-badge" title="Helper · Builder (unlimited · no expiry)">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>' +
+      '</svg><span class="hp-label">HELPER</span></span>';
+
+    // Zap-style SVG + ULTRA chip for exact 500M quota keys
+    const UL_BADGE_HTML =
+      '<span class="ul-badge" title="Ultra · 500M quota">' +
+      '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/>' +
+      '</svg><span class="ul-label">ULTRA</span></span>';
+
+    function buyerNameHtml(name, quotaTokens) {
+      const display = name || '-';
+      if (isSuperAdminName(name)) {
+        return '<span class="sa-name">' + display + '</span>' + SA_DEV_BADGE_HTML;
+      }
+      if (isSupporterName(name)) {
+        return '<span class="sp-name">' + display + '</span>' + SP_BADGE_HTML;
+      }
+      if (isHelperName(name)) {
+        return '<span class="hp-name">' + display + '</span>' + HP_BADGE_HTML;
+      }
+      const q = quotaTokens == null || quotaTokens === '' ? null : Number(quotaTokens);
+      if (q === 500000000) {
+        return '<span class="ul-name">' + display + '</span>' + UL_BADGE_HTML;
+      }
+      let style = '';
+      if (q === 250000000) style = ' style="color:#6ee7b7;font-weight:700"';
+      return '<span' + style + '>' + display + '</span>';
+    }
+
     async function fetchAPI(path) {
       const res = await fetch(path);
       if (!res.ok) throw new Error('API error');
       return res.json();
     }
 
+    function isClaudeModel(id) {
+      return typeof id === 'string' && id.toLowerCase().includes('claude');
+    }
+
+    function modelTagHtml(id) {
+      const display = id || '-';
+      if (isClaudeModel(id)) {
+        return '<span class="model-tag claude"><span class="claude-spark">&#10022;</span>' + display + '</span>';
+      }
+      return '<span class="model-tag">' + display + '</span>';
+    }
+
+    function timeAgo(ts) {
+      if (!ts) return '-';
+      const t = new Date(ts).getTime();
+      if (Number.isNaN(t)) return '-';
+      const diff = Math.max(0, Date.now() - t);
+      const s = Math.floor(diff / 1000);
+      if (s < 10) return 'baru saja';
+      if (s < 60) return s + 's ago';
+      const m = Math.floor(s / 60);
+      if (m < 60) return m + 'm ago';
+      const h = Math.floor(m / 60);
+      if (h < 24) return h + 'h ago';
+      const d = Math.floor(h / 24);
+      if (d < 7) return d + 'd ago';
+      return formatTime(ts);
+    }
+
+    const STAT_ICONS = {
+      requests: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
+      tokens: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>',
+      keys: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>'
+    };
+
+    function statCardHtml(value, label, iconKey, colorClass, countTarget, fmt) {
+      const icon = STAT_ICONS[iconKey] || STAT_ICONS.requests;
+      const dataAttrs = countTarget != null
+        ? ' data-count="' + countTarget + '" data-fmt="' + (fmt || 'num') + '"'
+        : '';
+      return '<div class="stat-card"><div class="stat-icon ' + (colorClass || '') + '">' + icon + '</div>' +
+        '<div class="stat-value"' + dataAttrs + '>' + value + '</div>' +
+        '<div class="stat-label">' + label + '</div></div>';
+    }
+
+    function runCountUps(rootEl) {
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      const els = (rootEl || document).querySelectorAll('[data-count]');
+      els.forEach(el => {
+        const target = Number(el.getAttribute('data-count'));
+        if (!Number.isFinite(target) || target <= 0) return;
+        const fmt = el.getAttribute('data-fmt') === 'tok' ? formatTokens : formatNum;
+        const dur = 700;
+        const start = performance.now();
+        function tick(now) {
+          const p = Math.min(1, (now - start) / dur);
+          const eased = 1 - Math.pow(1 - p, 3);
+          el.textContent = fmt(Math.round(target * eased));
+          if (p < 1) requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+      });
+    }
+
     // Leaderboard state
     let lbData = [];
-    let lbSortKey = 'total_requests';
+    let lbSortKey = 'used_tokens';
     let lbSortDir = 'desc';
     let lbSearchQ = '';
     let lbSearchTimer = null;
+    let lbShowInactive = false;
 
-    async function loadLeaderboard(q) {
+    async function loadLeaderboard(q, quiet) {
       try {
         const query = (q == null ? lbSearchQ : q).trim();
         lbSearchQ = query;
         const loading = document.getElementById('lb-loading');
         const content = document.getElementById('lb-content');
         const meta = document.getElementById('lb-search-meta');
-        loading.style.display = 'block';
-        content.style.display = 'none';
+        if (!quiet) {
+          loading.style.display = 'block';
+          content.style.display = 'none';
+        }
 
         const lbPath = query
           ? '/public/leaderboard?q=' + encodeURIComponent(query)
@@ -1682,8 +2627,10 @@ function publicDashboardPage(): string {
         // Render overview stats
         const statsEl = document.getElementById('overview-stats');
         if (overviewRes) {
-          statsEl.innerHTML = '<div class="stat-card"><div class="stat-value">' + formatNum(overviewRes.requests) + '</div><div class="stat-label">Total Requests</div></div>' +
-            '<div class="stat-card"><div class="stat-value">' + formatTokens(overviewRes.tokens) + '</div><div class="stat-label">Total Tokens</div></div>';
+          statsEl.innerHTML =
+            statCardHtml(formatNum(overviewRes.requests), 'Total Requests', 'requests', 'blue', Number(overviewRes.requests) || 0, 'num') +
+            statCardHtml(formatTokens(overviewRes.tokens), 'Total Tokens', 'tokens', 'amber', Number(overviewRes.tokens) || 0, 'tok');
+          if (!quiet) runCountUps(statsEl);
         }
 
         lbData = lbRes.rows || [];
@@ -1695,7 +2642,7 @@ function publicDashboardPage(): string {
           }
         }
         if (lbData.length === 0) {
-          content.innerHTML = '<div class="empty">' + (query ? 'Tidak ketemu untuk "' + query + '"' : 'No usage data yet') + '</div>';
+          content.innerHTML = emptyHtml(query ? 'Tidak ketemu untuk "' + query + '"' : 'No usage data yet');
           return;
         }
 
@@ -1703,7 +2650,7 @@ function publicDashboardPage(): string {
       } catch (e) {
         document.getElementById('lb-loading').style.display = 'none';
         document.getElementById('lb-content').style.display = 'block';
-        document.getElementById('lb-content').innerHTML = '<div class="empty">Failed to load data</div>';
+        document.getElementById('lb-content').innerHTML = emptyHtml('Failed to load data');
       }
     }
 
@@ -1739,26 +2686,56 @@ function publicDashboardPage(): string {
     })();
 
     function sortLeaderboard(key) {
+      const allowed = {
+        total_requests: true,
+        used_tokens: true,
+        remaining_days: true,
+        last_request_at: true
+      };
+      if (!allowed[key]) return;
       if (lbSortKey === key) {
         lbSortDir = lbSortDir === 'desc' ? 'asc' : 'desc';
       } else {
         lbSortKey = key;
+        // Default direction: newest / most used / most remaining first
         lbSortDir = 'desc';
       }
       renderLeaderboardTable();
     }
 
     function renderLeaderboardTable() {
-      const sorted = [...lbData].sort((a, b) => {
-        let valA = a[lbSortKey];
-        let valB = b[lbSortKey];
-        if (lbSortKey === 'used_tokens' || lbSortKey === 'quota_tokens') {
-          valA = Number(valA);
-          valB = Number(valB);
+      const sortValue = (row, key) => {
+        if (key === 'total_requests') return Number(row.total_requests) || 0;
+        if (key === 'used_tokens') return Number(row.used_tokens) || 0;
+        if (key === 'remaining_days') {
+          // null/∞ = no expiry → treat as largest remaining
+          if (row.remaining_days === null || row.remaining_days === undefined || row.remaining_days === '') {
+            return Number.POSITIVE_INFINITY;
+          }
+          const n = Number(row.remaining_days);
+          return Number.isNaN(n) ? 0 : n;
         }
+        if (key === 'last_request_at') {
+          if (!row.last_request_at) return 0;
+          const t = new Date(row.last_request_at).getTime();
+          return Number.isNaN(t) ? 0 : t;
+        }
+        return 0;
+      };
+
+      const sorted = [...lbData].sort((a, b) => {
+        const valA = sortValue(a, lbSortKey);
+        const valB = sortValue(b, lbSortKey);
         if (valA < valB) return lbSortDir === 'asc' ? -1 : 1;
         if (valA > valB) return lbSortDir === 'asc' ? 1 : -1;
-        return 0;
+        // Tie-break: used_tokens desc, then requests desc, then name
+        const usedA = Number(a.used_tokens) || 0;
+        const usedB = Number(b.used_tokens) || 0;
+        if (usedA !== usedB) return usedB - usedA;
+        const reqA = Number(a.total_requests) || 0;
+        const reqB = Number(b.total_requests) || 0;
+        if (reqA !== reqB) return reqB - reqA;
+        return String(a.buyer_name || '').localeCompare(String(b.buyer_name || ''));
       });
 
       const arrow = (key) => {
@@ -1781,61 +2758,110 @@ function publicDashboardPage(): string {
           '<div style="font-size:11px;color:#94a3b8;margin-top:2px">' + pct + '%</div></div>';
       };
 
-      // Columns: rank, user, requests, token quota (used/limit), remaining days, last active.
-      // "Usage Tokens" (lifetime sum from usage_events) removed — redundant with Token Quota.
-      let html = '<div class="table-wrapper"><table><thead><tr><th>#</th><th>User</th><th class="sortable" onclick="sortLeaderboard(&apos;total_requests&apos;)">Requests ' + arrow('total_requests') + '</th><th class="sortable" onclick="sortLeaderboard(&apos;used_tokens&apos;)">Token Quota ' + arrow('used_tokens') + '</th><th>Remaining Days</th><th>Last Active</th></tr></thead><tbody>';
-      sorted.forEach((row, i) => {
+      // Podium Top 3 (hanya saat tanpa pencarian & data cukup)
+      let podiumHtml = '';
+      if (!lbSearchQ && sorted.length >= 3) {
+        const medals = ['🥇', '🥈', '🥉'];
+        const pods = [0, 1, 2].map(i => {
+          const row = sorted[i];
+          return '<div class="podium-card p-' + (i + 1) + '">' +
+            '<div class="podium-medal">' + (i === 0 ? '👑' : medals[i]) + '</div>' +
+            '<div class="podium-name">' + buyerNameHtml(row.buyer_name, row.quota_tokens) + '</div>' +
+            '<div class="podium-stat"><strong>' + formatTokens(Number(row.used_tokens) || 0) + '</strong> tokens · ' + formatNum(row.total_requests) + ' req</div>' +
+            '</div>';
+        });
+        podiumHtml = '<div class="podium">' + pods.join('') + '</div>';
+      }
+
+      // Pisahkan key inactive (0 kuota terpakai) di belakang toggle
+      const isInactiveRow = (row) => (Number(row.used_tokens) || 0) === 0;
+      const activeRows = lbSearchQ ? sorted : sorted.filter(r => !isInactiveRow(r));
+      const inactiveRows = lbSearchQ ? [] : sorted.filter(isInactiveRow);
+      const visibleRows = lbShowInactive ? sorted : activeRows;
+
+      // Columns: rank, user, requests, kuota dipakai, remaining days, last active — all sortable except rank/user
+      let html = podiumHtml + '<div class="table-wrapper"><table><thead><tr>' +
+        '<th>#</th>' +
+        '<th>User</th>' +
+        '<th class="sortable" onclick="sortLeaderboard(&apos;total_requests&apos;)">Requests ' + arrow('total_requests') + '</th>' +
+        '<th class="sortable" onclick="sortLeaderboard(&apos;used_tokens&apos;)">Kuota Dipakai ' + arrow('used_tokens') + '</th>' +
+        '<th class="sortable" onclick="sortLeaderboard(&apos;remaining_days&apos;)">Remaining Days ' + arrow('remaining_days') + '</th>' +
+        '<th class="sortable" onclick="sortLeaderboard(&apos;last_request_at&apos;)">Last Active ' + arrow('last_request_at') + '</th>' +
+        '</tr></thead><tbody>';
+      visibleRows.forEach((row, i) => {
         const rankClass = i < 3 ? ' rank-' + (i + 1) : '';
         const topRowClass = i < 3 ? ' class="top-row top-' + (i + 1) + '"' : '';
-        const daysText = row.remaining_days !== null ? row.remaining_days + 'd' : '∞';
-        const daysClass = row.remaining_days !== null ? (row.remaining_days <= 3 ? 'badge-red' : row.remaining_days <= 7 ? 'badge-yellow' : 'badge-green') : 'badge-blue';
-        const nameStyle = (row.buyer_name || '').trim().toLowerCase() === 'super admin'
-          ? ' style="color:#c084fc;font-weight:700"'
-          : row.is_vip ? ' style="color:#fbbf24;font-weight:700"' : '';
-        const vipBadge = (row.buyer_name || '').trim().toLowerCase() === 'super admin'
-          ? ' <span style="color:#c084fc" title="Super Admin (unlimited)">👑</span>'
-          : row.is_vip ? ' <span style="color:#fbbf24" title="VIP (500M token quota)">👑</span>' : '';
-        html += '<tr' + topRowClass + '><td class="rank' + rankClass + '">' + (i + 1) + '</td><td' + nameStyle + '>' + (row.buyer_name || '-') + vipBadge + '</td><td>' + formatNum(row.total_requests) + '</td><td>' + formatQuotaCell(row) + '</td><td><span class="badge ' + daysClass + '">' + daysText + '</span></td><td>' + formatTime(row.last_request_at) + '</td></tr>';
+        const daysText = row.remaining_days !== null && row.remaining_days !== undefined ? row.remaining_days + 'd' : '∞';
+        const daysClass = row.remaining_days !== null && row.remaining_days !== undefined
+          ? (row.remaining_days <= 3 ? 'badge-red' : row.remaining_days <= 7 ? 'badge-yellow' : 'badge-green')
+          : 'badge-blue';
+        html += '<tr' + topRowClass + '><td class="rank' + rankClass + '">' + (i + 1) + '</td><td>' + buyerNameHtml(row.buyer_name, row.quota_tokens) + '</td><td>' + formatNum(row.total_requests) + '</td><td>' + formatQuotaCell(row) + '</td><td><span class="badge ' + daysClass + '">' + daysText + '</span></td><td>' + formatTime(row.last_request_at) + '</td></tr>';
       });
       html += '</tbody></table></div>';
+      if (inactiveRows.length > 0) {
+        html += '<button type="button" class="lb-inactive-toggle" onclick="toggleLbInactive()">' +
+          (lbShowInactive
+            ? 'Sembunyikan ' + inactiveRows.length + ' key tanpa pemakaian ▲'
+            : 'Tampilkan ' + inactiveRows.length + ' key tanpa pemakaian ▼') +
+          '</button>';
+      }
       document.getElementById('lb-content').innerHTML = html;
     }
 
+    function toggleLbInactive() {
+      lbShowInactive = !lbShowInactive;
+      renderLeaderboardTable();
+    }
+
     // Live
+    let livePrevKeys = null;
     async function loadLive() {
       try {
         const data = await fetchAPI('/public/live');
         const loading = document.getElementById('live-loading');
         const content = document.getElementById('live-content');
+        const statsEl = document.getElementById('live-stats');
         loading.style.display = 'none';
         content.style.display = 'block';
 
         document.getElementById('live-updated').textContent = 'Updated: ' + formatTime(new Date().toISOString());
 
+        const summary = data.summary || {};
+        const activeKeys = Number(summary.active_keys ?? (data.active || []).length) || 0;
+        const liveRequests = Number(summary.requests ?? 0) || 0;
+        const liveTokens = Number(summary.tokens ?? 0) || 0;
+        if (statsEl) {
+          statsEl.innerHTML =
+            statCardHtml(formatNum(activeKeys), 'Active Keys (5m)', 'keys', 'green', null) +
+            statCardHtml(formatNum(liveRequests), 'Requests (5m)', 'requests', 'blue', null) +
+            statCardHtml(formatTokens(liveTokens), 'Tokens (5m)', 'tokens', 'amber', null);
+        }
+
         if (!data.active || data.active.length === 0) {
-          content.innerHTML = '<div class="empty">No active keys in the last 5 minutes</div>';
+          livePrevKeys = new Set();
+          content.innerHTML = emptyHtml('No active keys in the last 5 minutes');
           return;
         }
 
+        const currKeys = new Set(data.active.map(r => String(r.buyer_name || '') + '|' + String(r.last_request_at || '')));
         let html = '<div class="table-wrapper"><table><thead><tr><th>User</th><th>Requests</th><th>Tokens</th><th>Models</th><th>Last Request</th></tr></thead><tbody>';
         data.active.forEach(row => {
-          const models = (row.models_used || []).map(m => '<span class="model-tag">' + m + '</span>').join('');
-          const nameStyle = (row.buyer_name || '').trim().toLowerCase() === 'super admin'
-            ? ' style="color:#c084fc;font-weight:700"'
-            : row.is_vip ? ' style="color:#fbbf24;font-weight:700"' : '';
-          const vipBadge = (row.buyer_name || '').trim().toLowerCase() === 'super admin'
-            ? ' <span style="color:#c084fc" title="Super Admin (unlimited)">👑</span>'
-            : row.is_vip ? ' <span style="color:#fbbf24" title="VIP Unlimited">👑</span>' : '';
-          html += '<tr><td' + nameStyle + '>' + (row.buyer_name || '-') + vipBadge + '</td><td>' + formatNum(row.request_count) + '</td><td>' + formatTokens(row.total_tokens) + '</td><td>' + models + '</td><td>' + formatTime(row.last_request_at) + '</td></tr>';
+          const models = (row.models_used || []).map(m => modelTagHtml(m)).join('');
+          const rowKey = String(row.buyer_name || '') + '|' + String(row.last_request_at || '');
+          const isNew = livePrevKeys !== null && !livePrevKeys.has(rowKey);
+          const rowClass = isNew ? ' class="row-new row-enter"' : '';
+          html += '<tr' + rowClass + '><td>' + buyerNameHtml(row.buyer_name, row.quota_tokens) + '</td><td>' + formatNum(row.request_count) + '</td><td>' + formatTokens(row.total_tokens) + '</td><td>' + models + '</td><td title="' + formatTime(row.last_request_at) + '">' + timeAgo(row.last_request_at) + '</td></tr>';
         });
         html += '</tbody></table></div>';
         content.innerHTML = html;
+        livePrevKeys = currKeys;
       } catch (e) {
         // silent
       }
     }
 
     // Usage
+    let usagePrevIds = null;
     async function loadUsage() {
       try {
         const data = await fetchAPI('/public/usage');
@@ -1845,27 +2871,27 @@ function publicDashboardPage(): string {
         content.style.display = 'block';
 
         if (!data.events || data.events.length === 0) {
-          content.innerHTML = '<div class="empty">No usage events yet</div>';
+          usagePrevIds = new Set();
+          content.innerHTML = emptyHtml('No usage events yet');
           return;
         }
 
+        const evKey = (row) => String(row.created_at || '') + '|' + String(row.buyer_name || '') + '|' + String(row.model_id || '');
+        const currIds = new Set(data.events.map(evKey));
         let html = '<div class="table-wrapper"><table><thead><tr><th>Time</th><th>User</th><th>Model</th><th>Status</th><th>Tokens</th><th>Latency</th></tr></thead><tbody>';
         data.events.forEach(row => {
           const statusBadge = row.success ? '<span class="badge badge-green">200</span>' : '<span class="badge badge-red">' + (row.status_code || 'ERR') + '</span>';
           const tokens = formatTokens(row.total_tokens);
           const latency = row.latency_ms ? row.latency_ms + 'ms' : '-';
-          const nameStyle = (row.buyer_name || '').trim().toLowerCase() === 'super admin'
-            ? ' style="color:#c084fc;font-weight:700"'
-            : row.is_vip ? ' style="color:#fbbf24;font-weight:700"' : '';
-          const vipBadge = (row.buyer_name || '').trim().toLowerCase() === 'super admin'
-            ? ' <span style="color:#c084fc" title="Super Admin (unlimited)">👑</span>'
-            : row.is_vip ? ' <span style="color:#fbbf24" title="VIP Unlimited">👑</span>' : '';
-          html += '<tr><td>' + formatTime(row.created_at) + '</td><td' + nameStyle + '>' + (row.buyer_name || '-') + vipBadge + '</td><td class="model-tag">' + (row.model_id || '-') + '</td><td>' + statusBadge + '</td><td>' + tokens + '</td><td>' + latency + '</td></tr>';
+          const isNew = usagePrevIds !== null && !usagePrevIds.has(evKey(row));
+          const rowClass = isNew ? ' class="row-new"' : '';
+          html += '<tr' + rowClass + '><td title="' + formatTime(row.created_at) + '">' + timeAgo(row.created_at) + '</td><td>' + buyerNameHtml(row.buyer_name, row.quota_tokens) + '</td><td>' + modelTagHtml(row.model_id) + '</td><td>' + statusBadge + '</td><td>' + tokens + '</td><td>' + latency + '</td></tr>';
         });
         html += '</tbody></table></div>';
         content.innerHTML = html;
+        usagePrevIds = currIds;
       } catch (e) {
-        document.getElementById('usage-content').innerHTML = '<div class="empty">Failed to load data</div>';
+        document.getElementById('usage-content').innerHTML = emptyHtml('Failed to load data');
       }
     }
 
@@ -1944,11 +2970,22 @@ function publicDashboardPage(): string {
       });
 
       svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
-      svg.innerHTML = '<path d="' + reqPath + '" fill="none" stroke="#3b82f6" stroke-width="2"/>' +
-        reqLabels +
-        '<path d="' + tokPath + '" fill="none" stroke="#fbbf24" stroke-width="2"/>' +
-        tokLabels +
-        timeLabels;
+      const baseY = padding.top + chartH;
+      const reqArea = reqPath + ' L' + reqPoints[reqPoints.length - 1][0] + ',' + baseY + ' L' + reqPoints[0][0] + ',' + baseY + ' Z';
+      const tokArea = tokPath + ' L' + tokPoints[tokPoints.length - 1][0] + ',' + baseY + ' L' + tokPoints[0][0] + ',' + baseY + ' Z';
+      svg.innerHTML = '<defs>' +
+        '<linearGradient id="reqFill" x1="0" y1="0" x2="0" y2="1">' +
+        '<stop offset="0%" stop-color="#3b82f6" stop-opacity="0.28"/>' +
+        '<stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/></linearGradient>' +
+        '<linearGradient id="tokFill" x1="0" y1="0" x2="0" y2="1">' +
+        '<stop offset="0%" stop-color="#fbbf24" stop-opacity="0.22"/>' +
+        '<stop offset="100%" stop-color="#fbbf24" stop-opacity="0"/></linearGradient>' +
+        '</defs>' +
+        '<path class="chart-fade-in" d="' + reqArea + '" fill="url(#reqFill)" stroke="none"/>' +
+        '<path class="chart-fade-in" d="' + tokArea + '" fill="url(#tokFill)" stroke="none"/>' +
+        '<path class="chart-line-anim" d="' + reqPath + '" fill="none" stroke="#3b82f6" stroke-width="2"/>' +
+        '<path class="chart-line-anim" d="' + tokPath + '" fill="none" stroke="#fbbf24" stroke-width="2"/>' +
+        '<g class="chart-fade-in">' + reqLabels + tokLabels + timeLabels + '</g>';
     }
 
     // Models
@@ -1961,31 +2998,114 @@ function publicDashboardPage(): string {
         content.style.display = 'block';
 
         if (!data.models || data.models.length === 0) {
-          content.innerHTML = '<div class="empty">No models available</div>';
+          content.innerHTML = emptyHtml('No models available');
           return;
         }
 
-        let html = '<div style="display:flex;flex-wrap:wrap;gap:0.5rem">';
-        data.models.forEach(m => {
-          html += '<span class="model-tag" style="cursor:pointer" onclick="copyModel(this, \\'' + m.id + '\\')">' + m.id + '</span>';
+        const freeCount = data.models.filter(function(m) {
+          const roles = Array.isArray(m.access_roles) ? m.access_roles : [];
+          return !!m.quota_exempt && roles.length === 0 && !m.privileged_only;
+        }).length;
+        const privCount = data.models.filter(function(m) {
+          const roles = Array.isArray(m.access_roles) ? m.access_roles : [];
+          return roles.length > 0 || !!m.privileged_only;
+        }).length;
+        let html = '';
+        const hintParts = [];
+        if (freeCount > 0) {
+          hintParts.push('<strong>' + freeCount + ' unlimited</strong> · usage tercatat, kuota token key tidak terpotong');
+        }
+        if (privCount > 0) {
+          hintParts.push('<span class="priv-strong">' + privCount + ' role-restricted</span> · Dev / Supporter / Ultra (lihat badge)');
+        }
+        if (hintParts.length) {
+          html += '<div class="model-hint">' + hintParts.join(' · ') + ' · klik kartu untuk copy ID</div>';
+        } else {
+          html += '<div class="model-hint">Klik kartu untuk copy model ID</div>';
+        }
+        html += '<div class="models-grid-public" style="margin-top:0.9rem">';
+
+        data.models.forEach(function(m) {
+          let roles = Array.isArray(m.access_roles) ? m.access_roles.slice() : [];
+          if (!roles.length && m.privileged_only) roles = ['dev', 'supporter'];
+          const isPriv = roles.length > 0;
+          const isFree = !!m.quota_exempt && !isPriv;
+          const name = m.display_name || m.id;
+          let badge;
+          if (isPriv) {
+            const labels = roles.map(function(r) {
+              if (r === 'dev') return 'Dev';
+              if (r === 'supporter') return 'Supporter';
+              if (r === 'ultra') return 'Ultra';
+              return r;
+            });
+            badge = '<span class="privileged-badge" title="Hanya role: ' + labels.join(', ') + '">' + labels.join(' · ') + '</span>';
+          } else if (isFree) {
+            badge = '<span class="free-badge" title="Tidak potong kuota token key"><span aria-hidden="true">∞</span>Unlimited</span>';
+          } else {
+            badge = '<span class="metered-badge">Metered</span>';
+          }
+          const cardClass = (isPriv ? ' privileged' : (isFree ? ' free' : '')) + (isClaudeModel(m.id) ? ' claude-card' : '');
+          let meta;
+          if (isPriv) {
+            const labels = roles.map(function(r) {
+              if (r === 'dev') return 'Super Admin (DEV)';
+              if (r === 'supporter') return 'Supporter';
+              if (r === 'ultra') return 'Ultra (500M)';
+              return r;
+            });
+            meta = '<span style="font-size:0.72rem;color:#fbbf24">Akses: ' + labels.join(' · ') + '</span>';
+          } else if (isFree) {
+            meta = '<span style="font-size:0.72rem;color:#7dd3fc">Free tokens · RPM tetap berlaku</span>';
+          } else {
+            meta = '<span style="font-size:0.72rem;color:#94a3b8">Menggunakan kuota token key</span>';
+          }
+          const claudeBadge = isClaudeModel(m.id) ? '<span class="claude-badge" title="Claude model">&#10022; Claude</span>' : '';
+          html += '<div class="model-card' + cardClass + '" data-id="' + escapeHtml(m.id) + '" role="button" tabindex="0" title="Copy ' + escapeHtml(m.id) + '">' +
+            '<div class="model-card-top"><div class="model-card-name">' + escapeHtml(name) + '</div>' + claudeBadge + badge + '</div>' +
+            '<div class="model-card-id">' + escapeHtml(m.id) + '</div>' +
+            '<div class="model-card-meta">' + meta + '</div></div>';
         });
         html += '</div>';
         content.innerHTML = html;
+
+        content.querySelectorAll('.model-card').forEach(function(el) {
+          el.addEventListener('click', function() { copyModelCard(el); });
+          el.addEventListener('keydown', function(ev) {
+            if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); copyModelCard(el); }
+          });
+        });
       } catch (e) {
-        document.getElementById('models-content').innerHTML = '<div class="empty">Failed to load models</div>';
+        document.getElementById('models-content').innerHTML = emptyHtml('Failed to load models');
       }
     }
 
-    function copyModel(el, id) {
+    function escapeHtml(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function copyModelCard(el) {
+      const id = el.getAttribute('data-id') || '';
+      if (!id) return;
       navigator.clipboard.writeText(id);
-      el.classList.add('badge-green');
-      const orig = el.textContent;
-      el.textContent = 'Copied!';
-      setTimeout(() => { el.textContent = orig; el.classList.remove('badge-green'); }, 1500);
+      el.classList.add('copied');
+      const idEl = el.querySelector('.model-card-id');
+      const orig = idEl ? idEl.textContent : '';
+      if (idEl) idEl.textContent = 'Copied!';
+      setTimeout(function() {
+        el.classList.remove('copied');
+        if (idEl) idEl.textContent = orig;
+      }, 1400);
     }
 
     // Initial load
     loadLeaderboard();
+    lbInterval = setInterval(() => loadLeaderboard(null, true), 45000);
   </script>
 </body>
 </html>`;

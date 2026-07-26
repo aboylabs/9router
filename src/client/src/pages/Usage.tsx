@@ -3,10 +3,22 @@ import { Search } from "lucide-react";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from "../components/ui/Table";
 import { Badge } from "../components/ui/Badge";
 import { CopyButton } from "../components/CopyButton";
-import { formatDateShort, formatNumber } from "../lib/utils";
+import {
+  formatDateShort,
+  formatNumber,
+  buyerNameClassName,
+  isSuperAdminName,
+  isSupporterName,
+  isHelperName,
+  isUltraQuota
+} from "../lib/utils";
 import type { UsageEvent } from "../hooks/useDashboard";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Card, CardHeader, CardTitle } from "../components/ui/Card";
+import { SuperAdminBadge } from "../components/SuperAdminBadge";
+import { SupporterBadge } from "../components/SupporterBadge";
+import { HelperBadge } from "../components/HelperBadge";
+import { UltraBadge } from "../components/UltraBadge";
 
 interface UsagePageProps {
   usage: UsageEvent[];
@@ -35,8 +47,8 @@ export function Usage({ usage }: UsagePageProps) {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold text-text-primary">Usage History</h2>
-        <p className="text-sm text-text-muted">Last 250 API requests</p>
+        <h2 className="text-xl font-semibold tracking-tight text-text-primary">Usage History</h2>
+        <p className="text-sm text-text-muted mt-0.5">Last 250 API requests</p>
       </div>
 
       {/* Charts */}
@@ -145,9 +157,17 @@ export function Usage({ usage }: UsagePageProps) {
                 <code className="text-xs bg-surface-tertiary px-1.5 py-0.5 rounded">{event.model_id?.split("/").pop() || "-"}</code>
                 <span className="text-xs font-medium text-text-primary">{formatNumber(event.total_tokens)} tok{event.estimated && <span className="text-text-muted ml-1">est.</span>}</span>
               </div>
-              <div className="flex items-center justify-between text-xs text-text-muted">
-                <span>{event.buyer_name || "-"}</span>
-                <span>{event.latency_ms}ms</span>
+              <div className="flex items-center justify-between text-xs text-text-muted gap-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className={`truncate font-medium ${buyerNameClassName(event.buyer_name, event.quota_tokens)}`}>
+                    {event.buyer_name || "-"}
+                  </span>
+                  {isSuperAdminName(event.buyer_name) ? <SuperAdminBadge /> : null}
+                  {isSupporterName(event.buyer_name) ? <SupporterBadge /> : null}
+                  {isHelperName(event.buyer_name) ? <HelperBadge /> : null}
+                  {!isSuperAdminName(event.buyer_name) && !isSupporterName(event.buyer_name) && !isHelperName(event.buyer_name) && isUltraQuota(event.quota_tokens) ? <UltraBadge /> : null}
+                </div>
+                <span className="shrink-0">{event.latency_ms}ms</span>
               </div>
             </div>
           ))
@@ -176,7 +196,17 @@ export function Usage({ usage }: UsagePageProps) {
             filtered.map((event, i) => (
               <TableRow key={i}>
                 <TableCell>{formatDateShort(event.created_at)}</TableCell>
-                <TableCell className="font-medium text-text-primary">{event.buyer_name || "-"}</TableCell>
+                <TableCell className="font-medium">
+                  <div className="flex items-center gap-1.5">
+                    <span className={buyerNameClassName(event.buyer_name, event.quota_tokens)}>
+                      {event.buyer_name || "-"}
+                    </span>
+                    {isSuperAdminName(event.buyer_name) ? <SuperAdminBadge /> : null}
+                    {isSupporterName(event.buyer_name) ? <SupporterBadge /> : null}
+                    {isHelperName(event.buyer_name) ? <HelperBadge /> : null}
+                    {!isSuperAdminName(event.buyer_name) && !isSupporterName(event.buyer_name) && !isHelperName(event.buyer_name) && isUltraQuota(event.quota_tokens) ? <UltraBadge /> : null}
+                  </div>
+                </TableCell>
                 <TableCell>
                   {event.key_prefix ? (
                     <div className="flex items-center gap-1">

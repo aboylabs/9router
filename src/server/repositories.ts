@@ -53,25 +53,36 @@ export function invalidateApiKeyCache(keyHash?: string) {
   }
 }
 
-export function apiKeyIsUsable(record: ApiKeyRecord) {
+export function checkTokenQuota(record: ApiKeyRecord) {
+  // Daily reset keys: check used_tokens against daily_quota_tokens
+  if (record.daily_reset && record.daily_quota_tokens !== null) {
+    if (Number(record.used_tokens) >= Number(record.daily_quota_tokens)) {
+      return {
+        ok: false as const,
+        code: "daily_quota_exceeded",
+        message: "Daily token quota exceeded. Resets at 00:00 WIB."
+      };
+    }
+  } else if (record.quota_tokens !== null && Number(record.used_tokens) >= Number(record.quota_tokens)) {
+    return { ok: false as const, code: "token_quota_exceeded", message: "Token quota exceeded" };
+  }
+  return { ok: true as const };
+}
+
+export function apiKeyIsUsable(record: ApiKeyRecord, opts?: { skipTokenQuota?: boolean }) {
   if (record.is_hidden) return { ok: true as const };
   if (record.deleted_at) return { ok: false, code: "key_deleted", message: "API key has been deleted" };
   if (record.revoked_at) return { ok: false, code: "key_revoked", message: "API key has been revoked" };
   if (record.expires_at && new Date(record.expires_at).getTime() <= Date.now()) {
     return { ok: false, code: "key_expired", message: "API key has expired" };
   }
-  // Request quota still applies to non-VIP keys only
-  if (!record.is_vip && record.quota_requests !== null && Number(record.used_requests) >= Number(record.quota_requests)) {
+  // Request quota (if set) applies to all keys / all models
+  if (record.quota_requests !== null && Number(record.used_requests) >= Number(record.quota_requests)) {
     return { ok: false, code: "request_quota_exceeded", message: "Request quota exceeded" };
   }
-  // Daily reset keys: check used_tokens against daily_quota_tokens
-  if (record.daily_reset && record.daily_quota_tokens !== null) {
-    if (Number(record.used_tokens) >= Number(record.daily_quota_tokens)) {
-      return { ok: false, code: "daily_quota_exceeded", message: "Daily token quota exceeded. Resets at 00:00 WIB." };
-    }
-  } else if (record.quota_tokens !== null && Number(record.used_tokens) >= Number(record.quota_tokens)) {
-    // VIP and non-VIP both enforce token quota when set (VIP typically 500M, non-VIP 100M)
-    return { ok: false, code: "token_quota_exceeded", message: "Token quota exceeded" };
+  if (!opts?.skipTokenQuota) {
+    const tokenQuota = checkTokenQuota(record);
+    if (!tokenQuota.ok) return tokenQuota;
   }
   return { ok: true as const };
 }
@@ -88,8 +99,10 @@ export async function modelForKey(apiKeyId: string, requestedModel: string) {
     display_name: string;
     input_cost_per_million: string | null;
     output_cost_per_million: string | null;
+    quota_exempt: boolean;
   }>(
-    `select m.id, m.upstream_model, m.upstream_id, m.display_name, m.input_cost_per_million, m.output_cost_per_million
+    `select m.id, m.upstream_model, m.upstream_id, m.display_name, m.input_cost_per_million, m.output_cost_per_million,
+            coalesce(m.quota_exempt, false) as quota_exempt
      from models m
      join buyer_model_access bma on bma.model_id = m.id
      where bma.api_key_id = $1 and m.id = $2 and m.active = true
@@ -242,8 +255,11 @@ export async function recordUsage(params: {
   costEstimate: number;
   latencyMs: number;
   errorCode?: string | null;
+  /** When false, usage_events/rollups still log tokens but api_keys.used_tokens is not increased (quota-exempt models). Default true. */
+  countTowardTokenQuota?: boolean;
 }) {
   const client = await queryClient();
+  const countTowardTokenQuota = params.countTowardTokenQuota !== false;
   try {
     await client.query("begin");
     await client.query(
@@ -271,11 +287,13 @@ export async function recordUsage(params: {
     );
 
     if (params.apiKeyId) {
+      // used_requests always increments (request-quota still applies).
+      // used_tokens only when the model is not quota-exempt.
       await client.query(
         `update api_keys
          set used_tokens = used_tokens + $1, used_requests = used_requests + 1
          where id = $2`,
-        [params.totalTokens, params.apiKeyId]
+        [countTowardTokenQuota ? params.totalTokens : 0, params.apiKeyId]
       );
     }
 

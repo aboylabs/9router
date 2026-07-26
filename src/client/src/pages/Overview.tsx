@@ -3,7 +3,11 @@ import { MetricCard } from "../components/MetricCard";
 import { Card, CardHeader, CardTitle } from "../components/ui/Card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from "../components/ui/Table";
 import { Badge } from "../components/ui/Badge";
-import { formatDateShort, formatNumber, formatTokens, buyerNameClassName } from "../lib/utils";
+import { SuperAdminBadge } from "../components/SuperAdminBadge";
+import { SupporterBadge } from "../components/SupporterBadge";
+import { HelperBadge } from "../components/HelperBadge";
+import { UltraBadge } from "../components/UltraBadge";
+import { formatDateShort, formatNumber, formatTokens, buyerNameClassName, isSuperAdminName, isSupporterName, isHelperName, isUltraQuota } from "../lib/utils";
 import type { Overview as OverviewData, ChartPoint, Key as KeyType } from "../hooks/useDashboard";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
@@ -33,8 +37,8 @@ export function Overview({ overview, chartData, chartRange, setChartRange, keys 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold text-text-primary">Dashboard</h2>
-        <p className="text-sm text-text-muted">Overview of your API gateway</p>
+        <h2 className="text-xl font-semibold tracking-tight text-text-primary">Dashboard</h2>
+        <p className="text-sm text-text-muted mt-0.5">Overview of your API gateway</p>
       </div>
 
       {/* Metrics */}
@@ -168,7 +172,13 @@ export function Overview({ overview, chartData, chartRange, setChartRange, keys 
               return (
                 <div key={key.id} className="border border-border rounded-lg p-3 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className={`font-medium text-sm ${buyerNameClassName(key.buyer_name, key.is_vip)}`}>{key.buyer_name}</span>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className={`font-medium text-sm truncate ${buyerNameClassName(key.buyer_name, key.quota_tokens)}`}>{key.buyer_name}</span>
+                      {isSuperAdminName(key.buyer_name) ? <SuperAdminBadge /> : null}
+                      {isSupporterName(key.buyer_name) ? <SupporterBadge /> : null}
+                      {isHelperName(key.buyer_name) ? <HelperBadge /> : null}
+                      {!isSuperAdminName(key.buyer_name) && !isSupporterName(key.buyer_name) && !isHelperName(key.buyer_name) && isUltraQuota(key.quota_tokens) ? <UltraBadge /> : null}
+                    </div>
                     {key.revoked_at ? (
                       <Badge variant="danger">Revoked</Badge>
                     ) : key.expires_at && new Date(key.expires_at) < new Date() ? (
@@ -212,7 +222,15 @@ export function Overview({ overview, chartData, chartRange, setChartRange, keys 
             ) : (
               recentKeys.map((key) => (
                 <TableRow key={key.id}>
-                  <TableCell className={`font-medium ${buyerNameClassName(key.buyer_name, key.is_vip)}`}>{key.buyer_name}</TableCell>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-1.5">
+                      <span className={buyerNameClassName(key.buyer_name, key.quota_tokens)}>{key.buyer_name}</span>
+                      {isSuperAdminName(key.buyer_name) ? <SuperAdminBadge /> : null}
+                      {isSupporterName(key.buyer_name) ? <SupporterBadge /> : null}
+                      {isHelperName(key.buyer_name) ? <HelperBadge /> : null}
+                      {!isSuperAdminName(key.buyer_name) && !isSupporterName(key.buyer_name) && !isHelperName(key.buyer_name) && isUltraQuota(key.quota_tokens) ? <UltraBadge /> : null}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <code className="text-xs bg-surface-tertiary px-1.5 py-0.5 rounded">{key.key_prefix}</code>
                   </TableCell>

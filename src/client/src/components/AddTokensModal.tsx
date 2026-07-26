@@ -22,10 +22,15 @@ export function AddTokensModal({ open, onOpenChange, onSuccess, keys }: AddToken
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Only show non-daily-reset, active keys
+  // Active finite-quota keys only. Unlimited (quota_tokens null) cannot receive add-tokens —
+  // backend would refuse / would demote them if not guarded.
   const eligibleKeys = useMemo(() => {
     return keys.filter(
-      (k) => !k.revoked_at && k.expires_at && new Date(k.expires_at) > new Date() && !k.daily_reset
+      (k) =>
+        !k.revoked_at &&
+        (!k.expires_at || new Date(k.expires_at) > new Date()) &&
+        k.quota_tokens != null &&
+        k.quota_tokens !== ""
     );
   }, [keys]);
 
@@ -121,7 +126,7 @@ export function AddTokensModal({ open, onOpenChange, onSuccess, keys }: AddToken
             </span>
           </DialogTitle>
           <DialogDescription>
-            Add quota tokens to active keys (non-daily-reset only)
+            Add quota tokens to active keys
           </DialogDescription>
         </DialogHeader>
 

@@ -1,3 +1,67 @@
+/**
+ * Paid create-key packages — aligned with public Prices tab
+ * (Starter / Pro / Business / Ultra). Used by admin Create API Key.
+ * Supporter is name/DB promote, not in this create form.
+ */
+export const CREATE_KEY_PACKAGES = [
+  {
+    id: "starter",
+    label: "Starter",
+    priceRp: 150_000,
+    quotaTokens: 150_000_000,
+    rateLimitRpm: 10,
+    defaultDays: 28,
+  },
+  {
+    id: "pro",
+    label: "Pro",
+    priceRp: 250_000,
+    quotaTokens: 250_000_000,
+    rateLimitRpm: 20,
+    defaultDays: 28,
+  },
+  {
+    id: "business",
+    label: "Business",
+    priceRp: 350_000,
+    quotaTokens: 350_000_000,
+    rateLimitRpm: 30,
+    defaultDays: 28,
+  },
+  {
+    id: "ultra",
+    label: "Ultra",
+    priceRp: 500_000,
+    quotaTokens: 500_000_000,
+    rateLimitRpm: 50,
+    defaultDays: 28,
+  },
+] as const;
+
+export type CreateKeyPackage = (typeof CREATE_KEY_PACKAGES)[number];
+export type CreateKeyPackageId = CreateKeyPackage["id"];
+
+export const DEFAULT_CREATE_KEY_PACKAGE_ID: CreateKeyPackageId = "starter";
+
+export const CREATE_KEY_PACKAGE_IDS = [
+  "starter",
+  "pro",
+  "business",
+  "ultra",
+] as const satisfies readonly CreateKeyPackageId[];
+
+export const CREATE_KEY_PACKAGES_BY_ID = Object.fromEntries(
+  CREATE_KEY_PACKAGES.map((pkg) => [pkg.id, pkg]),
+) as Record<CreateKeyPackageId, CreateKeyPackage>;
+
+export function createKeyPackageForId(
+  packageId: string | null | undefined,
+): CreateKeyPackage | undefined {
+  if (!packageId) return undefined;
+  return CREATE_KEY_PACKAGES_BY_ID[packageId as CreateKeyPackageId];
+}
+
+/** Legacy buyer-package presets (sales/history). Separate from create-key paid tiers. */
 export const PRESET_PACKAGES = [
   {
     id: "paket_a_2w",

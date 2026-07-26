@@ -6,13 +6,28 @@ import { Button } from "../components/ui/Button";
 import { useToast } from "../components/ui/Toast";
 import { api } from "../lib/api";
 
+type UpstreamApiKey = {
+  id: string;
+  label: string;
+  apiKey: string;
+  isActive: boolean;
+};
+
 type Upstream = {
   id: string;
   name: string;
   baseUrl: string;
   apiKey: string;
   isActive: boolean;
-  weight: number;
+  apiKeys?: UpstreamApiKey[];
+};
+
+type ManagedKey = {
+  id: string;
+  label: string;
+  apiKey: string;
+  isActive: boolean;
+  masked: string;
 };
 
 export function Settings() {
@@ -20,16 +35,20 @@ export function Settings() {
 
   const [upstreams, setUpstreams] = useState<Upstream[]>([]);
   const [loadingUpstreams, setLoadingUpstreams] = useState(true);
-  const [roundRobin, setRoundRobin] = useState(true);
-  const [rrSaving, setRrSaving] = useState(false);
-
   // Form state for add/edit
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formName, setFormName] = useState("");
   const [formBaseUrl, setFormBaseUrl] = useState("");
   const [formApiKey, setFormApiKey] = useState("");
-  const [formWeight, setFormWeight] = useState(1);
   const [formSaving, setFormSaving] = useState(false);
+
+  // Multi API-key manager for selected upstream
+  const [keysUpstreamId, setKeysUpstreamId] = useState<string | null>(null);
+  const [managedKeys, setManagedKeys] = useState<ManagedKey[]>([]);
+  const [keysLoading, setKeysLoading] = useState(false);
+  const [newKeyValue, setNewKeyValue] = useState("");
+  const [newKeyLabel, setNewKeyLabel] = useState("");
+  const [keySaving, setKeySaving] = useState(false);
 
   const [adminEmail, setAdminEmail] = useState("");
   const [newEmail, setNewEmail] = useState("");
@@ -56,7 +75,6 @@ export function Settings() {
   useEffect(() => {
     Promise.all([
       loadUpstreams(),
-      loadRoundRobin(),
       api<{ admin: { id: string; email: string } | null }>("/admin/profile").then((data) => {
         if (data.admin) {
           setAdminEmail(data.admin.email);
@@ -72,32 +90,6 @@ export function Settings() {
       toast("Failed to load settings", "error");
     });
   }, []);
-
-  async function loadRoundRobin() {
-    try {
-      const data = await api<{ round_robin_enabled: boolean }>("/admin/settings/round-robin");
-      setRoundRobin(data.round_robin_enabled);
-    } catch {
-      // keep default (true)
-    }
-  }
-
-  async function saveRoundRobin() {
-    setRrSaving(true);
-    try {
-      const next = !roundRobin;
-      await api("/admin/settings/round-robin", {
-        method: "PUT",
-        body: JSON.stringify({ enabled: next }),
-      });
-      setRoundRobin(next);
-      toast(next ? "Round-Robin enabled" : "Round-Robin disabled", "success");
-    } catch {
-      toast("Failed to update Round-Robin setting", "error");
-    } finally {
-      setRrSaving(false);
-    }
-  }
 
   async function loadUpstreams() {
     setLoadingUpstreams(true);
@@ -116,7 +108,6 @@ export function Settings() {
     setFormName("");
     setFormBaseUrl("");
     setFormApiKey("");
-    setFormWeight(1);
   }
 
   function startEdit(up: Upstream) {
@@ -124,7 +115,6 @@ export function Settings() {
     setFormName(up.name);
     setFormBaseUrl(up.baseUrl);
     setFormApiKey(up.apiKey);
-    setFormWeight(up.weight);
   }
 
   async function saveUpstream() {
@@ -138,13 +128,13 @@ export function Settings() {
       if (editingId) {
         await api(`/admin/upstreams/${editingId}`, {
           method: "PUT",
-          body: JSON.stringify({ name: formName, base_url: formBaseUrl, api_key: formApiKey, weight: formWeight })
+          body: JSON.stringify({ name: formName, base_url: formBaseUrl, api_key: formApiKey })
         });
         toast("Upstream updated", "success");
       } else {
         await api("/admin/upstreams", {
           method: "POST",
-          body: JSON.stringify({ name: formName, base_url: formBaseUrl, api_key: formApiKey, is_active: true, weight: formWeight })
+          body: JSON.stringify({ name: formName, base_url: formBaseUrl, api_key: formApiKey, is_active: true })
         });
         toast("Upstream created and synced", "success");
       }
@@ -185,6 +175,67 @@ export function Settings() {
       toast(res.message ?? "Models synced", "success");
     } catch {
       toast("Failed to sync models", "error");
+    }
+  }
+
+  async function openKeysManager(upstreamId: string) {
+    setKeysUpstreamId(upstreamId);
+    setKeysLoading(true);
+    setNewKeyValue("");
+    setNewKeyLabel("");
+    try {
+      const data = await api<{ keys: ManagedKey[] }>(`/admin/upstreams/${upstreamId}/keys`);
+      setManagedKeys(data.keys || []);
+    } catch {
+      toast("Failed to load API keys", "error");
+      setManagedKeys([]);
+    } finally {
+      setKeysLoading(false);
+    }
+  }
+
+  async function addManagedKey() {
+    if (!keysUpstreamId) return;
+    if (!newKeyValue.trim()) { toast("API key is required", "error"); return; }
+    setKeySaving(true);
+    try {
+      await api(`/admin/upstreams/${keysUpstreamId}/keys`, {
+        method: "POST",
+        body: JSON.stringify({ api_key: newKeyValue.trim(), label: newKeyLabel.trim() || undefined, is_active: true }),
+      });
+      toast("API key added (round-robin active)", "success");
+      setNewKeyValue("");
+      setNewKeyLabel("");
+      await openKeysManager(keysUpstreamId);
+      await loadUpstreams();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to add API key", "error");
+    } finally {
+      setKeySaving(false);
+    }
+  }
+
+  async function toggleManagedKey(keyId: string) {
+    if (!keysUpstreamId) return;
+    try {
+      await api(`/admin/upstreams/${keysUpstreamId}/keys/${keyId}/toggle`, { method: "PATCH" });
+      await openKeysManager(keysUpstreamId);
+      await loadUpstreams();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to toggle key", "error");
+    }
+  }
+
+  async function deleteManagedKey(keyId: string) {
+    if (!keysUpstreamId) return;
+    if (!confirm("Delete this upstream API key?")) return;
+    try {
+      await api(`/admin/upstreams/${keysUpstreamId}/keys/${keyId}`, { method: "DELETE" });
+      toast("API key deleted", "success");
+      await openKeysManager(keysUpstreamId);
+      await loadUpstreams();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to delete key", "error");
     }
   }
 
@@ -360,32 +411,8 @@ export function Settings() {
           <CardTitle>Upstream Configuration</CardTitle>
         </CardHeader>
         <p className="text-xs text-text-muted mb-4">
-          Multiple upstreams are supported with weighted round-robin load balancing and automatic failover.
+          Multiple upstreams with per-model pinning + automatic failover. Each upstream supports multiple API keys with round-robin.
         </p>
-
-        {/* Round-Robin toggle */}
-        <div className="flex items-center justify-between mb-6 p-4 rounded-lg border border-border bg-surface-secondary">
-          <div>
-            <p className="text-sm font-medium text-text-primary">Round-Robin Load Balancing</p>
-            <p className="text-xs text-text-muted mt-0.5">
-              {roundRobin
-                ? "On: requests are distributed across active upstreams by weight."
-                : "Off: requests always use the primary (first active) upstream."}
-            </p>
-          </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={roundRobin}
-            disabled={rrSaving}
-            onClick={saveRoundRobin}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${roundRobin ? "bg-green-500" : "bg-gray-600"} ${rrSaving ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${roundRobin ? "translate-x-6" : "translate-x-1"}`}
-            />
-          </button>
-        </div>
 
         {/* Form */}
         <div className="space-y-4 mb-6 p-4 rounded-lg border border-border bg-surface-secondary">
@@ -394,7 +421,7 @@ export function Settings() {
             <Input label="Name" value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="e.g., Alibaba Primary" />
             <Input label="Base URL" value={formBaseUrl} onChange={(e) => setFormBaseUrl(e.target.value)} placeholder="https://api.example.com/v1" />
             <div className="grid gap-1.5">
-              <label className="text-sm font-medium text-text-secondary">API Key</label>
+              <label className="text-sm font-medium text-text-secondary">Primary API Key</label>
               <input
                 type="password"
                 value={formApiKey}
@@ -403,7 +430,6 @@ export function Settings() {
                 className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors"
               />
             </div>
-            <Input label="Weight (Round-Robin)" type="number" min={1} value={String(formWeight)} onChange={(e) => setFormWeight(Number(e.target.value) || 1)} placeholder="1" />
           </div>
           <div className="flex gap-2 pt-2">
             <Button onClick={saveUpstream} loading={formSaving}>
@@ -424,8 +450,8 @@ export function Settings() {
               <tr className="border-b border-border text-text-muted text-left">
                 <th className="pb-2 pl-2">Name</th>
                 <th className="pb-2">Base URL</th>
-                <th className="pb-2">API Key</th>
-                <th className="pb-2 text-center">Weight</th>
+                <th className="pb-2">Primary Key</th>
+                <th className="pb-2 text-center">Keys</th>
                 <th className="pb-2 text-center">Status</th>
                 <th className="pb-2 text-center">Actions</th>
               </tr>
@@ -441,9 +467,18 @@ export function Settings() {
                     <td className="py-3 pl-2 font-medium text-text-primary">{up.name}</td>
                     <td className="py-3 text-text-secondary truncate max-w-[200px]" title={up.baseUrl}>{up.baseUrl}</td>
                     <td className="py-3 text-text-muted font-mono text-xs">
-                      {up.apiKey.slice(0, 6)}...{up.apiKey.slice(-4)}
+                      {up.apiKey ? `${up.apiKey.slice(0, 6)}...${up.apiKey.slice(-4)}` : "-"}
                     </td>
-                    <td className="py-3 text-center text-text-secondary">{up.weight}</td>
+                    <td className="py-3 text-center">
+                      <button
+                        type="button"
+                        onClick={() => openKeysManager(up.id)}
+                        className="text-xs px-2 py-1 rounded-md border border-border hover:bg-surface-tertiary text-text-secondary"
+                        title="Manage API keys (round-robin)"
+                      >
+                        {(up.apiKeys?.length ?? 1)} key{(up.apiKeys?.length ?? 1) === 1 ? "" : "s"}
+                      </button>
+                    </td>
                     <td className="py-3 text-center">
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${up.isActive ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${up.isActive ? "bg-green-400" : "bg-red-400"}`}></span>
@@ -473,6 +508,86 @@ export function Settings() {
           </table>
         </div>
       </Card>
+
+      {keysUpstreamId && (
+        <Card className="w-full max-w-4xl">
+          <CardHeader>
+            <CardTitle>
+              API Keys — {upstreams.find((u) => u.id === keysUpstreamId)?.name || "Upstream"}
+            </CardTitle>
+          </CardHeader>
+          <p className="text-xs text-text-muted mb-4">
+            Requests to this upstream rotate across active keys (round-robin). On 429/5xx the next key is tried, then other upstreams.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4 p-3 rounded-lg border border-border bg-surface-secondary">
+            <Input
+              label="Label (optional)"
+              value={newKeyLabel}
+              onChange={(e) => setNewKeyLabel(e.target.value)}
+              placeholder="e.g. key-2"
+            />
+            <div className="grid gap-1.5 md:col-span-2">
+              <label className="text-sm font-medium text-text-secondary">New API Key</label>
+              <input
+                type="password"
+                value={newKeyValue}
+                onChange={(e) => setNewKeyValue(e.target.value)}
+                placeholder="sk-..."
+                className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors"
+              />
+            </div>
+            <div className="md:col-span-3 flex gap-2">
+              <Button onClick={addManagedKey} loading={keySaving}>Add Key</Button>
+              <Button variant="secondary" onClick={() => { setKeysUpstreamId(null); setManagedKeys([]); }}>Close</Button>
+            </div>
+          </div>
+
+          {keysLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <RefreshCw className="h-5 w-5 animate-spin text-text-muted" />
+            </div>
+          ) : managedKeys.length === 0 ? (
+            <p className="text-sm text-text-muted text-center py-6">No keys yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-text-muted text-left">
+                    <th className="pb-2 pl-2">Label</th>
+                    <th className="pb-2">Key</th>
+                    <th className="pb-2 text-center">Status</th>
+                    <th className="pb-2 text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {managedKeys.map((k) => (
+                    <tr key={k.id} className="border-b border-border/50">
+                      <td className="py-3 pl-2 text-text-primary">{k.label || "(no label)"}</td>
+                      <td className="py-3 font-mono text-xs text-text-muted">{k.masked}</td>
+                      <td className="py-3 text-center">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${k.isActive ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}>
+                          {k.isActive ? "Active" : "Off"}
+                        </span>
+                      </td>
+                      <td className="py-3 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <Button variant="ghost" size="sm" onClick={() => toggleManagedKey(k.id)} title={k.isActive ? "Disable" : "Enable"}>
+                            <Power className={`h-3.5 w-3.5 ${!k.isActive ? "text-red-400" : ""}`} />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => deleteManagedKey(k.id)} title="Delete" className="text-red-400 hover:text-red-300 hover:bg-red-500/10">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+      )}
 
       {/* Active Sessions */}
       <Card className="w-full max-w-4xl">

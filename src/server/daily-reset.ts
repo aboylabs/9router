@@ -1,4 +1,5 @@
 import { query } from "./db.js";
+import { invalidateApiKeyCache } from "./repositories.js";
 
 let lastResetDate: string | null = null;
 
@@ -19,11 +20,19 @@ async function checkAndReset() {
 
   // Date has changed — reset daily keys
   try {
+    // Include keys with no expiry (expires_at IS NULL) and keep used_requests as lifetime counter
     const result = await query(
-      `UPDATE api_keys SET used_tokens = 0 WHERE daily_reset = true AND deleted_at IS NULL AND revoked_at IS NULL AND expires_at > now()`
+      `UPDATE api_keys
+       SET used_tokens = 0
+       WHERE daily_reset = true
+         AND deleted_at IS NULL
+         AND revoked_at IS NULL
+         AND (expires_at IS NULL OR expires_at > now())`
     );
     const count = result.rowCount ?? 0;
     lastResetDate = today;
+    // Clear in-memory key cache so proxy immediately sees used_tokens = 0
+    invalidateApiKeyCache();
     console.log(`[daily-reset] Reset ${count} daily-reset key(s) at ${new Date().toISOString()} (WIB date: ${today})`);
   } catch (err) {
     console.error(`[daily-reset] Failed to reset daily keys:`, err);

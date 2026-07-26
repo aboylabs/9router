@@ -5,7 +5,11 @@ import { Card, CardHeader, CardTitle } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
 import { CopyButton } from "../components/CopyButton";
 import { api } from "../lib/api";
-import { formatDateShort, formatTokens, buyerNameClassName, isSuperAdminName } from "../lib/utils";
+import { SuperAdminBadge } from "../components/SuperAdminBadge";
+import { SupporterBadge } from "../components/SupporterBadge";
+import { HelperBadge } from "../components/HelperBadge";
+import { UltraBadge } from "../components/UltraBadge";
+import { formatDateShort, formatTokens, buyerNameClassName, isSuperAdminName, isSupporterName, isHelperName, isUltraQuota } from "../lib/utils";
 
 type LeaderboardEntry = {
   buyer_id: string;
@@ -21,7 +25,7 @@ type LeaderboardEntry = {
   prompt_tokens: string;
   completion_tokens: string;
   last_request_at: string;
-  is_vip: boolean;
+  quota_tokens?: string | null;
 };
 
 function formatRemainingDays(expiresAt: string | null): string {
@@ -105,11 +109,11 @@ export function Leaderboard() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-text-primary flex items-center gap-2">
+          <h2 className="text-xl font-semibold tracking-tight text-text-primary flex items-center gap-2">
             <Trophy className="h-5 w-5 text-yellow-500" />
             Leaderboard
           </h2>
-          <p className="text-sm text-text-muted">Top API keys by request count and token usage</p>
+          <p className="text-sm text-text-muted mt-0.5">Top API keys by request count and token usage</p>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-xs text-text-muted hidden sm:block">
@@ -213,12 +217,13 @@ export function Leaderboard() {
                           <code className="bg-surface-tertiary px-1.5 py-0.5 rounded font-mono text-text-muted text-xs">{entry.key_prefix}****</code>
                           <CopyButton text={entry.key_prefix} />
                         </div>
-                        <span className={`font-medium ${buyerNameClassName(entry.buyer_name, entry.is_vip)}`}>{entry.buyer_name}</span>
-                        {isSuperAdminName(entry.buyer_name) ? (
-                          <span className="text-purple-400 text-xs">👑</span>
-                        ) : entry.is_vip ? (
-                          <span className="text-yellow-500 text-xs">👑</span>
-                        ) : null}
+                        <div className="flex items-center gap-1.5">
+                          <span className={`font-medium ${buyerNameClassName(entry.buyer_name, entry.quota_tokens)}`}>{entry.buyer_name}</span>
+                          {isSuperAdminName(entry.buyer_name) ? <SuperAdminBadge /> : null}
+                          {isSupporterName(entry.buyer_name) ? <SupporterBadge /> : null}
+                          {isHelperName(entry.buyer_name) ? <HelperBadge /> : null}
+                          {!isSuperAdminName(entry.buyer_name) && !isSupporterName(entry.buyer_name) && !isHelperName(entry.buyer_name) && isUltraQuota(entry.quota_tokens) ? <UltraBadge /> : null}
+                        </div>
                         <span className="text-xs text-text-muted">{entry.buyer_email}</span>
                         <span className={`text-xs font-medium ${getExpiryColor(entry.expires_at)}`}>
                           {formatRemainingDays(entry.expires_at)}
