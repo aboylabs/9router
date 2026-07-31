@@ -140,8 +140,8 @@ export function Leaderboard() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="text-left p-2 font-medium text-text-muted w-10">#</th>
-                  <th className="text-left p-2 font-medium text-text-muted w-[45%]">Key / Buyer</th>
+                  <th className="text-left p-2 font-medium text-text-muted w-8">#</th>
+                  <th className="text-left p-2 font-medium text-text-muted">Key / Buyer</th>
                   <th 
                     className="text-right p-2 font-medium text-text-muted cursor-pointer hover:text-text-primary transition-colors"
                     onClick={() => handleSort("total_requests")}

@@ -273,6 +273,13 @@
 .sa-sparkle-2 { animation: sa-sparkle-2 3.5s ease-in-out infinite 0.5s; }
 
 /* Row highlight — subtle gradient background for SA rows */
+/* td must inherit row background so highlight shows through */
+.sa-row-highlight td,
+.sp-row-highlight td,
+.ul-row-highlight td {
+  background: inherit !important;
+}
+
 @keyframes sa-row-glow {
   0%, 100% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
@@ -280,9 +287,9 @@
 .sa-row-highlight {
   position: relative;
   background: linear-gradient(90deg,
-    rgba(168,85,247,0.06) 0%,
-    rgba(232,121,249,0.04) 50%,
-    rgba(236,72,153,0.06) 100%);
+    rgba(168,85,247,0.03) 0%,
+    rgba(232,121,249,0.02) 50%,
+    rgba(236,72,153,0.03) 100%);
   background-size: 200% 100%;
   animation: sa-row-glow 4s ease-in-out infinite;
 }
@@ -293,7 +300,7 @@
   width: 3px;
   border-radius: 2px;
   background: linear-gradient(180deg, #c4b5fd, #e879f9, #f0abfc);
-  box-shadow: 0 0 8px rgba(232,121,249,0.5);
+  box-shadow: 0 0 4px rgba(232,121,249,0.35);
 }
 
 /* prefers-reduced-motion: disable all SA animations */
@@ -418,9 +425,9 @@
 .sp-row-highlight {
   position: relative;
   background: linear-gradient(90deg,
-    rgba(250,204,21,0.07) 0%,
-    rgba(251,191,36,0.04) 50%,
-    rgba(245,158,11,0.07) 100%);
+    rgba(250,204,21,0.03) 0%,
+    rgba(251,191,36,0.02) 50%,
+    rgba(245,158,11,0.03) 100%);
   background-size: 200% 100%;
   animation: sp-row-glow 4s ease-in-out infinite;
 }
@@ -431,7 +438,7 @@
   width: 3px;
   border-radius: 2px;
   background: linear-gradient(180deg, #fef9c3, #fde047, #fbbf24);
-  box-shadow: 0 0 8px rgba(250,204,21,0.5);
+  box-shadow: 0 0 4px rgba(250,204,21,0.35);
 }
 
 /* ════════════════════════════════════════════════════
@@ -525,9 +532,9 @@
 .ul-row-highlight {
   position: relative;
   background: linear-gradient(90deg,
-    rgba(14,165,233,0.07) 0%,
-    rgba(34,211,238,0.04) 50%,
-    rgba(59,130,246,0.07) 100%);
+    rgba(14,165,233,0.03) 0%,
+    rgba(34,211,238,0.02) 50%,
+    rgba(59,130,246,0.03) 100%);
   background-size: 200% 100%;
   animation: ul-row-glow 4s ease-in-out infinite;
 }
@@ -538,5 +545,5 @@
   width: 3px;
   border-radius: 2px;
   background: linear-gradient(180deg, #bae6fd, #22d3ee, #60a5fa);
-  box-shadow: 0 0 8px rgba(34,211,238,0.5);
+  box-shadow: 0 0 4px rgba(34,211,238,0.35);
 }
