@@ -137,10 +137,17 @@ export function Leaderboard() {
       ) : (
         <Card>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm table-fixed">
+              <colgroup>
+                <col className="w-12" />
+                <col />
+                <col className="w-28" />
+                <col className="w-32 hidden sm:table-cell" />
+                <col className="w-36 hidden md:table-cell" />
+              </colgroup>
               <thead>
                 <tr className="border-b border-border">
-                  <th className="text-left p-2 font-medium text-text-muted w-8">#</th>
+                  <th className="text-left p-2 font-medium text-text-muted">#</th>
                   <th className="text-left p-2 font-medium text-text-muted">Key / Buyer</th>
                   <th 
                     className="text-right p-2 font-medium text-text-muted cursor-pointer hover:text-text-primary transition-colors"
