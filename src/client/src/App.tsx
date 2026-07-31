@@ -9,7 +9,6 @@ import { Keys } from "./pages/Keys";
 import { Models } from "./pages/Models";
 import { Usage } from "./pages/Usage";
 import { Live } from "./pages/Live";
-import { Leaderboard } from "./pages/Leaderboard";
 import { Settings } from "./pages/Settings";
 
 function App() {
@@ -51,7 +50,7 @@ function Dashboard({ adminEmail, page, onNavigate, onLogout }: {
   onNavigate: (page: Page) => void;
   onLogout: () => void;
 }) {
-  const { models, activeModels, keys, usage, overview, chartData, chartRange, setChartRange, refreshChart, loading, refresh } = useDashboard();
+  const { models, keys, usage, overview, chartData, chartRange, setChartRange, refreshChart, loading, refresh } = useDashboard();
 
   return (
     <div className="min-h-screen bg-surface-secondary flex">
@@ -62,7 +61,7 @@ function Dashboard({ adminEmail, page, onNavigate, onLogout }: {
         onLogout={onLogout}
       />
 
-      <main className="flex-1 lg:ml-0 p-4 lg:p-8 pt-16 lg:pt-8 overflow-auto min-h-screen">
+      <main className="flex-1 lg:ml-0 p-3 sm:p-4 lg:p-8 pt-16 lg:pt-8 overflow-auto min-h-screen">
         <div className="max-w-[1600px] mx-auto page-enter">
           {loading ? (
             <div className="flex items-center justify-center py-20">
@@ -73,12 +72,11 @@ function Dashboard({ adminEmail, page, onNavigate, onLogout }: {
             </div>
           ) : (
             <>
-              {page === "overview" && <Overview overview={overview} chartData={chartData} chartRange={chartRange} setChartRange={(r) => { setChartRange(r); refreshChart(r); }} keys={keys} />}
+              {page === "overview" && <Overview overview={overview} chartData={chartData} chartRange={chartRange} setChartRange={(r) => { setChartRange(r); refreshChart(r); }} />}
               {page === "keys" && <Keys keys={keys} onRefresh={refresh} />}
               {page === "models" && <Models models={models} onRefresh={refresh} />}
               {page === "usage" && <Usage usage={usage} />}
               {page === "live" && <Live />}
-              {page === "leaderboard" && <Leaderboard />}
               {page === "settings" && <Settings />}
             </>
           )}

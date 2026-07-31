@@ -1,15 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
 import { Trophy, ArrowUp, ArrowDown, RefreshCw } from "lucide-react";
 import { Button } from "../components/ui/Button";
-import { Card, CardHeader, CardTitle } from "../components/ui/Card";
-import { Badge } from "../components/ui/Badge";
+import { Card } from "../components/ui/Card";
 import { CopyButton } from "../components/CopyButton";
 import { api } from "../lib/api";
 import { SuperAdminBadge } from "../components/SuperAdminBadge";
 import { SupporterBadge } from "../components/SupporterBadge";
 import { HelperBadge } from "../components/HelperBadge";
 import { UltraBadge } from "../components/UltraBadge";
-import { formatDateShort, formatTokens, buyerNameClassName, isSuperAdminName, isSupporterName, isHelperName, isUltraQuota } from "../lib/utils";
+import { formatDateShort, formatTokens, buyerNameClassName, isSuperAdminName, isSupporterName, isHelperName, isUltraKey, roleRowClassName } from "../lib/utils";
 
 type LeaderboardEntry = {
   buyer_id: string;
@@ -26,6 +25,7 @@ type LeaderboardEntry = {
   completion_tokens: string;
   last_request_at: string;
   quota_tokens?: string | null;
+  is_ultra?: boolean;
 };
 
 function formatRemainingDays(expiresAt: string | null): string {
@@ -106,60 +106,26 @@ export function Leaderboard() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight text-text-primary flex items-center gap-2">
+          <h3 className="text-lg font-semibold tracking-tight text-text-primary flex items-center gap-2">
             <Trophy className="h-5 w-5 text-yellow-500" />
             Leaderboard
-          </h2>
+          </h3>
           <p className="text-sm text-text-muted mt-0.5">Top API keys by request count and token usage</p>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-xs text-text-muted hidden sm:block">
             Updated: {lastRefresh.toLocaleTimeString("id-ID", { timeZone: "Asia/Jakarta", hour: "numeric", minute: "2-digit", second: "2-digit", hour12: false })}
           </span>
-          <Button variant="outline" size="sm" onClick={fetchLeaderboard}>
+          <Button variant="outline" size="sm" onClick={fetchLeaderboard} title="Refresh leaderboard">
             <RefreshCw className="h-3.5 w-3.5" />
           </Button>
         </div>
       </div>
 
-      {/* Summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-        <Card>
-          <div className="p-4 text-center">
-            <div className="text-2xl font-bold text-text-primary">{entries.length}</div>
-            <div className="text-xs text-text-muted mt-1">Active Keys</div>
-          </div>
-        </Card>
-        <Card>
-          <div className="p-4 text-center">
-            <div className="text-2xl font-bold text-text-primary">
-              {entries.reduce((sum, e) => sum + e.total_requests, 0).toLocaleString("id-ID")}
-            </div>
-            <div className="text-xs text-text-muted mt-1">Total Requests</div>
-          </div>
-        </Card>
-        <Card>
-          <div className="p-4 text-center">
-            <div className="text-2xl font-bold text-text-primary">
-              {formatTokens(entries.reduce((sum, e) => sum + Number(e.total_tokens), 0))}
-            </div>
-            <div className="text-xs text-text-muted mt-1">Total Tokens</div>
-          </div>
-        </Card>
-        <Card>
-          <div className="p-4 text-center">
-            <div className="text-2xl font-bold text-text-primary">
-              {new Set(entries.map(e => e.buyer_id)).size}
-            </div>
-            <div className="text-xs text-text-muted mt-1">Unique Buyers</div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Leaderboard Table */}
+      {/* Summary cards removed — Overview metric cards already show these */}
       {loading ? (
         <p className="text-sm text-text-muted text-center py-8">Loading...</p>
       ) : sortedEntries.length === 0 ? (
@@ -174,10 +140,10 @@ export function Leaderboard() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="text-left p-3 font-medium text-text-muted">#</th>
-                  <th className="text-left p-3 font-medium text-text-muted">Key / Buyer</th>
+                  <th className="text-left p-2 font-medium text-text-muted w-8">#</th>
+                  <th className="text-left p-2 font-medium text-text-muted">Key / Buyer</th>
                   <th 
-                    className="text-right p-3 font-medium text-text-muted cursor-pointer hover:text-text-primary transition-colors"
+                    className="text-right p-2 font-medium text-text-muted cursor-pointer hover:text-text-primary transition-colors"
                     onClick={() => handleSort("total_requests")}
                   >
                     <div className="flex items-center justify-end gap-1">
@@ -185,7 +151,7 @@ export function Leaderboard() {
                     </div>
                   </th>
                   <th 
-                    className="text-right p-3 font-medium text-text-muted cursor-pointer hover:text-text-primary transition-colors hidden sm:table-cell"
+                    className="text-right p-2 font-medium text-text-muted cursor-pointer hover:text-text-primary transition-colors hidden sm:table-cell"
                     onClick={() => handleSort("total_tokens")}
                   >
                     <div className="flex items-center justify-end gap-1">
@@ -193,7 +159,7 @@ export function Leaderboard() {
                     </div>
                   </th>
                   <th 
-                    className="text-right p-3 font-medium text-text-muted cursor-pointer hover:text-text-primary transition-colors hidden md:table-cell"
+                    className="text-right p-2 font-medium text-text-muted cursor-pointer hover:text-text-primary transition-colors hidden md:table-cell"
                     onClick={() => handleSort("last_request_at")}
                   >
                     <div className="flex items-center justify-end gap-1">
@@ -204,25 +170,25 @@ export function Leaderboard() {
               </thead>
               <tbody>
                 {sortedEntries.map((entry, index) => (
-                  <tr key={entry.key_id} className="border-b border-border hover:bg-surface-tertiary/50 transition-colors">
-                    <td className="p-3">
+                  <tr key={entry.key_id} className={`border-b border-border hover:bg-surface-tertiary/50 transition-colors${roleRowClassName(entry.buyer_name, entry.quota_tokens, entry.is_ultra) ? " " + roleRowClassName(entry.buyer_name, entry.quota_tokens, entry.is_ultra) : ""}`}>
+                    <td className="p-2">
                       {index === 0 && <Trophy className="h-4 w-4 text-yellow-500 inline mr-1" />}
                       {index === 1 && <Trophy className="h-4 w-4 text-gray-400 inline mr-1" />}
                       {index === 2 && <Trophy className="h-4 w-4 text-amber-700 inline mr-1" />}
                       {index > 2 && <span className="text-text-muted ml-5">{index + 1}</span>}
                     </td>
-                    <td className="p-3">
+                    <td className="p-2">
                       <div className="flex flex-col gap-0.5">
                         <div className="flex items-center gap-1.5">
                           <code className="bg-surface-tertiary px-1.5 py-0.5 rounded font-mono text-text-muted text-xs">{entry.key_prefix}****</code>
                           <CopyButton text={entry.key_prefix} />
                         </div>
-                        <div className="flex items-center gap-1.5">
-                          <span className={`font-medium ${buyerNameClassName(entry.buyer_name, entry.quota_tokens)}`}>{entry.buyer_name}</span>
+                        <div className="flex items-center flex-wrap gap-1.5">
+                          <span className={`font-medium ${buyerNameClassName(entry.buyer_name, entry.quota_tokens, entry.is_ultra)}`}>{entry.buyer_name}</span>
                           {isSuperAdminName(entry.buyer_name) ? <SuperAdminBadge /> : null}
                           {isSupporterName(entry.buyer_name) ? <SupporterBadge /> : null}
                           {isHelperName(entry.buyer_name) ? <HelperBadge /> : null}
-                          {!isSuperAdminName(entry.buyer_name) && !isSupporterName(entry.buyer_name) && !isHelperName(entry.buyer_name) && isUltraQuota(entry.quota_tokens) ? <UltraBadge /> : null}
+                          {!isSuperAdminName(entry.buyer_name) && !isSupporterName(entry.buyer_name) && !isHelperName(entry.buyer_name) && isUltraKey(entry.is_ultra, entry.quota_tokens) ? <UltraBadge /> : null}
                         </div>
                         <span className="text-xs text-text-muted">{entry.buyer_email}</span>
                         <span className={`text-xs font-medium ${getExpiryColor(entry.expires_at)}`}>
@@ -230,10 +196,10 @@ export function Leaderboard() {
                         </span>
                       </div>
                     </td>
-                    <td className="p-3 text-right">
+                    <td className="p-2 text-right">
                       <span className="font-semibold text-text-primary">{entry.total_requests.toLocaleString("id-ID")}</span>
                     </td>
-                    <td className="p-3 text-right hidden sm:table-cell">
+                    <td className="p-2 text-right hidden sm:table-cell">
                       <div className="flex flex-col items-end">
                         <span className="font-medium text-text-primary">{formatTokens(entry.total_tokens)}</span>
                         <span className="text-[10px] text-text-muted">
@@ -241,7 +207,7 @@ export function Leaderboard() {
                         </span>
                       </div>
                     </td>
-                    <td className="p-3 text-right text-text-muted hidden md:table-cell">
+                    <td className="p-2 text-right text-text-muted hidden md:table-cell">
                       {formatDateShort(entry.last_request_at)}
                     </td>
                   </tr>

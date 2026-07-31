@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
-import { Infinity as InfinityIcon, Power, RefreshCw, Search, ShieldCheck, Trash2 } from "lucide-react";
+import { Infinity as InfinityIcon, Power, RefreshCw, Search, ShieldCheck, Trash2, Box } from "lucide-react";
 import { Button } from "../components/ui/Button";
+import { PageHeader } from "../components/PageHeader";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from "../components/ui/Table";
 import { Badge } from "../components/ui/Badge";
 import { useToast } from "../components/ui/Toast";
@@ -142,21 +143,17 @@ export function Models({ models, onRefresh }: ModelsPageProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold text-text-primary">Model Catalog</h2>
-          <p className="text-sm text-text-muted">
-            Free/Unlimited = usage logged, token quota key tidak terpotong. Role Dev / Supporter / Ultra bisa diaktifkan
-            satu-satu. Kosong = semua key.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+      <PageHeader
+        icon={<Box className="h-5 w-5 text-primary-500" />}
+        title="Model Catalog"
+        subtitle="Free/Unlimited = usage logged, token quota key tidak terpotong. Role Dev / Supporter / Ultra bisa diaktifkan satu-satu. Kosong = semua key."
+        actions={
           <Button variant="outline" size="sm" onClick={syncModels} loading={syncing}>
             <RefreshCw className="h-4 w-4" />
             <span className="hidden sm:inline">Sync Models</span>
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />

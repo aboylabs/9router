@@ -51,6 +51,7 @@ export function CreateKeyModal({ open, onOpenChange, onSuccess }: CreateKeyModal
   const [userName, setUserName] = useState("");
   const [packageId, setPackageId] = useState<CreateKeyPackageId>(DEFAULT_CREATE_KEY_PACKAGE_ID);
   const [days, setDays] = useState(String(CREATE_KEY_PACKAGES.find((p) => p.id === DEFAULT_CREATE_KEY_PACKAGE_ID)?.defaultDays ?? 28));
+  const [unlimitedQuota, setUnlimitedQuota] = useState(false);
 
   const selectedPkg = useMemo(
     () => CREATE_KEY_PACKAGES.find((p) => p.id === packageId) ?? CREATE_KEY_PACKAGES[0],
@@ -62,6 +63,7 @@ export function CreateKeyModal({ open, onOpenChange, onSuccess }: CreateKeyModal
       setResult(null);
       setUserName("");
       setPackageId(DEFAULT_CREATE_KEY_PACKAGE_ID);
+      setUnlimitedQuota(false);
       const def = CREATE_KEY_PACKAGES.find((p) => p.id === DEFAULT_CREATE_KEY_PACKAGE_ID);
       setDays(String(def?.defaultDays ?? 28));
     }
@@ -93,7 +95,8 @@ export function CreateKeyModal({ open, onOpenChange, onSuccess }: CreateKeyModal
         body: JSON.stringify({
           name: userName.trim(),
           days: daysNum,
-          packageId
+          packageId,
+          unlimitedQuota
         })
       });
       setResult(data);
@@ -159,11 +162,26 @@ export function CreateKeyModal({ open, onOpenChange, onSuccess }: CreateKeyModal
             <p className="text-xs text-text-muted mt-1.5 leading-relaxed">
               <span className="font-medium text-text-secondary">{selectedPkg.label}</span>
               {" · "}
-              {formatQuotaM(selectedPkg.quotaTokens)} tokens
+              {unlimitedQuota ? "∞ tokens" : `${formatQuotaM(selectedPkg.quotaTokens)} tokens`}
               {" · "}
               {selectedPkg.rateLimitRpm} RPM
               {" · "}
               {formatPriceId(selectedPkg.priceRp)}
+            </p>
+          </div>
+
+          <div>
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={unlimitedQuota}
+                onChange={(e) => setUnlimitedQuota(e.target.checked)}
+                className="h-4 w-4 rounded border-border-primary text-primary-500 focus:ring-primary-500"
+              />
+              <span className="text-sm font-medium text-text-secondary">Unlimited quota</span>
+            </label>
+            <p className="text-xs text-text-muted mt-1 ml-6">
+              Centang untuk membuat token tanpa batas (∞), abaikan kuota paket
             </p>
           </div>
 

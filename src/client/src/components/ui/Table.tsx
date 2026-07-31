@@ -9,7 +9,7 @@ interface TableProps {
 export function Table({ className, children }: TableProps) {
   return (
     <div className="w-full overflow-x-auto rounded-xl border border-border bg-surface shadow-sm">
-      <table className={cn("w-full text-sm border-collapse", className)}>
+      <table className={cn("w-full text-sm border-collapse table-fixed", className)}>
         {children}
       </table>
     </div>
@@ -25,7 +25,7 @@ export function TableHeader({ children }: { children: ReactNode }) {
 }
 
 export function TableBody({ children }: { children: ReactNode }) {
-  return <tbody className="divide-y divide-border">{children}</tbody>;
+  return <tbody className="divide-y divide-border [&>tr:nth-child(even)]:bg-surface-secondary/40">{children}</tbody>;
 }
 
 export function TableRow({ children, className }: { children: ReactNode; className?: string }) {
@@ -40,7 +40,7 @@ export function TableHead({ children, className }: { children: ReactNode; classN
   return (
     <th
       className={cn(
-        "px-3 py-3 text-left text-[11px] font-semibold text-text-muted uppercase tracking-wider whitespace-nowrap",
+        "px-2 py-2.5 text-left text-[11px] font-semibold text-text-muted uppercase tracking-wider whitespace-nowrap",
         className
       )}
     >
@@ -51,7 +51,7 @@ export function TableHead({ children, className }: { children: ReactNode; classN
 
 export function TableCell({ children, className, ...props }: TdHTMLAttributes<HTMLTableCellElement>) {
   return (
-    <td className={cn("px-3 py-3 text-text-secondary whitespace-nowrap", className)} {...props}>
+    <td className={cn("px-2 py-2.5 text-text-secondary whitespace-nowrap", className)} {...props}>
       {children}
     </td>
   );

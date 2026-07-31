@@ -73,6 +73,7 @@ export async function registerPublicRoutes(app: FastifyInstance) {
         k.label as key_label,
         k.used_tokens::bigint as used_tokens,
         k.quota_tokens::bigint as quota_tokens,
+        k.is_ultra,
         COALESCE(stats.total_requests, 0)::int as total_requests,
         COALESCE(stats.total_tokens, 0)::bigint as total_tokens,
         stats.last_request_at,
@@ -93,7 +94,7 @@ export async function registerPublicRoutes(app: FastifyInstance) {
         GROUP BY ue.api_key_id
       ) stats ON stats.api_key_id = k.id
       ${filterSql}
-      ORDER BY k.used_tokens DESC, total_requests DESC, b.name ASC
+      ORDER BY total_tokens DESC, total_requests DESC, b.name ASC
       LIMIT ${limit}`,
       params
     );
@@ -118,6 +119,7 @@ export async function registerPublicRoutes(app: FastifyInstance) {
         k.key_prefix,
         b.name as buyer_name,
         k.quota_tokens,
+        k.is_ultra,
         count(ue.id)::int as request_count,
         max(ue.created_at) as last_request_at,
         sum(ue.total_tokens)::bigint as total_tokens,
@@ -127,7 +129,7 @@ export async function registerPublicRoutes(app: FastifyInstance) {
        JOIN buyers b ON b.id = k.buyer_id
        WHERE ue.created_at > now() - interval '5 minutes'
          AND k.is_hidden = false AND ue.status_code != 400
-       GROUP BY k.id, k.key_prefix, b.name, k.quota_tokens
+       GROUP BY k.id, k.key_prefix, b.name, k.quota_tokens, k.is_ultra
        ORDER BY max(ue.created_at) DESC`
     );
     const active = result.rows.map((r: any) => {
@@ -162,7 +164,7 @@ export async function registerPublicRoutes(app: FastifyInstance) {
     const result = await query(
       `SELECT ue.created_at, ue.endpoint, ue.model_id, ue.status_code, ue.success,
         ue.prompt_tokens, ue.completion_tokens, ue.total_tokens, ue.latency_ms,
-        k.key_prefix, b.name as buyer_name, k.quota_tokens
+        k.key_prefix, b.name as buyer_name, k.quota_tokens, k.is_ultra
        FROM usage_events ue
        JOIN api_keys k ON k.id = ue.api_key_id
        JOIN buyers b ON b.id = k.buyer_id
@@ -218,6 +220,50 @@ export async function registerPublicRoutes(app: FastifyInstance) {
 
     const result = await query(queryStr);
     return { points: result.rows };
+  });
+
+  // --- Public 24h Stats (total + per-model breakdown) ---
+  app.get("/public/stats24h", async (request, reply) => {
+    if (!enforcePublicRateLimit(request, reply)) return;
+
+    const [totals, perModel] = await Promise.all([
+      query(
+        `SELECT COUNT(*)::bigint as requests,
+                COALESCE(SUM(total_tokens), 0)::bigint as tokens
+         FROM usage_events
+         WHERE created_at >= NOW() - INTERVAL '24 hours'
+           AND status_code != 400`
+      ),
+      query(
+        `SELECT model_id,
+                COUNT(*)::int as requests,
+                COALESCE(SUM(total_tokens), 0)::bigint as tokens,
+                COALESCE(SUM(prompt_tokens), 0)::bigint as prompt_tokens,
+                COALESCE(SUM(completion_tokens), 0)::bigint as completion_tokens,
+                MAX(created_at) as last_request_at
+         FROM usage_events
+         WHERE created_at >= NOW() - INTERVAL '24 hours'
+           AND status_code != 400
+           AND model_id IS NOT NULL
+         GROUP BY model_id
+         ORDER BY tokens DESC`
+      )
+    ]);
+
+    return {
+      totals: {
+        requests: Number(totals.rows[0].requests),
+        tokens: Number(totals.rows[0].tokens)
+      },
+      models: perModel.rows.map((r: any) => ({
+        model_id: r.model_id,
+        requests: r.requests,
+        tokens: Number(r.tokens),
+        prompt_tokens: Number(r.prompt_tokens),
+        completion_tokens: Number(r.completion_tokens),
+        last_request_at: r.last_request_at
+      }))
+    };
   });
 
   // --- Public Overview Stats ---

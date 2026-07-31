@@ -1,19 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
 
-export type Buyer = {
-  id: string;
-  name: string;
-  email?: string;
-  notes?: string;
-  used_tokens: string;
-  total_quota: string;
-  request_count: string;
-  key_count: number;
-  api_keys: string[];
-  created_at: string;
-};
-
 export type ModelAccessRole = "dev" | "supporter" | "ultra";
 
 export type Model = {
@@ -50,6 +37,8 @@ export type Key = {
   daily_quota_tokens: string | null;
   package_id: string | null;
   rate_limit_rpm: number | null;
+  is_ultra?: boolean;
+  access_roles?: ModelAccessRole[] | string[];
 };
 
 export type UsageEvent = {
@@ -57,6 +46,7 @@ export type UsageEvent = {
   buyer_name: string | null;
   key_prefix: string | null;
   quota_tokens?: string | null;
+  is_ultra?: boolean;
   agent_id: string;
   model_id: string | null;
   status_code: number;
@@ -83,7 +73,6 @@ export type Overview = {
 };
 
 export function useDashboard() {
-  const [buyers, setBuyers] = useState<Buyer[]>([]);
   const [models, setModels] = useState<Model[]>([]);
   const [keys, setKeys] = useState<Key[]>([]);
   const [usage, setUsage] = useState<UsageEvent[]>([]);
@@ -103,15 +92,13 @@ export function useDashboard() {
 
   const refresh = useCallback(async () => {
     try {
-      const [overviewData, buyerData, modelData, keyData, usageData] = await Promise.all([
+      const [overviewData, modelData, keyData, usageData] = await Promise.all([
         api<Overview>("/admin/overview"),
-        api<{ buyers: Buyer[] }>("/admin/buyers"),
         api<{ models: Model[] }>("/admin/models"),
         api<{ keys: Key[] }>("/admin/keys"),
         api<{ events: UsageEvent[] }>("/admin/usage")
       ]);
       setOverview(overviewData);
-      setBuyers(buyerData.buyers);
       setModels(modelData.models);
       setKeys(keyData.keys);
       setUsage(usageData.events);
@@ -129,7 +116,5 @@ export function useDashboard() {
     return () => clearInterval(interval);
   }, [refresh]);
 
-  const activeModels = models.filter((m) => m.active);
-
-  return { buyers, models, activeModels, keys, usage, overview, chartData, chartRange, setChartRange, refreshChart, loading, refresh };
+  return { models, keys, usage, overview, chartData, chartRange, setChartRange, refreshChart, loading, refresh };
 }

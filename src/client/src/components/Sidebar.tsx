@@ -8,13 +8,12 @@ import {
   LogOut,
   Menu,
   X,
-  Settings,
-  Trophy
+  Settings
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { ThemeToggle } from "./ThemeToggle";
 
-export type Page = "overview" | "keys" | "models" | "usage" | "live" | "leaderboard" | "settings";
+export type Page = "overview" | "keys" | "models" | "usage" | "live" | "settings";
 
 interface SidebarProps {
   currentPage: Page;
@@ -23,14 +22,28 @@ interface SidebarProps {
   onLogout: () => void;
 }
 
-const navItems: { id: Page; label: string; icon: typeof LayoutDashboard }[] = [
-  { id: "overview", label: "Overview", icon: LayoutDashboard },
-  { id: "keys", label: "API Keys", icon: Key },
-  { id: "models", label: "Models", icon: Box },
-  { id: "usage", label: "Usage", icon: Activity },
-  { id: "live", label: "Live", icon: Radio },
-  { id: "leaderboard", label: "Leaderboard", icon: Trophy },
-  { id: "settings", label: "Settings", icon: Settings },
+const navGroups: { label: string; items: { id: Page; label: string; icon: typeof LayoutDashboard }[] }[] = [
+  {
+    label: "Main",
+    items: [
+      { id: "overview", label: "Overview", icon: LayoutDashboard },
+      { id: "keys", label: "API Keys", icon: Key },
+      { id: "models", label: "Models", icon: Box },
+    ],
+  },
+  {
+    label: "Monitoring",
+    items: [
+      { id: "usage", label: "Usage", icon: Activity },
+      { id: "live", label: "Live", icon: Radio },
+    ],
+  },
+  {
+    label: "System",
+    items: [
+      { id: "settings", label: "Settings", icon: Settings },
+    ],
+  },
 ];
 
 export function Sidebar({ currentPage, onNavigate, adminEmail, onLogout }: SidebarProps) {
@@ -86,29 +99,38 @@ export function Sidebar({ currentPage, onNavigate, adminEmail, onLogout }: Sideb
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const active = currentPage === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  onNavigate(item.id);
-                  setMobileOpen(false);
-                }}
-                className={cn(
-                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer",
-                  active
-                    ? "bg-primary-600 text-white shadow-md shadow-primary-900/30"
-                    : "text-sidebar-muted hover:text-sidebar-text hover:bg-sidebar-hover"
-                )}
-              >
-                <Icon className={cn("h-4 w-4", active ? "text-white" : "text-sidebar-muted")} />
-                {item.label}
-              </button>
-            );
-          })}
+        <nav className="flex-1 px-3 py-4 space-y-4 overflow-y-auto">
+          {navGroups.map((group) => (
+            <div key={group.label}>
+              <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-sidebar-muted/70">
+                {group.label}
+              </p>
+              <div className="space-y-0.5">
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const active = currentPage === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        onNavigate(item.id);
+                        setMobileOpen(false);
+                      }}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer",
+                        active
+                          ? "bg-primary-600 text-white shadow-md shadow-primary-900/30"
+                          : "text-sidebar-muted hover:text-sidebar-text hover:bg-sidebar-hover"
+                      )}
+                    >
+                      <Icon className={cn("h-4 w-4", active ? "text-white" : "text-sidebar-muted")} />
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
         {/* Footer */}

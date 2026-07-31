@@ -85,7 +85,7 @@ export function isSuperAdminName(name: string | null | undefined): boolean {
  * Supporter / donatur buyers — bright yellow name + badge.
  * Name-match list (extend as needed). Currently: GILBERT ARIAS, yuop.
  */
-const SUPPORTER_NAMES = new Set(["gilbert arias", "yuop"]);
+const SUPPORTER_NAMES = new Set(["gilbert arias", "yuop", "attta rebelution"]);
 
 export function isSupporterName(name: string | null | undefined): boolean {
   return SUPPORTER_NAMES.has((name || "").trim().toLowerCase());
@@ -105,11 +105,17 @@ export function isHelperName(name: string | null | undefined): boolean {
 export const QUOTA_500M = 500_000_000;
 export const QUOTA_250M = 250_000_000;
 
-/** Exact 500M lifetime quota → ULTRA tier badge (not Prices "Pro"). */
+/** Exact 500M lifetime quota → ULTRA tier badge (legacy quota-based check). */
 export function isUltraQuota(quotaTokens?: number | string | null): boolean {
   if (quotaTokens == null || quotaTokens === "") return false;
   const q = Number(quotaTokens);
   return Number.isFinite(q) && q === QUOTA_500M;
+}
+
+/** Ultra tier from dedicated is_ultra flag, falling back to legacy 500M quota. */
+export function isUltraKey(isUltra?: boolean | null, quotaTokens?: number | string | null): boolean {
+  if (isUltra === true) return true;
+  return isUltraQuota(quotaTokens);
 }
 
 /**
@@ -121,24 +127,19 @@ export function isUltraQuota(quotaTokens?: number | string | null): boolean {
  */
 export function buyerNameClassName(
   name: string | null | undefined,
-  quotaTokens?: number | string | null
+  quotaTokens?: number | string | null,
+  isUltra?: boolean | null
 ): string {
   if (isSuperAdminName(name)) {
     return [
       "font-semibold",
-      "bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600",
-      "dark:from-purple-300 dark:via-fuchsia-300 dark:to-pink-300",
-      "bg-clip-text text-transparent",
-      "drop-shadow-[0_0_8px_rgba(192,132,252,0.35)]",
+      "sa-name-anim",
     ].join(" ");
   }
   if (isSupporterName(name)) {
     return [
       "font-semibold",
-      "bg-gradient-to-r from-amber-600 via-yellow-500 to-amber-500",
-      "dark:from-yellow-100 dark:via-amber-200 dark:to-yellow-300",
-      "bg-clip-text text-transparent",
-      "drop-shadow-[0_0_8px_rgba(250,204,21,0.4)]",
+      "sp-name-anim",
     ].join(" ");
   }
   if (isHelperName(name)) {
@@ -150,13 +151,10 @@ export function buyerNameClassName(
       "drop-shadow-[0_0_10px_rgba(52,211,153,0.45)]",
     ].join(" ");
   }
-  if (isUltraQuota(quotaTokens)) {
+  if (isUltraKey(isUltra, quotaTokens)) {
     return [
       "font-semibold",
-      "bg-gradient-to-r from-sky-600 via-cyan-500 to-blue-600",
-      "dark:from-sky-200 dark:via-cyan-200 dark:to-blue-300",
-      "bg-clip-text text-transparent",
-      "drop-shadow-[0_0_10px_rgba(34,211,238,0.45)]",
+      "ul-name-anim",
     ].join(" ");
   }
   if (quotaTokens == null || quotaTokens === "") return "text-text-primary";
@@ -164,4 +162,21 @@ export function buyerNameClassName(
   if (!Number.isFinite(q)) return "text-text-primary";
   if (q === QUOTA_250M) return "text-emerald-600 dark:text-emerald-300 font-semibold";
   return "text-text-primary";
+}
+
+/**
+ * Row-level highlight class for special roles.
+ * Returns the appropriate CSS class for Super Admin / Supporter / Ultra rows,
+ * or empty string for normal rows.
+ */
+export function roleRowClassName(
+  name: string | null | undefined,
+  quotaTokens?: number | string | null,
+  isUltra?: boolean | null
+): string {
+  if (isSuperAdminName(name)) return "sa-row-highlight";
+  if (isSupporterName(name)) return "sp-row-highlight";
+  if (isHelperName(name)) return ""; // helper — no row highlight for now
+  if (isUltraKey(isUltra, quotaTokens)) return "ul-row-highlight";
+  return "";
 }

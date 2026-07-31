@@ -13,22 +13,6 @@ export const CREATE_KEY_PACKAGES = [
     defaultDays: 28,
   },
   {
-    id: "pro",
-    label: "Pro",
-    priceRp: 250_000,
-    quotaTokens: 250_000_000,
-    rateLimitRpm: 20,
-    defaultDays: 28,
-  },
-  {
-    id: "business",
-    label: "Business",
-    priceRp: 350_000,
-    quotaTokens: 350_000_000,
-    rateLimitRpm: 30,
-    defaultDays: 28,
-  },
-  {
     id: "ultra",
     label: "Ultra",
     priceRp: 500_000,
@@ -45,8 +29,6 @@ export const DEFAULT_CREATE_KEY_PACKAGE_ID: CreateKeyPackageId = "starter";
 
 export const CREATE_KEY_PACKAGE_IDS = [
   "starter",
-  "pro",
-  "business",
   "ultra",
 ] as const satisfies readonly CreateKeyPackageId[];
 

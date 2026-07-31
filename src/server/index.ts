@@ -11,7 +11,6 @@ import { registerAdminRoutes, seedInitialAdmin } from "./admin-routes.js";
 import { registerProxyRoutes } from "./proxy-routes.js";
 import { registerPublicRoutes } from "./public-routes.js";
 import { startDailyResetCron } from "./daily-reset.js";
-import { CREATABLE_PACKAGE_LABELS } from "../shared/package-catalog.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -725,7 +724,7 @@ function publicDashboardPage(): string {
     @media (prefers-reduced-motion: reduce) { .skeleton::after { animation: none; } }
 
     /* === NUMERIC ALIGNMENT === */
-    td, .stat-value, .podium-stat { font-variant-numeric: tabular-nums; }
+    td, .stat-value { font-variant-numeric: tabular-nums; }
 
     /* === PUBLIC FOOTER === */
     .pub-footer {
@@ -976,33 +975,73 @@ function publicDashboardPage(): string {
     .badge-yellow { background: rgba(202,138,4,0.15); color: #fbbf24; border-color: rgba(251,191,36,0.2); }
     .badge-red { background: rgba(220,38,38,0.15); color: #f87171; border-color: rgba(248,113,113,0.2); }
 
-    /* Super Admin developer badge */
+    /* Super Admin developer badge — animated purple/fuchsia */
     .sa-name {
-      font-weight: 700;
-      background: linear-gradient(90deg, #d8b4fe 0%, #f0abfc 50%, #f9a8d4 100%);
+      position: relative;
+      display: inline-block;
+      font-weight: 800;
+      background: linear-gradient(90deg, #c4b5fd 0%, #e879f9 28%, #f0abfc 52%, #f9a8d4 76%, #c4b5fd 100%);
+      background-size: 220% 100%;
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
-      text-shadow: 0 0 14px rgba(192,132,252,0.45);
-      filter: drop-shadow(0 0 8px rgba(192,132,252,0.35));
+      filter: drop-shadow(0 0 10px rgba(192,132,252,0.55));
+      animation: saNameShine 3.2s ease-in-out infinite;
+    }
+    @keyframes saNameShine {
+      0%, 100% {
+        background-position: 0% 50%;
+        filter: drop-shadow(0 0 8px rgba(192,132,252,0.4));
+      }
+      50% {
+        background-position: 100% 50%;
+        filter: drop-shadow(0 0 16px rgba(232,121,249,0.75));
+      }
     }
     .sa-badge {
+      position: relative;
+      overflow: hidden;
       display: inline-flex;
       align-items: center;
       gap: 0.28rem;
       margin-left: 0.4rem;
       vertical-align: middle;
-      padding: 0.12rem 0.45rem 0.12rem 0.32rem;
-      border-radius: 0.375rem;
+      padding: 0.14rem 0.5rem 0.14rem 0.34rem;
+      border-radius: 0.45rem;
       font-size: 0.62rem;
       font-weight: 800;
       letter-spacing: 0.08em;
       line-height: 1;
       color: #f5d0fe;
-      border: 1px solid rgba(232, 121, 249, 0.42);
-      background: linear-gradient(90deg, rgba(168,85,247,0.28), rgba(217,70,239,0.18), rgba(236,72,153,0.22));
-      box-shadow: 0 0 12px rgba(192,132,252,0.35);
+      border: 1px solid rgba(232, 121, 249, 0.55);
+      background:
+        radial-gradient(120% 160% at 20% 0%, rgba(244,114,182,0.28), transparent 55%),
+        linear-gradient(90deg, rgba(168,85,247,0.38), rgba(217,70,239,0.24), rgba(236,72,153,0.3));
+      box-shadow: 0 0 14px rgba(192,132,252,0.45), 0 0 28px rgba(217,70,239,0.18);
       white-space: nowrap;
+      animation: saBadgePulse 2.4s ease-in-out infinite;
+    }
+    .sa-badge::after {
+      content: '';
+      position: absolute;
+      top: 0; left: -130%;
+      width: 55%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.42), transparent);
+      transform: skewX(-22deg);
+      pointer-events: none;
+      animation: roleShimmerSweep 2.8s ease-in-out infinite;
+    }
+    @keyframes saBadgePulse {
+      0%, 100% {
+        box-shadow: 0 0 12px rgba(192,132,252,0.4), 0 0 22px rgba(217,70,239,0.14);
+        border-color: rgba(232, 121, 249, 0.45);
+        transform: translateY(0) scale(1);
+      }
+      50% {
+        box-shadow: 0 0 20px rgba(232,121,249,0.7), 0 0 36px rgba(236,72,153,0.3);
+        border-color: rgba(244, 114, 182, 0.75);
+        transform: translateY(-0.5px) scale(1.03);
+      }
     }
     .sa-badge svg {
       width: 11px;
@@ -1010,41 +1049,146 @@ function publicDashboardPage(): string {
       flex-shrink: 0;
       color: #e9d5ff;
       stroke: currentColor;
+      animation: saIconFlicker 2.6s ease-in-out infinite;
+      filter: drop-shadow(0 0 4px rgba(232,121,249,0.55));
+    }
+    @keyframes saIconFlicker {
+      0%, 100% { opacity: 0.85; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.12); }
     }
     .sa-badge .sa-dev {
-      background: linear-gradient(90deg, #d8b4fe, #f0abfc, #f9a8d4);
+      background: linear-gradient(90deg, #e9d5ff, #f0abfc, #f9a8d4, #e9d5ff);
+      background-size: 200% 100%;
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
+      animation: saNameShine 2.6s linear infinite;
+    }
+    .sa-badge .sa-sparkle {
+      position: absolute;
+      width: 3px; height: 3px;
+      border-radius: 50%;
+      background: #f0abfc;
+      pointer-events: none;
+      z-index: 1;
+    }
+    .sa-badge .sa-sparkle-1 {
+      top: -2px; right: 8px;
+      animation: saSparkle1 3s ease-in-out infinite;
+    }
+    .sa-badge .sa-sparkle-2 {
+      top: 0; left: 6px;
+      animation: saSparkle2 3.5s ease-in-out infinite 0.5s;
+    }
+    @keyframes saSparkle1 {
+      0%, 100% { opacity: 0; transform: translate(0, 0) scale(0); }
+      20% { opacity: 1; }
+      50% { opacity: 0.8; transform: translate(8px, -6px) scale(1); }
+      80% { opacity: 0; transform: translate(14px, -10px) scale(0.5); }
+    }
+    @keyframes saSparkle2 {
+      0%, 100% { opacity: 0; transform: translate(0, 0) scale(0); }
+      25% { opacity: 1; }
+      50% { opacity: 0.7; transform: translate(-7px, -5px) scale(1); }
+      75% { opacity: 0; transform: translate(-12px, -9px) scale(0.4); }
+    }
+    /* Row highlight for Super Admin rows in leaderboard table */
+    .sa-row-highlight {
+      position: relative;
+      background: linear-gradient(90deg,
+        rgba(168,85,247,0.08) 0%,
+        rgba(232,121,249,0.05) 50%,
+        rgba(236,72,153,0.08) 100%);
+      background-size: 200% 100%;
+      animation: saRowGlow 4s ease-in-out infinite;
+    }
+    .sa-row-highlight td {
+      background: inherit !important;
+    }
+    .sa-row-highlight td:first-child {
+      position: relative;
+    }
+    .sa-row-highlight td:first-child::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 3px;
+      background: linear-gradient(180deg, #c4b5fd, #e879f9, #f0abfc);
+      box-shadow: 0 0 8px rgba(232,121,249,0.5);
+      border-radius: 2px;
+    }
+    @keyframes saRowGlow {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
     }
 
-    /* Supporter / donatur badge — bright yellow */
+    /* Supporter / donatur badge — animated bright yellow */
     .sp-name {
-      font-weight: 700;
-      background: linear-gradient(90deg, #fef9c3 0%, #fde047 45%, #fbbf24 100%);
+      position: relative;
+      display: inline-block;
+      font-weight: 800;
+      background: linear-gradient(90deg, #fef9c3 0%, #fde047 30%, #fbbf24 55%, #f59e0b 78%, #fef9c3 100%);
+      background-size: 220% 100%;
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
-      text-shadow: 0 0 16px rgba(250,204,21,0.65);
-      filter: drop-shadow(0 0 10px rgba(250,204,21,0.55));
+      filter: drop-shadow(0 0 12px rgba(250,204,21,0.65));
+      animation: spNameShine 3s ease-in-out infinite;
+    }
+    @keyframes spNameShine {
+      0%, 100% {
+        background-position: 0% 50%;
+        filter: drop-shadow(0 0 10px rgba(250,204,21,0.5));
+      }
+      50% {
+        background-position: 100% 50%;
+        filter: drop-shadow(0 0 18px rgba(251,191,36,0.9));
+      }
     }
     .sp-badge {
+      position: relative;
+      overflow: hidden;
       display: inline-flex;
       align-items: center;
       gap: 0.28rem;
       margin-left: 0.4rem;
       vertical-align: middle;
-      padding: 0.12rem 0.45rem 0.12rem 0.32rem;
-      border-radius: 0.375rem;
+      padding: 0.14rem 0.5rem 0.14rem 0.34rem;
+      border-radius: 0.45rem;
       font-size: 0.62rem;
       font-weight: 800;
       letter-spacing: 0.08em;
       line-height: 1;
       color: #fef08a;
-      border: 1px solid rgba(250, 204, 21, 0.5);
-      background: linear-gradient(90deg, rgba(250,204,21,0.32), rgba(251,191,36,0.22), rgba(245,158,11,0.28));
-      box-shadow: 0 0 14px rgba(250,204,21,0.55);
+      border: 1px solid rgba(250, 204, 21, 0.62);
+      background:
+        radial-gradient(120% 160% at 20% 0%, rgba(253,224,71,0.35), transparent 55%),
+        linear-gradient(90deg, rgba(250,204,21,0.4), rgba(251,191,36,0.28), rgba(245,158,11,0.34));
+      box-shadow: 0 0 16px rgba(250,204,21,0.6), 0 0 30px rgba(245,158,11,0.22);
       white-space: nowrap;
+      animation: spBadgePulse 2.2s ease-in-out infinite;
+    }
+    .sp-badge::after {
+      content: '';
+      position: absolute;
+      top: 0; left: -130%;
+      width: 55%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
+      transform: skewX(-22deg);
+      pointer-events: none;
+      animation: roleShimmerSweep 2.5s ease-in-out infinite 0.4s;
+    }
+    @keyframes spBadgePulse {
+      0%, 100% {
+        box-shadow: 0 0 12px rgba(250,204,21,0.5), 0 0 22px rgba(245,158,11,0.18);
+        border-color: rgba(250, 204, 21, 0.55);
+        transform: translateY(0) scale(1);
+      }
+      50% {
+        box-shadow: 0 0 22px rgba(253,224,71,0.85), 0 0 38px rgba(251,191,36,0.35);
+        border-color: rgba(253, 224, 71, 0.9);
+        transform: translateY(-0.5px) scale(1.03);
+      }
     }
     .sp-badge svg {
       width: 11px;
@@ -1052,12 +1196,43 @@ function publicDashboardPage(): string {
       flex-shrink: 0;
       color: #fef08a;
       stroke: currentColor;
+      animation: spHeartBeat 1.4s ease-in-out infinite;
+      filter: drop-shadow(0 0 5px rgba(250,204,21,0.7));
+      transform-origin: center;
+    }
+    @keyframes spHeartBeat {
+      0%, 100% { transform: scale(1); }
+      14% { transform: scale(1.22); }
+      28% { transform: scale(1); }
+      42% { transform: scale(1.14); }
+      56% { transform: scale(1); }
     }
     .sp-badge .sp-label {
-      background: linear-gradient(90deg, #fef9c3, #fde047, #fbbf24);
+      background: linear-gradient(90deg, #fef9c3, #fde047, #fbbf24, #fef9c3);
+      background-size: 200% 100%;
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
+      animation: spNameShine 2.4s linear infinite;
+    }
+    @keyframes roleShimmerSweep {
+      0%, 20% { left: -130%; opacity: 0; }
+      35% { opacity: 1; }
+      55% { left: 140%; opacity: 0.9; }
+      100% { left: 140%; opacity: 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .sa-name, .sa-badge, .sa-badge::after, .sa-badge svg, .sa-badge .sa-dev,
+      .sa-badge .sa-sparkle, .sa-badge .sa-sparkle-1, .sa-badge .sa-sparkle-2,
+      .sa-row-highlight,
+      .sp-name, .sp-badge, .sp-badge::after, .sp-badge svg, .sp-badge .sp-label,
+      .sp-badge .sp-sparkle, .sp-badge .sp-sparkle-1, .sp-badge .sp-sparkle-2,
+      .sp-row-highlight,
+      .ul-name, .ul-badge, .ul-badge::after, .ul-badge svg, .ul-badge .ul-label,
+      .ul-badge .ul-sparkle, .ul-badge .ul-sparkle-1, .ul-badge .ul-sparkle-2,
+      .ul-row-highlight {
+        animation: none !important;
+      }
     }
 
     /* Helper / Builder badge — emerald */
@@ -1141,9 +1316,161 @@ function publicDashboardPage(): string {
     }
     .ul-badge .ul-label {
       background: linear-gradient(90deg, #bae6fd, #22d3ee, #60a5fa);
+      background-size: 200% 100%;
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
+      animation: ulNameShine 2.8s linear infinite;
+    }
+    @keyframes ulNameShine {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+    /* Ultra animated name — gradient flow */
+    .ul-name {
+      font-weight: 700;
+      background: linear-gradient(90deg, #bae6fd 0%, #22d3ee 45%, #60a5fa 100%);
+      background-size: 220% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      filter: drop-shadow(0 0 10px rgba(34,211,238,0.45));
+      animation: ulNameShine 2.8s ease-in-out infinite;
+    }
+    /* Ultra shimmer sweep */
+    .ul-badge::after {
+      content: '';
+      position: absolute;
+      top: 0; left: -130%;
+      width: 55%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.42), transparent);
+      transform: skewX(-22deg);
+      pointer-events: none;
+      animation: ulShimmerSweep 2.8s ease-in-out infinite;
+    }
+    @keyframes ulShimmerSweep {
+      0%, 20% { left: -130%; opacity: 0; }
+      35% { opacity: 1; }
+      55% { left: 140%; opacity: 0.9; }
+      100% { left: 140%; opacity: 0; }
+    }
+    .ul-badge { position: relative; overflow: hidden; }
+    /* Ultra icon flicker */
+    .ul-badge svg {
+      animation: ulIconFlicker 2.6s ease-in-out infinite;
+    }
+    @keyframes ulIconFlicker {
+      0%, 100% { opacity: 0.85; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.15); }
+    }
+    /* Ultra sparkles */
+    .ul-badge .ul-sparkle {
+      position: absolute;
+      width: 3px; height: 3px;
+      border-radius: 50%;
+      background: #22d3ee;
+      pointer-events: none;
+      z-index: 1;
+    }
+    .ul-badge .ul-sparkle-1 {
+      top: -2px; right: 8px;
+      animation: ulSparkle1 3s ease-in-out infinite;
+    }
+    .ul-badge .ul-sparkle-2 {
+      top: 0; left: 6px;
+      animation: ulSparkle2 3.5s ease-in-out infinite 0.5s;
+    }
+    @keyframes ulSparkle1 {
+      0%, 100% { opacity: 0; transform: translate(0, 0) scale(0); }
+      20% { opacity: 1; }
+      50% { opacity: 0.8; transform: translate(8px, -6px) scale(1); }
+      80% { opacity: 0; transform: translate(14px, -10px) scale(0.5); }
+    }
+    @keyframes ulSparkle2 {
+      0%, 100% { opacity: 0; transform: translate(0, 0) scale(0); }
+      25% { opacity: 1; }
+      50% { opacity: 0.7; transform: translate(-7px, -5px) scale(1); }
+      75% { opacity: 0; transform: translate(-12px, -9px) scale(0.4); }
+    }
+    /* Supporter sparkles */
+    .sp-badge .sp-sparkle {
+      position: absolute;
+      width: 3px; height: 3px;
+      border-radius: 50%;
+      background: #fde047;
+      pointer-events: none;
+      z-index: 1;
+    }
+    .sp-badge .sp-sparkle-1 {
+      top: -2px; right: 8px;
+      animation: spSparkle1 3s ease-in-out infinite;
+    }
+    .sp-badge .sp-sparkle-2 {
+      top: 0; left: 6px;
+      animation: spSparkle2 3.5s ease-in-out infinite 0.5s;
+    }
+    @keyframes spSparkle1 {
+      0%, 100% { opacity: 0; transform: translate(0, 0) scale(0); }
+      20% { opacity: 1; }
+      50% { opacity: 0.8; transform: translate(7px, -6px) scale(1); }
+      80% { opacity: 0; transform: translate(13px, -10px) scale(0.5); }
+    }
+    @keyframes spSparkle2 {
+      0%, 100% { opacity: 0; transform: translate(0, 0) scale(0); }
+      25% { opacity: 1; }
+      50% { opacity: 0.7; transform: translate(-6px, -5px) scale(1); }
+      75% { opacity: 0; transform: translate(-11px, -9px) scale(0.4); }
+    }
+    .sp-badge { position: relative; overflow: hidden; }
+    /* Supporter row highlight */
+    .sp-row-highlight {
+      position: relative;
+      background: linear-gradient(90deg,
+        rgba(250,204,21,0.08) 0%,
+        rgba(251,191,36,0.05) 50%,
+        rgba(245,158,11,0.08) 100%);
+      background-size: 200% 100%;
+      animation: spRowGlow 4s ease-in-out infinite;
+    }
+    .sp-row-highlight td { background: inherit !important; }
+    .sp-row-highlight td:first-child { position: relative; }
+    .sp-row-highlight td:first-child::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 3px;
+      background: linear-gradient(180deg, #fef9c3, #fde047, #fbbf24);
+      box-shadow: 0 0 8px rgba(250,204,21,0.5);
+      border-radius: 2px;
+    }
+    @keyframes spRowGlow {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+    /* Ultra row highlight */
+    .ul-row-highlight {
+      position: relative;
+      background: linear-gradient(90deg,
+        rgba(14,165,233,0.08) 0%,
+        rgba(34,211,238,0.05) 50%,
+        rgba(59,130,246,0.08) 100%);
+      background-size: 200% 100%;
+      animation: ulRowGlow 4s ease-in-out infinite;
+    }
+    .ul-row-highlight td { background: inherit !important; }
+    .ul-row-highlight td:first-child { position: relative; }
+    .ul-row-highlight td:first-child::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 3px;
+      background: linear-gradient(180deg, #bae6fd, #22d3ee, #60a5fa);
+      box-shadow: 0 0 8px rgba(34,211,238,0.5);
+      border-radius: 2px;
+    }
+    @keyframes ulRowGlow {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
     }
     @keyframes ultraPulse {
       0%, 100% { box-shadow: 0 0 12px rgba(34,211,238,0.4), 0 0 22px rgba(14,165,233,0.12); }
@@ -1153,106 +1480,254 @@ function publicDashboardPage(): string {
       .ul-badge { animation: none !important; }
     }
 
-    /* === RANK === */
+    /* === RANK TOP 1–3 (enhanced glow / shimmer / entrance) === */
     .rank { font-weight: 800; color: #64748b; font-size: 0.9rem; }
     .rank-1, .rank-2, .rank-3 {
+      position: relative;
+      overflow: hidden;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-width: 1.75rem;
-      height: 1.75rem;
+      gap: 0.18rem;
+      min-width: 2.35rem;
+      height: 1.9rem;
+      padding: 0 0.42rem;
       border-radius: 999px;
-      font-weight: 800;
-      font-size: 0.85rem;
+      font-weight: 900;
+      font-size: 0.82rem;
       letter-spacing: -0.02em;
+      vertical-align: middle;
+    }
+    .rank-1::after, .rank-2::after, .rank-3::after {
+      content: '';
+      position: absolute;
+      top: 0; left: -120%;
+      width: 55%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.45), transparent);
+      transform: skewX(-22deg);
+      pointer-events: none;
+    }
+    .rank-1::after { animation: rankShimmerSweep 2.6s ease-in-out infinite; }
+    .rank-2::after { animation: rankShimmerSweep 3.1s ease-in-out infinite 0.35s; }
+    .rank-3::after { animation: rankShimmerSweep 3.4s ease-in-out infinite 0.7s; }
+    @keyframes rankShimmerSweep {
+      0%, 18% { left: -120%; opacity: 0; }
+      35% { opacity: 1; }
+      55% { left: 140%; opacity: 0.85; }
+      100% { left: 140%; opacity: 0; }
+    }
+    .rank-medal {
+      font-size: 0.78rem;
+      line-height: 1;
+      display: inline-block;
+      filter: drop-shadow(0 0 4px rgba(255,255,255,0.25));
+    }
+    .rank-1 .rank-medal { animation: rankMedalFloat 2.4s ease-in-out infinite; font-size: 0.9rem; }
+    .rank-2 .rank-medal { animation: rankMedalFloat 2.8s ease-in-out infinite 0.15s; }
+    .rank-3 .rank-medal { animation: rankMedalFloat 3s ease-in-out infinite 0.3s; }
+    @keyframes rankMedalFloat {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      50% { transform: translateY(-1.5px) rotate(-6deg); }
     }
     .rank-1 {
-      color: #fef3c7;
-      background: linear-gradient(135deg, rgba(251,191,36,0.28), rgba(245,158,11,0.12));
-      border: 1px solid rgba(251,191,36,0.35);
-      box-shadow: 0 0 0 0 rgba(251,191,36,0.35);
-      animation: rankGoldPulse 2.4s ease-in-out infinite;
+      color: #fff7c2;
+      background:
+        radial-gradient(120% 140% at 30% 20%, rgba(253,224,71,0.45), transparent 55%),
+        linear-gradient(135deg, rgba(251,191,36,0.42), rgba(245,158,11,0.18));
+      border: 1px solid rgba(252,211,77,0.55);
+      box-shadow: 0 0 0 0 rgba(251,191,36,0.35), 0 0 16px rgba(251,191,36,0.35);
+      text-shadow: 0 0 10px rgba(251,191,36,0.55);
+      animation: rankGoldPulse 2.2s ease-in-out infinite;
     }
     .rank-2 {
       color: #f8fafc;
-      background: linear-gradient(135deg, rgba(226,232,240,0.22), rgba(148,163,184,0.1));
-      border: 1px solid rgba(226,232,240,0.28);
-      animation: rankSilverShimmer 3s ease-in-out infinite;
+      background:
+        radial-gradient(120% 140% at 30% 20%, rgba(248,250,252,0.28), transparent 55%),
+        linear-gradient(135deg, rgba(226,232,240,0.32), rgba(148,163,184,0.14));
+      border: 1px solid rgba(226,232,240,0.45);
+      box-shadow: 0 0 14px rgba(226,232,240,0.18);
+      text-shadow: 0 0 8px rgba(248,250,252,0.35);
+      animation: rankSilverShimmer 2.8s ease-in-out infinite;
     }
     .rank-3 {
       color: #ffedd5;
-      background: linear-gradient(135deg, rgba(251,146,60,0.25), rgba(217,119,6,0.1));
-      border: 1px solid rgba(251,146,60,0.3);
-      animation: rankBronzeGlow 2.8s ease-in-out infinite;
+      background:
+        radial-gradient(120% 140% at 30% 20%, rgba(251,146,60,0.35), transparent 55%),
+        linear-gradient(135deg, rgba(251,146,60,0.34), rgba(180,83,9,0.16));
+      border: 1px solid rgba(251,146,60,0.48);
+      box-shadow: 0 0 14px rgba(251,146,60,0.22);
+      text-shadow: 0 0 8px rgba(251,146,60,0.4);
+      animation: rankBronzeGlow 2.6s ease-in-out infinite;
     }
     @keyframes rankGoldPulse {
       0%, 100% {
         transform: translateY(0) scale(1);
-        box-shadow: 0 0 0 0 rgba(251,191,36,0.0), 0 0 14px rgba(251,191,36,0.28);
-        text-shadow: 0 0 10px rgba(251,191,36,0.35);
+        box-shadow: 0 0 0 0 rgba(251,191,36,0.0), 0 0 14px rgba(251,191,36,0.32), 0 0 28px rgba(245,158,11,0.12);
+        text-shadow: 0 0 10px rgba(251,191,36,0.4);
       }
       50% {
-        transform: translateY(-1px) scale(1.05);
-        box-shadow: 0 0 0 5px rgba(251,191,36,0.08), 0 0 22px rgba(251,191,36,0.45);
-        text-shadow: 0 0 16px rgba(251,191,36,0.55);
+        transform: translateY(-1px) scale(1.08);
+        box-shadow: 0 0 0 6px rgba(251,191,36,0.1), 0 0 26px rgba(251,191,36,0.55), 0 0 40px rgba(245,158,11,0.22);
+        text-shadow: 0 0 18px rgba(253,224,71,0.75);
       }
     }
     @keyframes rankSilverShimmer {
       0%, 100% {
-        transform: translateY(0);
-        box-shadow: 0 0 10px rgba(226,232,240,0.12);
+        transform: translateY(0) scale(1);
+        box-shadow: 0 0 10px rgba(226,232,240,0.16), 0 0 20px rgba(148,163,184,0.08);
         filter: brightness(1);
       }
       50% {
-        transform: translateY(-1px);
-        box-shadow: 0 0 16px rgba(226,232,240,0.28);
-        filter: brightness(1.08);
+        transform: translateY(-1px) scale(1.05);
+        box-shadow: 0 0 18px rgba(248,250,252,0.35), 0 0 28px rgba(148,163,184,0.16);
+        filter: brightness(1.12);
       }
     }
     @keyframes rankBronzeGlow {
       0%, 100% {
-        transform: translateY(0);
-        box-shadow: 0 0 10px rgba(251,146,60,0.14);
+        transform: translateY(0) scale(1);
+        box-shadow: 0 0 10px rgba(251,146,60,0.18), 0 0 20px rgba(180,83,9,0.08);
       }
       50% {
-        transform: translateY(-1px);
-        box-shadow: 0 0 18px rgba(251,146,60,0.32);
+        transform: translateY(-1px) scale(1.05);
+        box-shadow: 0 0 20px rgba(251,146,60,0.42), 0 0 32px rgba(180,83,9,0.18);
       }
     }
     tr.top-row td {
+      position: relative;
       background: transparent;
-      transition: background 0.25s ease;
+      transition: background 0.25s ease, filter 0.25s ease;
     }
-    tr.top-1 td {
-      background: linear-gradient(90deg, rgba(251,191,36,0.10), rgba(251,191,36,0.02) 55%, transparent);
-      animation: topRowGold 3.2s ease-in-out infinite;
+    tr.top-1 {
+      animation: topRowEnter 0.55s ease-out both;
     }
-    tr.top-2 td {
-      background: linear-gradient(90deg, rgba(226,232,240,0.08), rgba(226,232,240,0.015) 55%, transparent);
-      animation: topRowSilver 3.6s ease-in-out infinite;
+    tr.top-2 {
+      animation: topRowEnter 0.55s ease-out 0.08s both;
     }
-    tr.top-3 td {
-      background: linear-gradient(90deg, rgba(251,146,60,0.09), rgba(251,146,60,0.015) 55%, transparent);
-      animation: topRowBronze 3.4s ease-in-out infinite;
+    tr.top-3 {
+      animation: topRowEnter 0.55s ease-out 0.16s both;
     }
-    tr.top-1:hover td { background: linear-gradient(90deg, rgba(251,191,36,0.16), rgba(251,191,36,0.04) 60%, transparent); }
-    tr.top-2:hover td { background: linear-gradient(90deg, rgba(226,232,240,0.12), rgba(226,232,240,0.03) 60%, transparent); }
-    tr.top-3:hover td { background: linear-gradient(90deg, rgba(251,146,60,0.14), rgba(251,146,60,0.03) 60%, transparent); }
+    @keyframes topRowEnter {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    tr.top-1 td:not(.rank) {
+      background:
+        linear-gradient(90deg, rgba(251,191,36,0.16), rgba(251,191,36,0.05) 42%, rgba(251,191,36,0.015) 70%, transparent);
+      animation: topRowGold 2.8s ease-in-out infinite;
+    }
+    tr.top-2 td:not(.rank) {
+      background:
+        linear-gradient(90deg, rgba(226,232,240,0.12), rgba(226,232,240,0.04) 42%, rgba(226,232,240,0.01) 70%, transparent);
+      animation: topRowSilver 3.2s ease-in-out infinite;
+    }
+    tr.top-3 td:not(.rank) {
+      background:
+        linear-gradient(90deg, rgba(251,146,60,0.13), rgba(251,146,60,0.04) 42%, rgba(251,146,60,0.01) 70%, transparent);
+      animation: topRowBronze 3s ease-in-out infinite;
+    }
+    /* Rank cell keeps own badge animation; still tint the cell softly */
+    tr.top-1 td.rank {
+      background: linear-gradient(90deg, rgba(251,191,36,0.16), rgba(251,191,36,0.04) 80%, transparent);
+    }
+    tr.top-2 td.rank {
+      background: linear-gradient(90deg, rgba(226,232,240,0.12), rgba(226,232,240,0.03) 80%, transparent);
+    }
+    tr.top-3 td.rank {
+      background: linear-gradient(90deg, rgba(251,146,60,0.13), rgba(251,146,60,0.03) 80%, transparent);
+    }
+    tr.top-1 td.rank-1 { animation: rankGoldPulse 2.2s ease-in-out infinite; }
+    tr.top-2 td.rank-2 { animation: rankSilverShimmer 2.8s ease-in-out infinite; }
+    tr.top-3 td.rank-3 { animation: rankBronzeGlow 2.6s ease-in-out infinite; }
+    tr.top-1 td:first-child::before,
+    tr.top-2 td:first-child::before,
+    tr.top-3 td:first-child::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 8%; bottom: 8%;
+      width: 3px;
+      border-radius: 999px;
+      pointer-events: none;
+    }
+    tr.top-1 td:first-child::before {
+      background: linear-gradient(180deg, #fde68a, #f59e0b, #fde68a);
+      box-shadow: 0 0 12px rgba(251,191,36,0.65);
+      animation: topEdgePulseGold 2.2s ease-in-out infinite;
+    }
+    tr.top-2 td:first-child::before {
+      background: linear-gradient(180deg, #f8fafc, #94a3b8, #f8fafc);
+      box-shadow: 0 0 10px rgba(226,232,240,0.45);
+      animation: topEdgePulseSilver 2.6s ease-in-out infinite;
+    }
+    tr.top-3 td:first-child::before {
+      background: linear-gradient(180deg, #fdba74, #c2410c, #fdba74);
+      box-shadow: 0 0 10px rgba(251,146,60,0.5);
+      animation: topEdgePulseBronze 2.4s ease-in-out infinite;
+    }
+    @keyframes topEdgePulseGold {
+      0%, 100% { opacity: 0.7; box-shadow: 0 0 8px rgba(251,191,36,0.4); }
+      50% { opacity: 1; box-shadow: 0 0 16px rgba(251,191,36,0.85); }
+    }
+    @keyframes topEdgePulseSilver {
+      0%, 100% { opacity: 0.65; box-shadow: 0 0 6px rgba(226,232,240,0.3); }
+      50% { opacity: 1; box-shadow: 0 0 14px rgba(248,250,252,0.65); }
+    }
+    @keyframes topEdgePulseBronze {
+      0%, 100% { opacity: 0.65; box-shadow: 0 0 6px rgba(251,146,60,0.3); }
+      50% { opacity: 1; box-shadow: 0 0 14px rgba(251,146,60,0.7); }
+    }
+    tr.top-1:hover td:not(.rank) {
+      background: linear-gradient(90deg, rgba(251,191,36,0.22), rgba(251,191,36,0.07) 50%, transparent);
+      filter: brightness(1.05);
+    }
+    tr.top-2:hover td:not(.rank) {
+      background: linear-gradient(90deg, rgba(226,232,240,0.18), rgba(226,232,240,0.05) 50%, transparent);
+      filter: brightness(1.04);
+    }
+    tr.top-3:hover td:not(.rank) {
+      background: linear-gradient(90deg, rgba(251,146,60,0.18), rgba(251,146,60,0.05) 50%, transparent);
+      filter: brightness(1.04);
+    }
     @keyframes topRowGold {
-      0%, 100% { box-shadow: inset 3px 0 0 rgba(251,191,36,0.35); }
-      50% { box-shadow: inset 3px 0 0 rgba(251,191,36,0.75); }
+      0%, 100% {
+        box-shadow: inset 0 0 0 rgba(251,191,36,0);
+        filter: brightness(1);
+      }
+      50% {
+        box-shadow: inset 0 0 24px rgba(251,191,36,0.06);
+        filter: brightness(1.04);
+      }
     }
     @keyframes topRowSilver {
-      0%, 100% { box-shadow: inset 3px 0 0 rgba(226,232,240,0.25); }
-      50% { box-shadow: inset 3px 0 0 rgba(226,232,240,0.55); }
+      0%, 100% {
+        box-shadow: inset 0 0 0 rgba(226,232,240,0);
+        filter: brightness(1);
+      }
+      50% {
+        box-shadow: inset 0 0 20px rgba(226,232,240,0.05);
+        filter: brightness(1.03);
+      }
     }
     @keyframes topRowBronze {
-      0%, 100% { box-shadow: inset 3px 0 0 rgba(251,146,60,0.28); }
-      50% { box-shadow: inset 3px 0 0 rgba(251,146,60,0.6); }
+      0%, 100% {
+        box-shadow: inset 0 0 0 rgba(251,146,60,0);
+        filter: brightness(1);
+      }
+      50% {
+        box-shadow: inset 0 0 20px rgba(251,146,60,0.05);
+        filter: brightness(1.03);
+      }
     }
     @media (prefers-reduced-motion: reduce) {
       .rank-1, .rank-2, .rank-3,
-      tr.top-1 td, tr.top-2 td, tr.top-3 td {
+      .rank-1::after, .rank-2::after, .rank-3::after,
+      .rank-1 .rank-medal, .rank-2 .rank-medal, .rank-3 .rank-medal,
+      tr.top-1, tr.top-2, tr.top-3,
+      tr.top-1 td, tr.top-2 td, tr.top-3 td,
+      tr.top-1 td.rank-1, tr.top-2 td.rank-2, tr.top-3 td.rank-3,
+      tr.top-1 td:first-child::before,
+      tr.top-2 td:first-child::before,
+      tr.top-3 td:first-child::before {
         animation: none !important;
       }
     }
@@ -1312,6 +1787,19 @@ function publicDashboardPage(): string {
     }
     .chart-legend-item { display: flex; align-items: center; gap: 0.45rem; font-weight: 600; }
     .chart-dot { width: 10px; height: 10px; border-radius: 50%; box-shadow: 0 0 10px currentColor; }
+
+    /* === STATS 24H TABLE === */
+    .stats-table-wrap { overflow-x: auto; border-radius: 14px; border: 1px solid rgba(148,163,184,0.12); background: rgba(15,23,42,0.35); }
+    .stats-table { width: 100%; border-collapse: collapse; }
+    .stats-table th { padding: 0.7rem 0.85rem; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; font-weight: 600; border-bottom: 1px solid rgba(148,163,184,0.12); white-space: nowrap; }
+    .stats-table td { padding: 0.7rem 0.85rem; border-bottom: 1px solid rgba(148,163,184,0.06); vertical-align: top; }
+    .stats-table tr:last-child td { border-bottom: none; }
+    .stats-table tr:hover td { background: rgba(148,163,184,0.04); }
+    .stats-num { font-variant-numeric: tabular-nums; font-weight: 600; color: #e2e8f0; white-space: nowrap; }
+    .stats-num.sub { color: #64748b; font-weight: 400; font-size: 0.85rem; }
+    .stats-model-cell { min-width: 180px; }
+    .stats-bar-track { height: 4px; border-radius: 2px; background: rgba(148,163,184,0.08); margin-top: 0.4rem; overflow: hidden; }
+    .stats-bar-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, #3b82f6, #818cf8); transition: width 0.6s ease-out; }
 
     /* === LOADING & EMPTY === */
     .loading { text-align: center; padding: 3rem; color: #94a3b8; font-size: 0.95rem; }
@@ -1391,71 +1879,234 @@ function publicDashboardPage(): string {
       0%, 100% { transform: scale(1); opacity: 0.85; }
       50% { transform: scale(1.25); opacity: 1; }
     }
-    @media (prefers-reduced-motion: reduce) {
-      .model-tag.claude, .model-tag.claude::after, .model-tag.claude .claude-spark { animation: none; }
-    }
 
-    /* === PODIUM TOP 3 === */
-    .podium {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 0.85rem;
-      align-items: end;
-      margin-bottom: 1.4rem;
-    }
-    .podium-card {
+    /* === KIMI MODEL TAG (cyan glow pulse + shimmer sweep) === */
+    .model-tag.kimi {
       position: relative;
       overflow: hidden;
-      text-align: center;
-      border-radius: 18px;
-      padding: 1.15rem 0.85rem 1rem;
-      background: linear-gradient(180deg, rgba(30,41,59,0.85), rgba(15,23,42,0.7));
-      border: 1px solid rgba(148,163,184,0.16);
-      animation: podiumRise 0.55s ease-out both;
+      color: #22d3ee;
+      border-color: rgba(34,211,238,0.45);
+      background: linear-gradient(135deg, rgba(8,51,68,0.35), rgba(15,23,42,0.7));
+      animation: kimiGlow 2.4s ease-in-out infinite;
     }
-    .podium-card.p-1 { order: 2; padding-top: 1.6rem; padding-bottom: 1.35rem; animation-delay: 0.05s; }
-    .podium-card.p-2 { order: 1; animation-delay: 0.15s; }
-    .podium-card.p-3 { order: 3; animation-delay: 0.25s; }
-    @keyframes podiumRise {
-      from { opacity: 0; transform: translateY(18px); }
-      to { opacity: 1; transform: translateY(0); }
+    .model-tag.kimi::after {
+      content: '';
+      position: absolute;
+      top: 0; left: -150%;
+      width: 60%; height: 100%;
+      background: linear-gradient(105deg, transparent, rgba(165,243,252,0.32), transparent);
+      animation: kimiShimmer 2.8s ease-in-out infinite;
+      pointer-events: none;
     }
-    .podium-card.p-1 {
-      border-color: rgba(250,204,21,0.45);
-      background:
-        radial-gradient(130% 100% at 50% 0%, rgba(250,204,21,0.16), transparent 60%),
-        linear-gradient(180deg, rgba(30,41,59,0.9), rgba(15,23,42,0.72));
-      box-shadow: 0 0 24px rgba(250,204,21,0.12);
-    }
-    .podium-card.p-2 {
-      border-color: rgba(203,213,225,0.38);
-      background:
-        radial-gradient(130% 100% at 50% 0%, rgba(203,213,225,0.12), transparent 60%),
-        linear-gradient(180deg, rgba(30,41,59,0.88), rgba(15,23,42,0.7));
-    }
-    .podium-card.p-3 {
-      border-color: rgba(217,119,6,0.4);
-      background:
-        radial-gradient(130% 100% at 50% 0%, rgba(217,119,6,0.14), transparent 60%),
-        linear-gradient(180deg, rgba(30,41,59,0.88), rgba(15,23,42,0.7));
-    }
-    .podium-medal {
-      font-size: 1.5rem; line-height: 1; margin-bottom: 0.4rem;
+    .model-tag.kimi .kimi-spark {
+      color: #67e8f9;
+      margin-right: 0.3rem;
       display: inline-block;
+      animation: kimiSpark 2.4s ease-in-out infinite;
     }
-    .podium-card.p-1 .podium-medal { font-size: 1.9rem; animation: crownFloat 2.6s ease-in-out infinite; }
-    @keyframes crownFloat {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-4px); }
+    .model-tag.kimi:hover {
+      border-color: rgba(34,211,238,0.75);
+      background: linear-gradient(135deg, rgba(14,74,102,0.45), rgba(15,23,42,0.7));
+      color: #a5f3fc;
+      transform: translateY(-1px);
     }
-    .podium-name { font-weight: 800; font-size: 0.92rem; margin-bottom: 0.35rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .podium-stat { font-size: 0.78rem; color: #94a3b8; font-variant-numeric: tabular-nums; }
-    .podium-stat strong { color: #e2e8f0; font-weight: 800; }
-    @media (max-width: 640px) {
-      .podium { grid-template-columns: 1fr; align-items: stretch; }
-      .podium-card.p-1 { order: 1; }
-      .podium-card.p-2 { order: 2; }
-      .podium-card.p-3 { order: 3; }
+    @keyframes kimiGlow {
+      0%, 100% { box-shadow: 0 0 6px rgba(34,211,238,0.22), 0 4px 12px rgba(0,0,0,0.12); }
+      50% { box-shadow: 0 0 16px rgba(34,211,238,0.55), 0 0 30px rgba(34,211,238,0.18), 0 4px 12px rgba(0,0,0,0.12); }
+    }
+    @keyframes kimiShimmer {
+      0% { left: -150%; }
+      55% { left: 150%; }
+      100% { left: 150%; }
+    }
+    @keyframes kimiSpark {
+      0%, 100% { transform: scale(1); opacity: 0.85; }
+      50% { transform: scale(1.25); opacity: 1; }
+    }
+
+    /* === QWEN MODEL TAG (violet glow pulse + shimmer sweep) === */
+    .model-tag.qwen {
+      position: relative;
+      overflow: hidden;
+      color: #a78bfa;
+      border-color: rgba(167,139,250,0.45);
+      background: linear-gradient(135deg, rgba(76,29,149,0.35), rgba(15,23,42,0.7));
+      animation: qwenGlow 2.4s ease-in-out infinite;
+    }
+    .model-tag.qwen::after {
+      content: '';
+      position: absolute;
+      top: 0; left: -150%;
+      width: 60%; height: 100%;
+      background: linear-gradient(105deg, transparent, rgba(221,214,254,0.32), transparent);
+      animation: qwenShimmer 2.8s ease-in-out infinite;
+      pointer-events: none;
+    }
+    .model-tag.qwen .qwen-spark {
+      color: #c4b5fd;
+      margin-right: 0.3rem;
+      display: inline-block;
+      animation: qwenSpark 2.4s ease-in-out infinite;
+    }
+    .model-tag.qwen:hover {
+      border-color: rgba(167,139,250,0.75);
+      background: linear-gradient(135deg, rgba(91,33,182,0.45), rgba(15,23,42,0.7));
+      color: #ddd6fe;
+      transform: translateY(-1px);
+    }
+    @keyframes qwenGlow {
+      0%, 100% { box-shadow: 0 0 6px rgba(167,139,250,0.22), 0 4px 12px rgba(0,0,0,0.12); }
+      50% { box-shadow: 0 0 16px rgba(167,139,250,0.55), 0 0 30px rgba(167,139,250,0.18), 0 4px 12px rgba(0,0,0,0.12); }
+    }
+    @keyframes qwenShimmer {
+      0% { left: -150%; }
+      55% { left: 150%; }
+      100% { left: 150%; }
+    }
+    @keyframes qwenSpark {
+      0%, 100% { transform: scale(1); opacity: 0.85; }
+      50% { transform: scale(1.25); opacity: 1; }
+    }
+
+    /* === GROK MODEL TAG (metallic silver glow pulse + shimmer sweep) === */
+    .model-tag.grok {
+      position: relative;
+      overflow: hidden;
+      color: #f8fafc;
+      border-color: rgba(148,163,184,0.50);
+      background: linear-gradient(135deg, rgba(100,116,139,0.30), rgba(51,65,85,0.45), rgba(15,23,42,0.7));
+      animation: grokGlow 2.4s ease-in-out infinite;
+    }
+    .model-tag.grok::after {
+      content: '';
+      position: absolute;
+      top: 0; left: -150%;
+      width: 60%; height: 100%;
+      background: linear-gradient(105deg, transparent, rgba(248,250,252,0.40), transparent);
+      animation: grokShimmer 2.8s ease-in-out infinite;
+      pointer-events: none;
+    }
+    .model-tag.grok .grok-spark {
+      color: #e2e8f0;
+      margin-right: 0.3rem;
+      display: inline-block;
+      animation: grokSpark 2.4s ease-in-out infinite;
+    }
+    .model-tag.grok:hover {
+      border-color: rgba(203,213,225,0.80);
+      background: linear-gradient(135deg, rgba(148,163,184,0.40), rgba(71,85,105,0.50), rgba(15,23,42,0.7));
+      color: #ffffff;
+      transform: translateY(-1px);
+    }
+    @keyframes grokGlow {
+      0%, 100% { box-shadow: 0 0 6px rgba(203,213,225,0.28), 0 4px 12px rgba(0,0,0,0.12); }
+      50% { box-shadow: 0 0 18px rgba(203,213,225,0.60), 0 0 34px rgba(148,163,184,0.22), 0 4px 12px rgba(0,0,0,0.12); }
+    }
+    @keyframes grokShimmer {
+      0% { left: -150%; }
+      55% { left: 150%; }
+      100% { left: 150%; }
+    }
+    @keyframes grokSpark {
+      0%, 100% { transform: scale(1); opacity: 0.85; }
+      50% { transform: scale(1.25); opacity: 1; }
+    }
+
+    /* === GLM MODEL TAG (rose/pink glow pulse + shimmer sweep) === */
+    .model-tag.glm {
+      position: relative;
+      overflow: hidden;
+      color: #fb7185;
+      border-color: rgba(244,63,94,0.45);
+      background: linear-gradient(135deg, rgba(76,5,45,0.35), rgba(15,23,42,0.7));
+      animation: glmGlow 2.4s ease-in-out infinite;
+    }
+    .model-tag.glm::after {
+      content: '';
+      position: absolute;
+      top: 0; left: -150%;
+      width: 60%; height: 100%;
+      background: linear-gradient(105deg, transparent, rgba(251,207,232,0.32), transparent);
+      animation: glmShimmer 2.8s ease-in-out infinite;
+      pointer-events: none;
+    }
+    .model-tag.glm .glm-spark {
+      color: #fda4af;
+      margin-right: 0.3rem;
+      display: inline-block;
+      animation: glmSpark 2.4s ease-in-out infinite;
+    }
+    .model-tag.glm:hover {
+      border-color: rgba(244,63,94,0.75);
+      background: linear-gradient(135deg, rgba(76,5,45,0.5), rgba(15,23,42,0.7));
+      color: #fecdd3;
+      transform: translateY(-1px);
+    }
+    @keyframes glmGlow {
+      0%, 100% { box-shadow: 0 0 6px rgba(244,63,94,0.22), 0 4px 12px rgba(0,0,0,0.12); }
+      50% { box-shadow: 0 0 16px rgba(244,63,94,0.55), 0 0 30px rgba(244,63,94,0.18), 0 4px 12px rgba(0,0,0,0.12); }
+    }
+    @keyframes glmShimmer {
+      0% { left: -150%; }
+      55% { left: 150%; }
+      100% { left: 150%; }
+    }
+    @keyframes glmSpark {
+      0%, 100% { transform: scale(1); opacity: 0.85; }
+      50% { transform: scale(1.25); opacity: 1; }
+    }
+
+    /* === DEEPSEEK MODEL TAG (deep indigo glow pulse + shimmer sweep) === */
+    .model-tag.deepseek {
+      position: relative;
+      overflow: hidden;
+      color: #818cf8;
+      border-color: rgba(79,70,229,0.45);
+      background: linear-gradient(135deg, rgba(30,27,75,0.35), rgba(15,23,42,0.7));
+      animation: deepseekGlow 2.4s ease-in-out infinite;
+    }
+    .model-tag.deepseek::after {
+      content: '';
+      position: absolute;
+      top: 0; left: -150%;
+      width: 60%; height: 100%;
+      background: linear-gradient(105deg, transparent, rgba(199,210,254,0.32), transparent);
+      animation: deepseekShimmer 2.8s ease-in-out infinite;
+      pointer-events: none;
+    }
+    .model-tag.deepseek .deepseek-spark {
+      color: #a5b4fc;
+      margin-right: 0.3rem;
+      display: inline-block;
+      animation: deepseekSpark 2.4s ease-in-out infinite;
+    }
+    .model-tag.deepseek:hover {
+      border-color: rgba(79,70,229,0.75);
+      background: linear-gradient(135deg, rgba(30,27,75,0.5), rgba(15,23,42,0.7));
+      color: #c7d2fe;
+      transform: translateY(-1px);
+    }
+    @keyframes deepseekGlow {
+      0%, 100% { box-shadow: 0 0 6px rgba(79,70,229,0.22), 0 4px 12px rgba(0,0,0,0.12); }
+      50% { box-shadow: 0 0 16px rgba(79,70,229,0.55), 0 0 30px rgba(79,70,229,0.18), 0 4px 12px rgba(0,0,0,0.12); }
+    }
+    @keyframes deepseekShimmer {
+      0% { left: -150%; }
+      55% { left: 150%; }
+      100% { left: 150%; }
+    }
+    @keyframes deepseekSpark {
+      0%, 100% { transform: scale(1); opacity: 0.85; }
+      50% { transform: scale(1.25); opacity: 1; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .model-tag.claude, .model-tag.claude::after, .model-tag.claude .claude-spark,
+      .model-tag.kimi, .model-tag.kimi::after, .model-tag.kimi .kimi-spark,
+      .model-tag.qwen, .model-tag.qwen::after, .model-tag.qwen .qwen-spark,
+      .model-tag.grok, .model-tag.grok::after, .model-tag.grok .grok-spark,
+      .model-tag.glm, .model-tag.glm::after, .model-tag.glm .glm-spark,
+      .model-tag.deepseek, .model-tag.deepseek::after, .model-tag.deepseek .deepseek-spark { animation: none; }
     }
 
     /* === ZEBRA + ROW HOVER === */
@@ -1528,9 +2179,139 @@ function publicDashboardPage(): string {
       border: 1px solid rgba(251,191,36,0.35);
       padding: 0.22rem 0.55rem; border-radius: 999px;
     }
+    .model-card.kimi-card {
+      border-color: rgba(34,211,238,0.45);
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(34,211,238,0.16), transparent 55%),
+        linear-gradient(180deg, rgba(30,41,59,0.75), rgba(15,23,42,0.6));
+      animation: kimiGlow 2.8s ease-in-out infinite;
+    }
+    .model-card.kimi-card:hover { border-color: rgba(34,211,238,0.7); }
+    .kimi-badge {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      font-size: 0.68rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase;
+      color: #67e8f9; background: rgba(34,211,238,0.14);
+      border: 1px solid rgba(34,211,238,0.35);
+      padding: 0.22rem 0.55rem; border-radius: 999px;
+    }
+    .model-card.qwen-card {
+      border-color: rgba(167,139,250,0.45);
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(167,139,250,0.16), transparent 55%),
+        linear-gradient(180deg, rgba(30,41,59,0.75), rgba(15,23,42,0.6));
+      animation: qwenGlow 2.8s ease-in-out infinite;
+    }
+    .model-card.qwen-card:hover { border-color: rgba(167,139,250,0.7); }
+    .qwen-badge {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      font-size: 0.68rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase;
+      color: #c4b5fd; background: rgba(167,139,250,0.14);
+      border: 1px solid rgba(167,139,250,0.35);
+      padding: 0.22rem 0.55rem; border-radius: 999px;
+    }
+    .model-card.grok-card {
+      border-color: rgba(148,163,184,0.50);
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(203,213,225,0.18), transparent 55%),
+        radial-gradient(100% 80% at 0% 100%, rgba(100,116,139,0.10), transparent 50%),
+        linear-gradient(180deg, rgba(30,41,59,0.75), rgba(15,23,42,0.6));
+      animation: grokGlow 2.8s ease-in-out infinite;
+    }
+    .model-card.grok-card:hover { border-color: rgba(203,213,225,0.75); }
+    .grok-badge {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      font-size: 0.68rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase;
+      color: #f1f5f9; background: rgba(148,163,184,0.16);
+      border: 1px solid rgba(148,163,184,0.40);
+      padding: 0.22rem 0.55rem; border-radius: 999px;
+    }
+    /* Grok unlimited card: override .free sky-blue with metallic silver */
+    .model-card.free.grok-card {
+      border-color: rgba(148,163,184,0.50) !important;
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(203,213,225,0.18), transparent 55%),
+        radial-gradient(100% 80% at 0% 100%, rgba(100,116,139,0.10), transparent 50%),
+        linear-gradient(180deg, rgba(30,41,59,0.75), rgba(15,23,42,0.6)) !important;
+      box-shadow: 0 0 0 1px rgba(148,163,184,0.12), 0 12px 32px rgba(148,163,184,0.12);
+      animation: grokGlow 2.8s ease-in-out infinite !important;
+    }
+    .model-card.free.grok-card:hover {
+      border-color: rgba(203,213,225,0.75) !important;
+      box-shadow: 0 0 0 1px rgba(148,163,184,0.28), 0 16px 40px rgba(148,163,184,0.22);
+    }
+    /* === GLM CARD (rose/pink — unique dual-tone + card shimmer) === */
+    .model-card.glm-card {
+      border-color: rgba(244,63,94,0.50);
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(251,113,133,0.20), transparent 55%),
+        radial-gradient(100% 80% at 0% 100%, rgba(168,85,247,0.14), transparent 50%),
+        linear-gradient(180deg, rgba(30,20,40,0.82), rgba(15,23,42,0.6));
+      animation: glmGlow 2.8s ease-in-out infinite;
+      position: relative;
+      overflow: hidden;
+    }
+    .model-card.glm-card::after {
+      content: '';
+      position: absolute;
+      top: 0; left: -150%;
+      width: 60%; height: 100%;
+      background: linear-gradient(105deg, transparent, rgba(251,207,232,0.25), transparent);
+      animation: glmCardShimmer 3.5s ease-in-out infinite;
+      pointer-events: none;
+    }
+    .model-card.glm-card:hover {
+      border-color: rgba(244,63,94,0.8);
+      transform: translateY(-2px);
+    }
+    .glm-badge {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      font-size: 0.68rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase;
+      color: #fda4af; background: rgba(244,63,94,0.14);
+      border: 1px solid rgba(244,63,94,0.35);
+      padding: 0.22rem 0.55rem; border-radius: 999px;
+    }
+    @keyframes glmCardShimmer {
+      0% { left: -150%; }
+      55% { left: 150%; }
+      100% { left: 150%; }
+    }
+    /* === DEEPSEEK CARD (deep indigo) === */
+    .model-card.deepseek-card {
+      border-color: rgba(79,70,229,0.50);
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(99,102,241,0.20), transparent 55%),
+        radial-gradient(100% 80% at 0% 100%, rgba(67,56,202,0.14), transparent 50%),
+        linear-gradient(180deg, rgba(15,12,50,0.82), rgba(15,23,42,0.6));
+      animation: deepseekGlow 2.8s ease-in-out infinite;
+    }
+    .model-card.deepseek-card:hover {
+      border-color: rgba(79,70,229,0.8);
+      transform: translateY(-2px);
+    }
+    .deepseek-badge {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      font-size: 0.68rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase;
+      color: #a5b4fc; background: rgba(79,70,229,0.14);
+      border: 1px solid rgba(79,70,229,0.35);
+      padding: 0.22rem 0.55rem; border-radius: 999px;
+    }
+    /* DeepSeek unlimited card: override .free with deepseek indigo */
+    .model-card.free.deepseek-card {
+      border-color: rgba(79,70,229,0.50) !important;
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(99,102,241,0.20), transparent 55%),
+        radial-gradient(100% 80% at 0% 100%, rgba(67,56,202,0.14), transparent 50%),
+        linear-gradient(180deg, rgba(15,12,50,0.82), rgba(15,23,42,0.6)) !important;
+      box-shadow: 0 0 0 1px rgba(79,70,229,0.12), 0 12px 32px rgba(79,70,229,0.12);
+      animation: deepseekGlow 2.8s ease-in-out infinite !important;
+    }
+    .model-card.free.deepseek-card:hover {
+      border-color: rgba(79,70,229,0.8) !important;
+      box-shadow: 0 0 0 1px rgba(79,70,229,0.28), 0 16px 40px rgba(79,70,229,0.22);
+    }
     @media (prefers-reduced-motion: reduce) {
-      .podium-card, .podium-card.p-1 .podium-medal, tr.row-new td, tr.row-enter,
-      .chart-line-anim, .chart-fade-in, .model-card.claude-card { animation: none !important; }
+      tr.row-new td, tr.row-enter,
+      .chart-line-anim, .chart-fade-in, .model-card.claude-card, .model-card.kimi-card, .model-card.qwen-card, .model-card.grok-card, .model-card.glm-card, .model-card.glm-card::after, .model-card.deepseek-card { animation: none !important; }
       .chart-line-anim { stroke-dashoffset: 0; }
     }
 
@@ -1568,6 +2349,20 @@ function publicDashboardPage(): string {
       border-color: rgba(125,211,252,0.7);
       box-shadow: 0 0 0 1px rgba(56,189,248,0.28), 0 16px 40px rgba(14,165,233,0.22);
     }
+    /* GLM unlimited card: override .free sky-blue with rose/pink */
+    .model-card.free.glm-card {
+      border-color: rgba(244,63,94,0.50) !important;
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(251,113,133,0.20), transparent 55%),
+        radial-gradient(100% 80% at 0% 100%, rgba(168,85,247,0.14), transparent 50%),
+        linear-gradient(180deg, rgba(30,20,40,0.82), rgba(15,23,42,0.6)) !important;
+      box-shadow: 0 0 0 1px rgba(244,63,94,0.12), 0 12px 32px rgba(244,63,94,0.12);
+      animation: glmGlow 2.8s ease-in-out infinite !important;
+    }
+    .model-card.free.glm-card:hover {
+      border-color: rgba(244,63,94,0.8) !important;
+      box-shadow: 0 0 0 1px rgba(244,63,94,0.28), 0 16px 40px rgba(244,63,94,0.22);
+    }
     .model-card.privileged {
       border-color: rgba(251,191,36,0.5);
       background:
@@ -1575,10 +2370,29 @@ function publicDashboardPage(): string {
         radial-gradient(90% 80% at 0% 100%, rgba(244,114,182,0.12), transparent 50%),
         rgba(15,23,42,0.75);
       box-shadow: 0 0 0 1px rgba(251,191,36,0.14), 0 12px 32px rgba(245,158,11,0.12);
+      animation: privilegedGlow 2.8s ease-in-out infinite;
+    }
+    .model-card.privileged::after {
+      content: '';
+      position: absolute;
+      top: 0; left: -150%;
+      width: 60%; height: 100%;
+      background: linear-gradient(105deg, transparent, rgba(253,224,71,0.18), transparent);
+      animation: privilegedShimmer 3.2s ease-in-out infinite;
+      pointer-events: none;
     }
     .model-card.privileged:hover {
       border-color: rgba(252,211,77,0.75);
       box-shadow: 0 0 0 1px rgba(251,191,36,0.3), 0 16px 40px rgba(245,158,11,0.2);
+    }
+    @keyframes privilegedGlow {
+      0%, 100% { box-shadow: 0 0 0 1px rgba(251,191,36,0.14), 0 12px 32px rgba(245,158,11,0.10); }
+      50% { box-shadow: 0 0 0 1px rgba(251,191,36,0.30), 0 14px 36px rgba(244,114,182,0.18); }
+    }
+    @keyframes privilegedShimmer {
+      0% { left: -150%; }
+      55% { left: 150%; }
+      100% { left: 150%; }
     }
     @keyframes freeCardGlow {
       0%, 100% { box-shadow: 0 0 0 1px rgba(56,189,248,0.12), 0 12px 32px rgba(14,165,233,0.10); }
@@ -1648,7 +2462,12 @@ function publicDashboardPage(): string {
       color: #422006;
       background: linear-gradient(135deg, #fde047 0%, #fbbf24 45%, #f472b6 100%);
       box-shadow: 0 0 16px rgba(251,191,36,0.35);
+      animation: privilegedBadgePulse 2.2s ease-in-out infinite;
       white-space: nowrap;
+    }
+    @keyframes privilegedBadgePulse {
+      0%, 100% { filter: brightness(1); transform: scale(1); box-shadow: 0 0 16px rgba(251,191,36,0.35); }
+      50% { filter: brightness(1.1); transform: scale(1.03); box-shadow: 0 0 22px rgba(251,191,36,0.55); }
     }
     .metered-badge {
       display: inline-flex;
@@ -1675,7 +2494,7 @@ function publicDashboardPage(): string {
       box-shadow: 0 0 0 1px rgba(52,211,153,0.25), 0 12px 28px rgba(16,185,129,0.15) !important;
     }
     @media (prefers-reduced-motion: reduce) {
-      .model-card.free, .free-badge { animation: none !important; }
+      .model-card.free, .free-badge, .model-card.privileged, .model-card.privileged::after, .model-card.glm-card, .model-card.glm-card::after, .model-card.free.glm-card { animation: none !important; }
     }
 
     /* === SEARCH === */
@@ -1753,26 +2572,24 @@ function publicDashboardPage(): string {
       .brand-mark { width: 34px; height: 34px; border-radius: 10px; font-size: 0.8rem; }
       nav {
         display: flex;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
-        padding: 0.25rem 0.35rem 0.45rem;
-        gap: 0.15rem;
+        flex-wrap: wrap;
+        justify-content: center;
+        padding: 0.3rem 0.35rem 0.45rem;
+        gap: 0.2rem;
       }
-      nav::-webkit-scrollbar { display: none; }
       .tg-link svg { width: 18px; height: 18px; }
       .nav-item {
-        flex: 1;
-        min-width: 72px;
-        padding: 0.7rem 0.4rem;
-        font-size: 0.7rem;
+        flex: 1 1 auto;
+        min-width: 58px;
+        padding: 0.6rem 0.3rem;
+        font-size: 0.66rem;
         flex-direction: column;
-        gap: 0.3rem;
+        gap: 0.25rem;
         border-left: none;
         border-bottom: none;
         text-align: center;
         margin: 0;
-        border-radius: 12px;
+        border-radius: 10px;
       }
       .nav-item.active {
         border-bottom: none;
@@ -1895,16 +2712,16 @@ function publicDashboardPage(): string {
 
         .pricing-grid {
           display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
+          grid-template-columns: repeat(3, minmax(0, 1fr));
           gap: 1.1rem;
           margin-bottom: 1.5rem;
-          max-width: 980px;
+          max-width: 1080px;
         }
         @media (min-width: 1280px) {
           .pricing-grid {
-            grid-template-columns: repeat(5, minmax(0, 1fr));
-            max-width: none;
-            gap: 0.9rem;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            max-width: 860px;
+            gap: 1.1rem;
           }
         }
         .price-card {
@@ -1915,14 +2732,39 @@ function publicDashboardPage(): string {
           display: flex;
           flex-direction: column;
           position: relative;
-          transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+          overflow: hidden;
+          transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), border-color 0.3s, box-shadow 0.3s;
           min-height: 100%;
           box-shadow: 0 10px 28px rgba(0,0,0,0.14);
+          animation: priceCardEnter 0.55s cubic-bezier(0.22,1,0.36,1) both;
         }
+        .price-card::before {
+          content: '';
+          position: absolute;
+          top: 0; left: -150%;
+          width: 60%; height: 100%;
+          background: linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.07) 50%, transparent 70%);
+          transform: skewX(-18deg);
+          pointer-events: none;
+          animation: priceCardShimmer 5s ease-in-out infinite;
+          z-index: 1;
+        }
+        .price-card:nth-child(2)::before { animation-delay: 2.5s; }
+        .price-card:nth-child(3)::before { animation-delay: 1.25s; }
+        .price-card > * { position: relative; z-index: 2; }
         .price-card:hover {
-          transform: translateY(-4px);
+          transform: translateY(-6px) scale(1.02);
           border-color: rgba(148,163,184,0.28);
-          box-shadow: 0 16px 36px rgba(0,0,0,0.24);
+          box-shadow: 0 20px 44px rgba(0,0,0,0.28);
+        }
+        .price-card:hover::before { animation-duration: 1.5s; }
+        @keyframes priceCardEnter {
+          from { opacity: 0; transform: translateY(24px) scale(0.96); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes priceCardShimmer {
+          0%, 100% { left: -150%; }
+          50% { left: 150%; }
         }
         .price-card.featured {
           border-color: rgba(124,58,237,0.55);
@@ -1934,8 +2776,13 @@ function publicDashboardPage(): string {
           border-color: rgba(34,211,238,0.5);
           background: linear-gradient(180deg, rgba(14,165,233,0.18) 0%, rgba(30,41,59,0.95) 42%, rgba(15,23,42,0.9) 100%);
           box-shadow: 0 0 0 1px rgba(34,211,238,0.18), 0 16px 40px rgba(14,165,233,0.12);
+          animation: priceCardEnter 0.55s cubic-bezier(0.22,1,0.36,1) both, ultraGlowPulse 3s ease-in-out infinite 0.55s;
         }
-        .price-card.ultra:hover { border-color: #67e8f9; }
+        @keyframes ultraGlowPulse {
+          0%, 100% { box-shadow: 0 0 0 1px rgba(34,211,238,0.18), 0 16px 40px rgba(14,165,233,0.12); }
+          50% { box-shadow: 0 0 0 1px rgba(34,211,238,0.35), 0 16px 50px rgba(14,165,233,0.22); }
+        }
+        .price-card.ultra:hover { border-color: #67e8f9; animation: priceCardEnter 0.55s cubic-bezier(0.22,1,0.36,1) both; }
         .price-card.ultra .price-badge {
           background: linear-gradient(90deg, #0ea5e9, #22d3ee);
           color: #082f49;
@@ -1954,9 +2801,11 @@ function publicDashboardPage(): string {
           border-color: rgba(234,179,8,0.5);
           background: linear-gradient(180deg, rgba(234,179,8,0.16) 0%, rgba(30,41,59,0.95) 42%, rgba(15,23,42,0.9) 100%);
           box-shadow: 0 0 0 1px rgba(234,179,8,0.18), 0 16px 40px rgba(234,179,8,0.10);
+          padding-top: 2.3rem;
         }
         .price-card.supporter:hover { border-color: #fde047; }
         .price-card.supporter .price-badge {
+          top: 10px;
           background: linear-gradient(90deg, #ca8a04, #eab308);
           color: #1c1917;
         }
@@ -2001,12 +2850,30 @@ function publicDashboardPage(): string {
           line-height: 1.1;
           margin-bottom: 0.25rem;
           letter-spacing: -0.03em;
+          animation: priceAmountPop 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.15s both;
+        }
+        @keyframes priceAmountPop {
+          0% { opacity: 0; transform: scale(0.7); }
+          100% { opacity: 1; transform: scale(1); }
         }
         .price-amount span {
           font-size: 0.95rem;
           font-weight: 700;
           color: #94a3b8;
           margin-right: 0.2rem;
+        }
+        .price-amount .price-cur {
+          font-size: 0.95rem;
+          font-weight: 700;
+          color: #94a3b8;
+          margin-right: 0.2rem;
+        }
+        .price-amount .price-alt {
+          font-size: 1rem;
+          font-weight: 600;
+          color: #64748b;
+          margin-left: 0.35rem;
+          margin-right: 0;
         }
         .price-amount.contact {
           font-size: 1.55rem;
@@ -2039,6 +2906,18 @@ function publicDashboardPage(): string {
           font-size: 0.88rem;
           color: #e2e8f0;
           line-height: 1.4;
+          opacity: 0;
+          animation: featureFadeIn 0.4s ease-out forwards;
+        }
+        .price-features li:nth-child(1) { animation-delay: 0.25s; }
+        .price-features li:nth-child(2) { animation-delay: 0.35s; }
+        .price-features li:nth-child(3) { animation-delay: 0.45s; }
+        .price-features li:nth-child(4) { animation-delay: 0.55s; }
+        .price-features li:nth-child(5) { animation-delay: 0.65s; }
+        .price-features li:nth-child(6) { animation-delay: 0.75s; }
+        @keyframes featureFadeIn {
+          from { opacity: 0; transform: translateX(-10px); }
+          to { opacity: 1; transform: translateX(0); }
         }
         .price-check {
           width: 18px;
@@ -2062,10 +2941,30 @@ function publicDashboardPage(): string {
           border-radius: 12px;
           font-weight: 700;
           font-size: 0.9rem;
-          transition: all 0.2s;
+          transition: all 0.25s cubic-bezier(0.34,1.56,0.64,1);
           border: 1px solid rgba(148,163,184,0.18);
           background: rgba(7,11,22,0.7);
           color: #e2e8f0;
+          opacity: 0;
+          animation: ctaSlideUp 0.5s cubic-bezier(0.22,1,0.36,1) 0.5s forwards;
+          position: relative;
+          overflow: hidden;
+        }
+        .price-cta::after {
+          content: '';
+          position: absolute;
+          top: 0; left: -100%;
+          width: 100%; height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+          transition: left 0.5s ease;
+        }
+        .price-cta:hover::after { left: 100%; }
+        @keyframes ctaSlideUp {
+          from { opacity: 0; transform: translateY(12px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .price-card, .price-card::before, .price-amount, .price-features li, .price-cta, .price-cta::after { animation: none !important; opacity: 1 !important; }
         }
         .price-cta:hover { border-color: #3b82f6; color: #fff; background: #1e293b; }
         .price-cta.primary {
@@ -2122,16 +3021,33 @@ function publicDashboardPage(): string {
         }
 
         @media (max-width: 1024px) {
-          .pricing-grid { grid-template-columns: 1fr; max-width: 460px; }
+          .pricing-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 620px; }
           .price-card.featured { order: -1; }
-          .prices-note { max-width: 460px; }
+          .prices-note { max-width: 620px; }
         }
         @media (max-width: 768px) {
           .prices-hero { padding: 1.15rem 1rem; border-radius: 16px; }
           .prices-hero-title { font-size: 1.05rem; }
+          .prices-hero-sub { font-size: 0.82rem; line-height: 1.5; }
           .price-amount { font-size: 1.65rem; }
-          .pricing-grid { max-width: none; gap: 0.95rem; }
+          .price-amount.contact { font-size: 1.3rem; }
+          .pricing-grid { grid-template-columns: 1fr; max-width: none; gap: 0.95rem; }
+          .price-card { padding: 1.25rem 1rem 1.1rem; }
+          .price-card.supporter { padding-top: 2.1rem; }
+          .price-features li { font-size: 0.84rem; }
+          .price-cta { font-size: 0.84rem; padding: 0.75rem 0.85rem; }
+          .prices-pills { gap: 0.4rem; }
+          .price-pill { font-size: 0.7rem; padding: 0.3rem 0.6rem; }
           .prices-note { max-width: none; padding: 1.1rem 1rem; font-size: 0.86rem; }
+        }
+        @media (max-width: 420px) {
+          .prices-hero-title { font-size: 0.95rem; }
+          .price-amount { font-size: 1.45rem; }
+          .price-amount.contact { font-size: 1.15rem; }
+          .price-tier { font-size: 0.72rem; }
+          .price-features { gap: 0.5rem; }
+          .price-features li { font-size: 0.8rem; }
+          .price-pill { font-size: 0.65rem; padding: 0.25rem 0.5rem; }
         }
       </style>
 </head>
@@ -2163,12 +3079,16 @@ function publicDashboardPage(): string {
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
           <span class="nav-label">Usage</span>
         </div>
+        <div class="nav-item" data-page="stats" onclick="switchPage('stats')">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 16l4-8 4 4 6-10"/></svg>
+          <span class="nav-label">Stats</span>
+        </div>
         <div class="nav-item" data-page="models" onclick="switchPage('models')">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
           <span class="nav-label">Models</span>
         </div>
         <div class="nav-item" data-page="prices" onclick="switchPage('prices')">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
           <span class="nav-label">Prices</span>
         </div>
       </nav>
@@ -2180,7 +3100,7 @@ function publicDashboardPage(): string {
         <div class="page-header">
           <div>
             <h2 class="page-title"><span class="grad">Leaderboard</span></h2>
-            <p class="page-desc">Top API keys by kuota token terpakai (klik header untuk urutkan: Requests / Kuota / Remaining / Last Active)</p>
+            <p class="page-desc">Top API keys by total tokens used (click headers to sort: Requests / Quota / Remaining / Last Active)</p>
           </div>
         </div>
         <div class="overview-stats" id="overview-stats"></div>
@@ -2188,7 +3108,7 @@ function publicDashboardPage(): string {
           <input
             id="lb-search"
             type="search"
-            placeholder="Cari nama user atau paste API key..."
+            placeholder="Search by username or paste API key..."
             autocomplete="off"
             spellcheck="false"
           />
@@ -2197,7 +3117,7 @@ function publicDashboardPage(): string {
             type="button"
             class="primary"
             onclick="runLeaderboardSearch()"
-          >Cari</button>
+          >Search</button>
           <button
             id="lb-search-clear"
             type="button"
@@ -2258,12 +3178,28 @@ function publicDashboardPage(): string {
         <div id="usage-content" style="display:none"></div>
       </div>
 
+      <!-- Stats 24h -->
+      <div class="page" id="page-stats">
+        <div class="page-header">
+          <div>
+            <h2 class="page-title"><span class="grad">Stats 24h</span></h2>
+            <p class="page-desc">Total requests & tokens in the last 24 hours, breakdown per model</p>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.55rem;flex-wrap:wrap">
+            <span class="updated-at" id="stats-updated">-</span>
+          </div>
+        </div>
+        <div class="overview-stats" id="stats-overview"></div>
+        <div class="loading" id="stats-loading"><div class="skeleton-wrap"><div class="skeleton sk-lg"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div></div>
+        <div id="stats-content" style="display:none"></div>
+      </div>
+
       <!-- Models -->
       <div class="page" id="page-models">
         <div class="page-header">
           <div>
             <h2 class="page-title"><span class="grad">Available Models</span></h2>
-            <p class="page-desc">Klik kartu untuk copy model ID. Badge <strong style="color:#7dd3fc">Unlimited</strong> = tidak potong kuota token key.</p>
+            <p class="page-desc">Click a card to copy model ID. Badge <strong style="color:#7dd3fc">Unlimited</strong> = does not deduct key token quota.</p>
           </div>
         </div>
         <div class="loading" id="models-loading"><div class="skeleton-wrap"><div class="skeleton sk-lg"></div><div class="skeleton sk-lg"></div><div class="skeleton sk-lg"></div></div></div>
@@ -2274,118 +3210,83 @@ function publicDashboardPage(): string {
       <div class="page" id="page-prices">
         <div class="page-header">
           <div>
-            <h2 class="page-title"><span class="grad">Harga / Prices</span></h2>
-            <p class="page-desc">Daftar harga token Grok 4.5 terbaru</p>
+            <h2 class="page-title"><span class="grad">Prices</span></h2>
+            <p class="page-desc">Latest API package pricing</p>
           </div>
         </div>
 
         <div class="prices-hero">
-          <div class="prices-hero-title">Akses Grok 4.5 lewat API OpenAI-compatible</div>
+          <div class="prices-hero-title">Access AI models via OpenAI-compatible API</div>
           <div class="prices-hero-sub">
-            Semua paket include model <strong style="color:#c4b5fd">Grok 4.5</strong>, plus
-            <strong style="color:#86efac">semua model Unlimited</strong> bisa dipakai di semua paket.
-            Rate limit per paket: Starter <strong style="color:#93c5fd">10 RPM</strong>, Pro
-            <strong style="color:#93c5fd">20 RPM</strong>, Business <strong style="color:#93c5fd">30 RPM</strong>,
-            Ultra <strong style="color:#67e8f9">50 RPM</strong>.
+            All plans include <strong style="color:#86efac">unlimited models</strong>.
+            Starter gets <strong style="color:#c4b5fd">limited pro models</strong>,
+            Ultra gets <strong style="color:#67e8f9">all pro models</strong>,
+            Supporter gets <strong style="color:#fde68a">all pro models + unlimited tokens</strong>.
+            Rate limit: Starter <strong style="color:#93c5fd">10 RPM</strong>,
+            Ultra <strong style="color:#67e8f9">50 RPM</strong>,
+            Supporter <strong style="color:#fde68a">custom RPM</strong>.
             Order via Telegram.
           </div>
           <div class="prices-pills">
-            <span class="price-pill purple">Grok 4.5</span>
-            <span class="price-pill green">Semua Unlimited Model</span>
-            <span class="price-pill blue">10 / 20 / 30 / 50 RPM</span>
-            <span class="price-pill yellow">Aktif Instant</span>
+            <span class="price-pill purple">Pro Model</span>
+            <span class="price-pill green">Unlimited Model</span>
+            <span class="price-pill blue">10 / 50 RPM</span>
+            <span class="price-pill yellow">No Expiry Key</span>
+            <span class="price-pill yellow">Instant Activation</span>
           </div>
         </div>
 
         <div class="pricing-grid">
           <div class="price-card">
             <div class="price-tier" style="color:#6ee7b7">Starter</div>
-            <div class="price-amount"><span>Rp</span>150.000</div>
+            <div class="price-amount"><span class="price-cur">Rp</span>150.000<span class="price-alt"> · $10</span></div>
             <div class="price-period">28-day active period</div>
             <ul class="price-features">
-              <li><span class="price-check">✓</span><span><strong>150M</strong> token quota</span></li>
-              <li><span class="price-check">✓</span><span>Access <strong>Grok 4.5</strong></span></li>
-              <li><span class="price-check">✓</span><span>All <strong>Unlimited</strong> models included</span></li>
+              <li><span class="price-check">✓</span><span>Access to <strong>limited pro models</strong></span></li>
+              <li><span class="price-check">✓</span><span>All <strong>unlimited model</strong> included</span></li>
               <li><span class="price-check">✓</span><span>Rate limit <strong>10 RPM</strong></span></li>
-              <li><span class="price-check">✓</span><span>Tokens valid until expiry</span></li>
-              <li><span class="price-check">✓</span><span>Daily quota <strong>150M</strong> resets at <strong>00:00 WIB</strong></span></li>
             </ul>
             <a class="price-cta" href="https://t.me/routers9" target="_blank" rel="noopener">Order via Telegram</a>
           </div>
 
-          <div class="price-card featured">
-            <div class="price-badge">Most Popular</div>
-            <div class="price-tier" style="color:#7dd3fc">Pro</div>
-            <div class="price-amount"><span>Rp</span>250.000</div>
-            <div class="price-period">28-day active period</div>
-            <ul class="price-features">
-              <li><span class="price-check">✓</span><span><strong>250M</strong> token quota</span></li>
-              <li><span class="price-check">✓</span><span>Access <strong>Grok 4.5</strong></span></li>
-              <li><span class="price-check">✓</span><span>All <strong>Unlimited</strong> models included</span></li>
-              <li><span class="price-check">✓</span><span>Rate limit <strong>20 RPM</strong></span></li>
-              <li><span class="price-check">✓</span><span>Tokens valid until expiry</span></li>
-              <li><span class="price-check">✓</span><span>Daily quota <strong>250M</strong> resets at <strong>00:00 WIB</strong></span></li>
-            </ul>
-            <a class="price-cta primary" href="https://t.me/routers9" target="_blank" rel="noopener">Order Pro Now</a>
-          </div>
-
-          <div class="price-card">
-            <div class="price-tier" style="color:#c4b5fd">Business</div>
-            <div class="price-amount"><span>Rp</span>350.000</div>
-            <div class="price-period">28-day active period</div>
-            <ul class="price-features">
-              <li><span class="price-check">✓</span><span><strong>350M</strong> token quota</span></li>
-              <li><span class="price-check">✓</span><span>Access <strong>Grok 4.5</strong></span></li>
-              <li><span class="price-check">✓</span><span>All <strong>Unlimited</strong> models included</span></li>
-              <li><span class="price-check">✓</span><span>Rate limit <strong>30 RPM</strong></span></li>
-              <li><span class="price-check">✓</span><span>Tokens valid until expiry</span></li>
-              <li><span class="price-check">✓</span><span>Daily quota <strong>350M</strong> resets at <strong>00:00 WIB</strong></span></li>
-            </ul>
-            <a class="price-cta" href="https://t.me/routers9" target="_blank" rel="noopener">Order Business</a>
-          </div>
-
           <div class="price-card ultra">
-            <div class="price-badge">500M</div>
             <div class="price-tier" style="color:#67e8f9">Ultra</div>
-            <div class="price-amount"><span>Rp</span>500.000</div>
+            <div class="price-amount"><span class="price-cur">Rp</span>500.000<span class="price-alt"> · $30</span></div>
             <div class="price-period">28-day active period</div>
             <ul class="price-features">
-              <li><span class="price-check">✓</span><span><strong>500M</strong> token quota</span></li>
-              <li><span class="price-check">✓</span><span>Access <strong>Grok 4.5</strong></span></li>
-              <li><span class="price-check">✓</span><span>All <strong>Unlimited</strong> models included</span></li>
+              <li><span class="price-check">✓</span><span>Access to <strong>all pro models</strong></span></li>
+              <li><span class="price-check">✓</span><span>All <strong>unlimited model</strong> included</span></li>
               <li><span class="price-check">✓</span><span>Rate limit <strong>50 RPM</strong></span></li>
-              <li><span class="price-check">✓</span><span>Tokens valid until expiry</span></li>
-              <li><span class="price-check">✓</span><span>Daily quota <strong>500M</strong> resets at <strong>00:00 WIB</strong></span></li>
             </ul>
             <a class="price-cta" href="https://t.me/routers9" target="_blank" rel="noopener">Order Ultra</a>
           </div>
 
           <div class="price-card supporter">
-            <div class="price-badge">3 slots left</div>
-            <div class="price-tier" style="color:#fde68a">Supporter</div>
-            <div class="price-amount contact">Via DM</div>
-            <div class="price-period">3 slots left · no public price · message admin</div>
+            <div class="price-badge">Supporter</div>
+            <div class="price-tier" style="color:#fde68a">Supporter Pack</div>
+            <div class="price-amount contact"><span>DM</span> Admin</div>
+            <div class="price-period">No expiry — lifetime key</div>
             <ul class="price-features">
-              <li><span class="price-check">✓</span><span><strong>Unlimited</strong> token quota</span></li>
-              <li><span class="price-check">✓</span><span><strong>Request RPM limit</strong></span></li>
-              <li><span class="price-check">✓</span><span><strong>No expiry</strong> key</span></li>
-              <li><span class="price-check">✓</span><span>Access <strong>Grok 4.5</strong></span></li>
-              <li><span class="price-check">✓</span><span>All <strong>Unlimited</strong> models included</span></li>
-              <li><span class="price-check">✓</span><span><strong>SUPPORTER</strong> badge on panel</span></li>
+              <li><span class="price-check">✓</span><span><strong>Unlimited tokens</strong></span></li>
+              <li><span class="price-check">✓</span><span>Access to <strong>all pro models</strong></span></li>
+              <li><span class="price-check">✓</span><span>All <strong>unlimited model</strong> included</span></li>
+              <li><span class="price-check">✓</span><span><strong>No expiry</strong></span></li>
+              <li><span class="price-check">✓</span><span>Rate limit <strong>custom RPM</strong></span></li>
+              <li><span class="price-check">✓</span><span>Priority support & early access</span></li>
             </ul>
-            <a class="price-cta" href="https://t.me/routers9" target="_blank" rel="noopener">DM Admin Now</a>
+            <a class="price-cta" href="https://t.me/routers9" target="_blank" rel="noopener">Contact Admin</a>
           </div>
         </div>
 
         <div class="prices-note">
-          <div class="prices-note-title">📢 Pemberitahuan</div>
-          <p>Paket AI di sini akan terus berubah mengikuti perkembangan dan tren model AI terbaru. Model yang tersedia akan selalu diperbarui, diganti, atau ditambahkan berdasarkan performa dan kualitas terbaik yang tersedia.</p>
-          <p>Tujuan kami adalah selalu menghadirkan AI terbaik, bukan mempertahankan model tertentu.</p>
-          <p class="warn"><strong>⚠️ Tidak ada garansi model tertentu akan tersedia selamanya.</strong> Model dapat berubah sewaktu-waktu tanpa pemberitahuan sebelumnya.</p>
-          <p class="order-line"><strong>Cara order:</strong> chat Telegram
+          <div class="prices-note-title">📢 Notice</div>
+          <p>AI packages here will continually evolve following the latest AI model trends. Available models will always be updated, replaced, or added based on the best performance and quality available.</p>
+          <p>Our goal is to always bring the best AI, not to keep specific models.</p>
+          <p class="warn"><strong>⚠️ No guarantee that any specific model will be available forever.</strong> Models may change at any time without prior notice.</p>
+          <p class="order-line"><strong>How to order:</strong> chat Telegram
           <a href="https://t.me/routers9" target="_blank" rel="noopener">@routers9</a>
-          → sebut paket (Starter / Pro / Business / Ultra / Supporter) → bayar → key dikirim instant.
-          Hubungi admin untuk pembelian, perpanjangan, atau donasi Supporter.</p>
+          → pick a plan (Starter / Ultra / Supporter) → pay → key delivered instantly.
+          Supporter Pack price is custom — DM admin for details. Contact admin for purchase or renewal.</p>
         </div>
       </div>
 
@@ -2400,6 +3301,7 @@ function publicDashboardPage(): string {
   <script>
     let liveInterval = null;
     let lbInterval = null;
+    let statsInterval = null;
     let currentPage = 'leaderboard';
 
     function switchPage(page) {
@@ -2412,11 +3314,13 @@ function publicDashboardPage(): string {
       // Stop page polling when switching
       if (liveInterval) { clearInterval(liveInterval); liveInterval = null; }
       if (lbInterval) { clearInterval(lbInterval); lbInterval = null; }
+      if (statsInterval) { clearInterval(statsInterval); statsInterval = null; }
 
       // Load data for the page
       if (page === 'leaderboard') { loadLeaderboard(); lbInterval = setInterval(() => loadLeaderboard(null, true), 45000); }
       else if (page === 'live') { loadLive(); liveInterval = setInterval(loadLive, 10000); }
       else if (page === 'usage') { loadUsage(); loadChart('1d'); }
+      else if (page === 'stats') { loadStats24h(); statsInterval = setInterval(loadStats24h, 60000); }
       else if (page === 'models') loadModels();
       // prices page is static HTML — no fetch needed
 
@@ -2454,7 +3358,7 @@ function publicDashboardPage(): string {
 
     function formatTime(ts) {
       if (!ts) return '-';
-      return new Date(ts).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+      return new Date(ts).toLocaleString('en-US', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
     }
 
     function formatTokens(n) {
@@ -2467,26 +3371,45 @@ function publicDashboardPage(): string {
 
     function isSupporterName(name) {
       const n = (name || '').trim().toLowerCase();
-      return n === 'gilbert arias' || n === 'yuop';
+      return n === 'gilbert arias' || n === 'yuop' || n === 'attta rebelution';
     }
 
     function isHelperName(name) {
       return (name || '').trim().toLowerCase() === 'afiq';
     }
 
-    // Code2-style SVG + DEV chip for Super Admin (developer special)
+    function isUltraRow(name, quotaTokens, isUltra) {
+      if (isSuperAdminName(name) || isSupporterName(name) || isHelperName(name)) return false;
+      const q = quotaTokens == null || quotaTokens === '' ? null : Number(quotaTokens);
+      return isUltra === true || isUltra === 'true' || isUltra === 't' || q === 500000000;
+    }
+
+    function roleRowClass(name, quotaTokens, isUltra) {
+      if (isSuperAdminName(name)) return ' sa-row-highlight';
+      if (isSupporterName(name)) return ' sp-row-highlight';
+      if (isUltraRow(name, quotaTokens, isUltra)) return ' ul-row-highlight';
+      return '';
+    }
+
+    // Crown-style SVG + DEV chip for Super Admin (developer special)
     const SA_DEV_BADGE_HTML =
       '<span class="sa-badge" title="Super Admin · Developer (unlimited)">' +
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-      '<path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/>' +
+      '<span class="sa-sparkle sa-sparkle-1"></span>' +
+      '<span class="sa-sparkle sa-sparkle-2"></span>' +
+      '<svg viewBox="0 0 24 24" fill="currentColor" fill-opacity="0.15" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="M2 4l3 0h2l3 3 3-3 3 3 3-3h2l3 0v2"/>' +
+      '<path d="M5 6l3 0v8a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6"/>' +
+      '<path d="M9 20h6"/>' +
       '</svg><span class="sa-dev">DEV</span></span>';
 
     // HeartHandshake-style SVG + SUPPORTER chip (donatur special)
     const SP_BADGE_HTML =
       '<span class="sp-badge" title="Supporter · Donatur (unlimited · no expiry)">' +
+      '<span class="sp-sparkle sp-sparkle-1"></span>' +
+      '<span class="sp-sparkle sp-sparkle-2"></span>' +
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-      '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>' +
-      '<path d="M12 5 9.04 7.96a2.17 2.17 0 0 0 0 3.08c.82.82 2.13.85 3 .07l2.07-1.9a2.82 2.82 0 0 1 3.79 0l2.96 2.66"/>' +
+      '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />' +
+      '<path d="M12 5 9.04 7.96a2.17 2.17 0 0 0 0 3.08c.82.82 2.13.85 3 .07l2.07-1.9a2.82 2.82 0 0 1 3.79 0l2.96 2.66" />' +
       '<path d="m18 15-2-2"/><path d="m15 18-2-2"/>' +
       '</svg><span class="sp-label">SUPPORTER</span></span>';
 
@@ -2500,11 +3423,13 @@ function publicDashboardPage(): string {
     // Zap-style SVG + ULTRA chip for exact 500M quota keys
     const UL_BADGE_HTML =
       '<span class="ul-badge" title="Ultra · 500M quota">' +
+      '<span class="ul-sparkle ul-sparkle-1"></span>' +
+      '<span class="ul-sparkle ul-sparkle-2"></span>' +
       '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-      '<path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/>' +
+      '<path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z" />' +
       '</svg><span class="ul-label">ULTRA</span></span>';
 
-    function buyerNameHtml(name, quotaTokens) {
+    function buyerNameHtml(name, quotaTokens, isUltra) {
       const display = name || '-';
       if (isSuperAdminName(name)) {
         return '<span class="sa-name">' + display + '</span>' + SA_DEV_BADGE_HTML;
@@ -2516,7 +3441,7 @@ function publicDashboardPage(): string {
         return '<span class="hp-name">' + display + '</span>' + HP_BADGE_HTML;
       }
       const q = quotaTokens == null || quotaTokens === '' ? null : Number(quotaTokens);
-      if (q === 500000000) {
+      if (isUltra === true || isUltra === 'true' || isUltra === 't' || q === 500000000) {
         return '<span class="ul-name">' + display + '</span>' + UL_BADGE_HTML;
       }
       let style = '';
@@ -2530,14 +3455,62 @@ function publicDashboardPage(): string {
       return res.json();
     }
 
-    function isClaudeModel(id) {
-      return typeof id === 'string' && id.toLowerCase().includes('claude');
+    // Brand detection: probe BOTH model id and display name
+    // (e.g. "Kimi K3" display exists but id is routers9/qd/kmodel_latest — no "kimi" in id)
+    function modelBrand(id, name) {
+      const probe = (String(id == null ? '' : id) + ' ' + String(name == null ? '' : name)).toLowerCase();
+      if (probe.indexOf('claude') !== -1) return 'claude';
+      if (probe.indexOf('kimi') !== -1 || probe.indexOf('kmodel') !== -1) return 'kimi';
+      if (probe.indexOf('qwen') !== -1 || probe.indexOf('qmodel') !== -1) return 'qwen';
+      if (probe.indexOf('grok') !== -1) return 'grok';
+      if (probe.indexOf('glm') !== -1) return 'glm';
+      if (probe.indexOf('deepseek') !== -1 || probe.indexOf('ds-v4') !== -1 || probe.indexOf('dsv4') !== -1) return 'deepseek';
+      return '';
+    }
+    function isClaudeModel(id, name) { return modelBrand(id, name) === 'claude'; }
+    function isKimiModel(id, name) { return modelBrand(id, name) === 'kimi'; }
+    function isQwenModel(id, name) { return modelBrand(id, name) === 'qwen'; }
+    function isGrokModel(id, name) { return modelBrand(id, name) === 'grok'; }
+    function isGlmModel(id, name) { return modelBrand(id, name) === 'glm'; }
+    function isDeepseekModel(id, name) { return modelBrand(id, name) === 'deepseek'; }
+
+    // Maps model_id → display_name (populated from /public/models on initial load)
+    let modelNameMap = {};
+    let modelNameMapPromise = null;
+    async function loadModelNameMap() {
+      if (modelNameMapPromise) return modelNameMapPromise;
+      modelNameMapPromise = (async () => {
+        try {
+          const data = await fetchAPI('/public/models');
+          const models = (data && data.models) || [];
+          const map = {};
+          models.forEach(function(m) { if (m && m.id && m.display_name) map[m.id] = m.display_name; });
+          modelNameMap = map;
+        } catch (e) { /* fallback to raw ids */ }
+      })();
+      return modelNameMapPromise;
     }
 
     function modelTagHtml(id) {
-      const display = id || '-';
-      if (isClaudeModel(id)) {
+      const display = (id ? (modelNameMap[id] || id) : '-');
+      const brand = modelBrand(id, display);
+      if (brand === 'claude') {
         return '<span class="model-tag claude"><span class="claude-spark">&#10022;</span>' + display + '</span>';
+      }
+      if (brand === 'kimi') {
+        return '<span class="model-tag kimi"><span class="kimi-spark">&#10022;</span>' + display + '</span>';
+      }
+      if (brand === 'qwen') {
+        return '<span class="model-tag qwen"><span class="qwen-spark">&#10022;</span>' + display + '</span>';
+      }
+      if (brand === 'grok') {
+        return '<span class="model-tag grok"><span class="grok-spark">&#10022;</span>' + display + '</span>';
+      }
+      if (brand === 'glm') {
+        return '<span class="model-tag glm"><span class="glm-spark">&#10022;</span>' + display + '</span>';
+      }
+      if (brand === 'deepseek') {
+        return '<span class="model-tag deepseek"><span class="deepseek-spark">&#10022;</span>' + display + '</span>';
       }
       return '<span class="model-tag">' + display + '</span>';
     }
@@ -2548,7 +3521,7 @@ function publicDashboardPage(): string {
       if (Number.isNaN(t)) return '-';
       const diff = Math.max(0, Date.now() - t);
       const s = Math.floor(diff / 1000);
-      if (s < 10) return 'baru saja';
+      if (s < 10) return 'just now';
       if (s < 60) return s + 's ago';
       const m = Math.floor(s / 60);
       if (m < 60) return m + 'm ago';
@@ -2596,7 +3569,7 @@ function publicDashboardPage(): string {
 
     // Leaderboard state
     let lbData = [];
-    let lbSortKey = 'used_tokens';
+    let lbSortKey = 'total_tokens';
     let lbSortDir = 'desc';
     let lbSearchQ = '';
     let lbSearchTimer = null;
@@ -2636,13 +3609,13 @@ function publicDashboardPage(): string {
         lbData = lbRes.rows || [];
         if (meta) {
           if (query) {
-            meta.textContent = 'Hasil pencarian "' + query + '": ' + lbData.length + ' key';
+            meta.textContent = 'Search results for "' + query + '": ' + lbData.length + ' keys';
           } else {
             meta.textContent = '';
           }
         }
         if (lbData.length === 0) {
-          content.innerHTML = emptyHtml(query ? 'Tidak ketemu untuk "' + query + '"' : 'No usage data yet');
+          content.innerHTML = emptyHtml(query ? 'No results for "' + query + '"' : 'No usage data yet');
           return;
         }
 
@@ -2688,7 +3661,7 @@ function publicDashboardPage(): string {
     function sortLeaderboard(key) {
       const allowed = {
         total_requests: true,
-        used_tokens: true,
+        total_tokens: true,
         remaining_days: true,
         last_request_at: true
       };
@@ -2706,7 +3679,7 @@ function publicDashboardPage(): string {
     function renderLeaderboardTable() {
       const sortValue = (row, key) => {
         if (key === 'total_requests') return Number(row.total_requests) || 0;
-        if (key === 'used_tokens') return Number(row.used_tokens) || 0;
+        if (key === 'total_tokens') return Number(row.total_tokens) || 0;
         if (key === 'remaining_days') {
           // null/∞ = no expiry → treat as largest remaining
           if (row.remaining_days === null || row.remaining_days === undefined || row.remaining_days === '') {
@@ -2728,9 +3701,9 @@ function publicDashboardPage(): string {
         const valB = sortValue(b, lbSortKey);
         if (valA < valB) return lbSortDir === 'asc' ? -1 : 1;
         if (valA > valB) return lbSortDir === 'asc' ? 1 : -1;
-        // Tie-break: used_tokens desc, then requests desc, then name
-        const usedA = Number(a.used_tokens) || 0;
-        const usedB = Number(b.used_tokens) || 0;
+        // Tie-break: total_tokens desc, then requests desc, then name
+        const usedA = Number(a.total_tokens) || 0;
+        const usedB = Number(b.total_tokens) || 0;
         if (usedA !== usedB) return usedB - usedA;
         const reqA = Number(a.total_requests) || 0;
         const reqB = Number(b.total_requests) || 0;
@@ -2744,7 +3717,7 @@ function publicDashboardPage(): string {
       };
 
       const formatQuotaCell = (row) => {
-        const used = Number(row.used_tokens) || 0;
+        const used = Number(row.total_tokens) || 0;
         const quota = row.quota_tokens == null || row.quota_tokens === '' ? null : Number(row.quota_tokens);
         if (quota == null || Number.isNaN(quota)) {
           return formatTokens(used) + ' / ∞';
@@ -2758,51 +3731,40 @@ function publicDashboardPage(): string {
           '<div style="font-size:11px;color:#94a3b8;margin-top:2px">' + pct + '%</div></div>';
       };
 
-      // Podium Top 3 (hanya saat tanpa pencarian & data cukup)
-      let podiumHtml = '';
-      if (!lbSearchQ && sorted.length >= 3) {
-        const medals = ['🥇', '🥈', '🥉'];
-        const pods = [0, 1, 2].map(i => {
-          const row = sorted[i];
-          return '<div class="podium-card p-' + (i + 1) + '">' +
-            '<div class="podium-medal">' + (i === 0 ? '👑' : medals[i]) + '</div>' +
-            '<div class="podium-name">' + buyerNameHtml(row.buyer_name, row.quota_tokens) + '</div>' +
-            '<div class="podium-stat"><strong>' + formatTokens(Number(row.used_tokens) || 0) + '</strong> tokens · ' + formatNum(row.total_requests) + ' req</div>' +
-            '</div>';
-        });
-        podiumHtml = '<div class="podium">' + pods.join('') + '</div>';
-      }
-
-      // Pisahkan key inactive (0 kuota terpakai) di belakang toggle
-      const isInactiveRow = (row) => (Number(row.used_tokens) || 0) === 0;
+      // Separate inactive keys (0 tokens used) behind toggle
+      const isInactiveRow = (row) => (Number(row.total_tokens) || 0) === 0;
       const activeRows = lbSearchQ ? sorted : sorted.filter(r => !isInactiveRow(r));
       const inactiveRows = lbSearchQ ? [] : sorted.filter(isInactiveRow);
       const visibleRows = lbShowInactive ? sorted : activeRows;
 
-      // Columns: rank, user, requests, kuota dipakai, remaining days, last active — all sortable except rank/user
-      let html = podiumHtml + '<div class="table-wrapper"><table><thead><tr>' +
+      // Columns: rank, user, requests, quota used, remaining days, last active — all sortable except rank/user
+      let html = '<div class="table-wrapper"><table><thead><tr>' +
         '<th>#</th>' +
         '<th>User</th>' +
         '<th class="sortable" onclick="sortLeaderboard(&apos;total_requests&apos;)">Requests ' + arrow('total_requests') + '</th>' +
-        '<th class="sortable" onclick="sortLeaderboard(&apos;used_tokens&apos;)">Kuota Dipakai ' + arrow('used_tokens') + '</th>' +
+        '<th class="sortable" onclick="sortLeaderboard(&apos;total_tokens&apos;)">Quota Used ' + arrow('total_tokens') + '</th>' +
         '<th class="sortable" onclick="sortLeaderboard(&apos;remaining_days&apos;)">Remaining Days ' + arrow('remaining_days') + '</th>' +
         '<th class="sortable" onclick="sortLeaderboard(&apos;last_request_at&apos;)">Last Active ' + arrow('last_request_at') + '</th>' +
         '</tr></thead><tbody>';
       visibleRows.forEach((row, i) => {
         const rankClass = i < 3 ? ' rank-' + (i + 1) : '';
-        const topRowClass = i < 3 ? ' class="top-row top-' + (i + 1) + '"' : '';
+        const topRowClass = i < 3 ? ' class="top-row top-' + (i + 1) + roleRowClass(row.buyer_name, row.quota_tokens, row.is_ultra) + '"' : (roleRowClass(row.buyer_name, row.quota_tokens, row.is_ultra) ? ' class="' + roleRowClass(row.buyer_name, row.quota_tokens, row.is_ultra).trim() + '"' : '');
+        const medals = ['🥇', '🥈', '🥉'];
+        const rankLabel = i < 3
+          ? '<span class="rank-medal" aria-hidden="true">' + medals[i] + '</span><span>' + (i + 1) + '</span>'
+          : String(i + 1);
         const daysText = row.remaining_days !== null && row.remaining_days !== undefined ? row.remaining_days + 'd' : '∞';
         const daysClass = row.remaining_days !== null && row.remaining_days !== undefined
           ? (row.remaining_days <= 3 ? 'badge-red' : row.remaining_days <= 7 ? 'badge-yellow' : 'badge-green')
           : 'badge-blue';
-        html += '<tr' + topRowClass + '><td class="rank' + rankClass + '">' + (i + 1) + '</td><td>' + buyerNameHtml(row.buyer_name, row.quota_tokens) + '</td><td>' + formatNum(row.total_requests) + '</td><td>' + formatQuotaCell(row) + '</td><td><span class="badge ' + daysClass + '">' + daysText + '</span></td><td>' + formatTime(row.last_request_at) + '</td></tr>';
+        html += '<tr' + topRowClass + '><td class="rank' + rankClass + '">' + rankLabel + '</td><td>' + buyerNameHtml(row.buyer_name, row.quota_tokens, row.is_ultra) + '</td><td>' + formatNum(row.total_requests) + '</td><td>' + formatQuotaCell(row) + '</td><td><span class="badge ' + daysClass + '">' + daysText + '</span></td><td>' + formatTime(row.last_request_at) + '</td></tr>';
       });
       html += '</tbody></table></div>';
       if (inactiveRows.length > 0) {
         html += '<button type="button" class="lb-inactive-toggle" onclick="toggleLbInactive()">' +
           (lbShowInactive
-            ? 'Sembunyikan ' + inactiveRows.length + ' key tanpa pemakaian ▲'
-            : 'Tampilkan ' + inactiveRows.length + ' key tanpa pemakaian ▼') +
+            ? 'Hide ' + inactiveRows.length + ' keys with no usage ▲'
+            : 'Show ' + inactiveRows.length + ' keys with no usage ▼') +
           '</button>';
       }
       document.getElementById('lb-content').innerHTML = html;
@@ -2817,6 +3779,7 @@ function publicDashboardPage(): string {
     let livePrevKeys = null;
     async function loadLive() {
       try {
+        await loadModelNameMap();
         const data = await fetchAPI('/public/live');
         const loading = document.getElementById('live-loading');
         const content = document.getElementById('live-content');
@@ -2849,8 +3812,8 @@ function publicDashboardPage(): string {
           const models = (row.models_used || []).map(m => modelTagHtml(m)).join('');
           const rowKey = String(row.buyer_name || '') + '|' + String(row.last_request_at || '');
           const isNew = livePrevKeys !== null && !livePrevKeys.has(rowKey);
-          const rowClass = isNew ? ' class="row-new row-enter"' : '';
-          html += '<tr' + rowClass + '><td>' + buyerNameHtml(row.buyer_name, row.quota_tokens) + '</td><td>' + formatNum(row.request_count) + '</td><td>' + formatTokens(row.total_tokens) + '</td><td>' + models + '</td><td title="' + formatTime(row.last_request_at) + '">' + timeAgo(row.last_request_at) + '</td></tr>';
+          const rowClass = isNew ? ' class="row-new row-enter' + roleRowClass(row.buyer_name, row.quota_tokens, row.is_ultra) + '"' : (roleRowClass(row.buyer_name, row.quota_tokens, row.is_ultra) ? ' class="' + roleRowClass(row.buyer_name, row.quota_tokens, row.is_ultra).trim() + '"' : '');
+          html += '<tr' + rowClass + '><td>' + buyerNameHtml(row.buyer_name, row.quota_tokens, row.is_ultra) + '</td><td>' + formatNum(row.request_count) + '</td><td>' + formatTokens(row.total_tokens) + '</td><td>' + models + '</td><td title="' + formatTime(row.last_request_at) + '">' + timeAgo(row.last_request_at) + '</td></tr>';
         });
         html += '</tbody></table></div>';
         content.innerHTML = html;
@@ -2864,6 +3827,7 @@ function publicDashboardPage(): string {
     let usagePrevIds = null;
     async function loadUsage() {
       try {
+        await loadModelNameMap();
         const data = await fetchAPI('/public/usage');
         const loading = document.getElementById('usage-loading');
         const content = document.getElementById('usage-content');
@@ -2884,8 +3848,8 @@ function publicDashboardPage(): string {
           const tokens = formatTokens(row.total_tokens);
           const latency = row.latency_ms ? row.latency_ms + 'ms' : '-';
           const isNew = usagePrevIds !== null && !usagePrevIds.has(evKey(row));
-          const rowClass = isNew ? ' class="row-new"' : '';
-          html += '<tr' + rowClass + '><td title="' + formatTime(row.created_at) + '">' + timeAgo(row.created_at) + '</td><td>' + buyerNameHtml(row.buyer_name, row.quota_tokens) + '</td><td>' + modelTagHtml(row.model_id) + '</td><td>' + statusBadge + '</td><td>' + tokens + '</td><td>' + latency + '</td></tr>';
+          const rowClass = isNew ? ' class="row-new' + roleRowClass(row.buyer_name, row.quota_tokens, row.is_ultra) + '"' : (roleRowClass(row.buyer_name, row.quota_tokens, row.is_ultra) ? ' class="' + roleRowClass(row.buyer_name, row.quota_tokens, row.is_ultra).trim() + '"' : '');
+          html += '<tr' + rowClass + '><td title="' + formatTime(row.created_at) + '">' + timeAgo(row.created_at) + '</td><td>' + buyerNameHtml(row.buyer_name, row.quota_tokens, row.is_ultra) + '</td><td>' + modelTagHtml(row.model_id) + '</td><td>' + statusBadge + '</td><td>' + tokens + '</td><td>' + latency + '</td></tr>';
         });
         html += '</tbody></table></div>';
         content.innerHTML = html;
@@ -2988,6 +3952,68 @@ function publicDashboardPage(): string {
         '<g class="chart-fade-in">' + reqLabels + tokLabels + timeLabels + '</g>';
     }
 
+    // Stats 24h
+    async function loadStats24h() {
+      try {
+        await loadModelNameMap();
+        const data = await fetchAPI('/public/stats24h');
+        const loading = document.getElementById('stats-loading');
+        const content = document.getElementById('stats-content');
+        loading.style.display = 'none';
+        content.style.display = 'block';
+
+        var totals = data.totals || { requests: 0, tokens: 0 };
+        var models = data.models || [];
+        var maxTokens = 1;
+        for (var i = 0; i < models.length; i++) {
+          if (models[i].tokens > maxTokens) maxTokens = models[i].tokens;
+        }
+
+        // Overview stat cards
+        var overviewEl = document.getElementById('stats-overview');
+        overviewEl.innerHTML =
+          statCardHtml(formatNum(totals.requests), 'Requests 24h', 'requests', 'blue', totals.requests, 'num') +
+          statCardHtml(formatTokens(totals.tokens), 'Tokens 24h', 'tokens', 'amber', totals.tokens, 'tok') +
+          statCardHtml(formatNum(models.length), 'Active Models', 'keys', 'green', null, null);
+        runCountUps(overviewEl);
+
+        // Per-model table with bar
+        if (models.length === 0) {
+          content.innerHTML = emptyHtml('No data in the last 24 hours yet');
+        } else {
+          var html = '<div class="stats-table-wrap"><table class="stats-table"><thead><tr>' +
+            '<th>Model</th>' +
+            '<th style="text-align:right">Requests</th>' +
+            '<th style="text-align:right">Tokens</th>' +
+            '<th style="text-align:right">Prompt</th>' +
+            '<th style="text-align:right">Completion</th>' +
+            '<th style="text-align:right">Last Active</th>' +
+            '</tr></thead><tbody>';
+          for (var i = 0; i < models.length; i++) {
+            var m = models[i];
+            var pct = maxTokens > 0 ? (Number(m.tokens) / maxTokens * 100).toFixed(1) : 0;
+            html += '<tr>' +
+              '<td><div class="stats-model-cell">' + modelTagHtml(m.model_id) +
+              '<div class="stats-bar-track"><div class="stats-bar-fill" style="width:' + pct + '%"></div></div>' +
+              '</div></td>' +
+              '<td style="text-align:right" class="stats-num">' + m.requests.toLocaleString() + '</td>' +
+              '<td style="text-align:right" class="stats-num">' + formatTokens(m.tokens) + '</td>' +
+              '<td style="text-align:right" class="stats-num sub">' + formatTokens(m.prompt_tokens) + '</td>' +
+              '<td style="text-align:right" class="stats-num sub">' + formatTokens(m.completion_tokens) + '</td>' +
+              '<td style="text-align:right" class="stats-num">' + timeAgo(m.last_request_at) + '</td>' +
+              '</tr>';
+          }
+          html += '</tbody></table></div>';
+          content.innerHTML = html;
+        }
+
+        var updEl = document.getElementById('stats-updated');
+        if (updEl) updEl.textContent = 'Updated ' + new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+      } catch (e) {
+        console.error('Failed to load stats24h:', e);
+      }
+    }
+
     // Models
     async function loadModels() {
       try {
@@ -3013,15 +4039,15 @@ function publicDashboardPage(): string {
         let html = '';
         const hintParts = [];
         if (freeCount > 0) {
-          hintParts.push('<strong>' + freeCount + ' unlimited</strong> · usage tercatat, kuota token key tidak terpotong');
+          hintParts.push('<strong>' + freeCount + ' unlimited</strong> · usage logged, key token quota not deducted');
         }
         if (privCount > 0) {
-          hintParts.push('<span class="priv-strong">' + privCount + ' role-restricted</span> · Dev / Supporter / Ultra (lihat badge)');
+          hintParts.push('<span class="priv-strong">' + privCount + ' role-restricted</span> · Dev / Supporter / Ultra (see badge)');
         }
         if (hintParts.length) {
-          html += '<div class="model-hint">' + hintParts.join(' · ') + ' · klik kartu untuk copy ID</div>';
+          html += '<div class="model-hint">' + hintParts.join(' · ') + ' · click card to copy ID</div>';
         } else {
-          html += '<div class="model-hint">Klik kartu untuk copy model ID</div>';
+          html += '<div class="model-hint">Click a card to copy model ID</div>';
         }
         html += '<div class="models-grid-public" style="margin-top:0.9rem">';
 
@@ -3039,13 +4065,14 @@ function publicDashboardPage(): string {
               if (r === 'ultra') return 'Ultra';
               return r;
             });
-            badge = '<span class="privileged-badge" title="Hanya role: ' + labels.join(', ') + '">' + labels.join(' · ') + '</span>';
+            badge = '<span class="privileged-badge" title="Roles only: ' + labels.join(', ') + '">' + labels.join(' · ') + '</span>';
           } else if (isFree) {
-            badge = '<span class="free-badge" title="Tidak potong kuota token key"><span aria-hidden="true">∞</span>Unlimited</span>';
+            badge = '<span class="free-badge" title="Does not deduct key token quota"><span aria-hidden="true">∞</span>Unlimited</span>';
           } else {
             badge = '<span class="metered-badge">Metered</span>';
           }
-          const cardClass = (isPriv ? ' privileged' : (isFree ? ' free' : '')) + (isClaudeModel(m.id) ? ' claude-card' : '');
+          const cardBrand = modelBrand(m.id, name);
+          const cardClass = (isPriv ? ' privileged' : (isFree ? ' free' : '')) + (cardBrand === 'claude' ? ' claude-card' : cardBrand === 'kimi' ? ' kimi-card' : cardBrand === 'qwen' ? ' qwen-card' : cardBrand === 'grok' ? ' grok-card' : cardBrand === 'glm' ? ' glm-card' : cardBrand === 'deepseek' ? ' deepseek-card' : '');
           let meta;
           if (isPriv) {
             const labels = roles.map(function(r) {
@@ -3054,15 +4081,20 @@ function publicDashboardPage(): string {
               if (r === 'ultra') return 'Ultra (500M)';
               return r;
             });
-            meta = '<span style="font-size:0.72rem;color:#fbbf24">Akses: ' + labels.join(' · ') + '</span>';
+            meta = '<span style="font-size:0.72rem;color:#fbbf24">Access: ' + labels.join(' · ') + '</span>';
           } else if (isFree) {
-            meta = '<span style="font-size:0.72rem;color:#7dd3fc">Free tokens · RPM tetap berlaku</span>';
+            meta = '<span style="font-size:0.72rem;color:#7dd3fc">Free tokens · RPM still applies</span>';
           } else {
-            meta = '<span style="font-size:0.72rem;color:#94a3b8">Menggunakan kuota token key</span>';
+            meta = '<span style="font-size:0.72rem;color:#94a3b8">Uses key token quota</span>';
           }
-          const claudeBadge = isClaudeModel(m.id) ? '<span class="claude-badge" title="Claude model">&#10022; Claude</span>' : '';
+          const claudeBadge = cardBrand === 'claude' ? '<span class="claude-badge" title="Claude model">&#10022; Claude</span>' : '';
+          const kimiBadge = cardBrand === 'kimi' ? '<span class="kimi-badge" title="Kimi model">&#10022; Kimi</span>' : '';
+          const qwenBadge = cardBrand === 'qwen' ? '<span class="qwen-badge" title="Qwen model">&#10022; Qwen</span>' : '';
+          const grokBadge = cardBrand === 'grok' ? '<span class="grok-badge" title="Grok model">&#10022; Grok</span>' : '';
+          const glmBadge = cardBrand === 'glm' ? '<span class="glm-badge" title="GLM model">&#10022; GLM</span>' : '';
+          const deepseekBadge = cardBrand === 'deepseek' ? '<span class="deepseek-badge" title="DeepSeek model">&#10022; DeepSeek</span>' : '';
           html += '<div class="model-card' + cardClass + '" data-id="' + escapeHtml(m.id) + '" role="button" tabindex="0" title="Copy ' + escapeHtml(m.id) + '">' +
-            '<div class="model-card-top"><div class="model-card-name">' + escapeHtml(name) + '</div>' + claudeBadge + badge + '</div>' +
+            '<div class="model-card-top"><div class="model-card-name">' + escapeHtml(name) + '</div>' + claudeBadge + kimiBadge + qwenBadge + grokBadge + glmBadge + deepseekBadge + badge + '</div>' +
             '<div class="model-card-id">' + escapeHtml(m.id) + '</div>' +
             '<div class="model-card-meta">' + meta + '</div></div>';
         });

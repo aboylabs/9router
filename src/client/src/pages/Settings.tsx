@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Eye, EyeOff, RefreshCw, User, Lock, Monitor, Smartphone, LogOut, Plus, Trash2, Edit2, Power } from "lucide-react";
+import { Eye, EyeOff, RefreshCw, User, Lock, Monitor, Smartphone, LogOut, Plus, Trash2, Edit2, Power, Settings as SettingsIcon } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "../components/ui/Card";
+import { PageHeader } from "../components/PageHeader";
 import { Input } from "../components/ui/Input";
 import { Button } from "../components/ui/Button";
 import { useToast } from "../components/ui/Toast";
@@ -344,10 +345,11 @@ export function Settings() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl sm:text-2xl font-bold text-text-primary">Settings</h2>
-        <p className="text-sm text-text-secondary mt-1">Manage your account and upstream configuration</p>
-      </div>
+      <PageHeader
+        icon={<SettingsIcon className="h-5 w-5 text-primary-500" />}
+        title="Settings"
+        subtitle="Manage your account and upstream configuration"
+      />
 
       <Card className="w-full max-w-4xl">
         <CardHeader>

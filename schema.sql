@@ -49,6 +49,11 @@ CREATE TABLE IF NOT EXISTS api_keys (
   package_id VARCHAR(64),
   is_hidden BOOLEAN NOT NULL DEFAULT FALSE,
   rate_limit_rpm INTEGER,
+  -- Ultra tier role flag (independent of quota_tokens; quota may be NULL/unlimited).
+  is_ultra BOOLEAN NOT NULL DEFAULT FALSE,
+  -- Per-key role assignments (additive to name-match logic).
+  -- Values: 'dev', 'supporter', 'ultra'. Empty = no explicit roles.
+  access_roles TEXT[] NOT NULL DEFAULT '{}',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -71,7 +76,7 @@ CREATE TABLE IF NOT EXISTS models (
   -- Legacy mirror: true when access_roles is non-empty.
   privileged_only BOOLEAN NOT NULL DEFAULT FALSE,
   -- Role allowlist for this model (empty = all keys). Independent toggles:
-  -- 'dev' (Super Admin), 'supporter' (name roster), 'ultra' (quota_tokens = 500M).
+  -- 'dev' (Super Admin), 'supporter' (name roster), 'ultra' (is_ultra flag).
   access_roles TEXT[] NOT NULL DEFAULT '{}'
 );
 

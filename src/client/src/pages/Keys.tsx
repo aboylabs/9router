@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Plus, Search, ClockArrowUp, Coins, Gauge, X, Settings2, Edit, Eye, EyeOff, RefreshCw, Infinity as InfinityIcon } from "lucide-react";
+import { Plus, Search, ClockArrowUp, Coins, Gauge, X, Settings2, Edit, Eye, EyeOff, RefreshCw, Infinity as InfinityIcon, KeyRound, CalendarPlus, UserCog } from "lucide-react";
 import { Button } from "../components/ui/Button";
+import { PageHeader } from "../components/PageHeader";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from "../components/ui/Table";
 import { Badge } from "../components/ui/Badge";
 import { CopyButton } from "../components/CopyButton";
@@ -16,7 +17,8 @@ import { UltraBadge } from "../components/UltraBadge";
 import { useToast } from "../components/ui/Toast";
 import { api } from "../lib/api";
 import { buildCopyText } from "../lib/copy";
-import { formatRemaining, formatTokens, buyerNameClassName, isSuperAdminName, isSupporterName, isHelperName, isUltraQuota } from "../lib/utils";
+import { formatRemaining, formatTokens, buyerNameClassName, isSuperAdminName, isSupporterName, isHelperName, isUltraKey, roleRowClassName } from "../lib/utils";
+import { createKeyPackageForId } from "@shared/package-catalog";
 import type { Key } from "../hooks/useDashboard";
 
 interface KeysPageProps {
@@ -39,6 +41,25 @@ function isUnlimitedKey(key: Key): boolean {
   return key.quota_tokens == null || key.quota_tokens === "";
 }
 
+const PACKAGE_BADGE_STYLES: Record<string, string> = {
+  starter: "border-slate-400/30 bg-slate-500/10 text-slate-500 dark:text-slate-300",
+  pro: "border-blue-400/30 bg-blue-500/10 text-blue-600 dark:text-blue-300",
+  business: "border-emerald-400/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300",
+  ultra: "border-cyan-400/30 bg-cyan-500/10 text-cyan-600 dark:text-cyan-300",
+};
+
+function PackagePill({ packageId }: { packageId: string | null }) {
+  if (!packageId) return null;
+  const pkg = createKeyPackageForId(packageId);
+  const label = pkg?.label ?? packageId;
+  const style = PACKAGE_BADGE_STYLES[packageId] ?? "border-border bg-surface-tertiary text-text-muted";
+  return (
+    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${style}`}>
+      {label}
+    </span>
+  );
+}
+
 export function Keys({ keys, onRefresh }: KeysPageProps) {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
@@ -56,6 +77,10 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
   const [dailyResetLoading, setDailyResetLoading] = useState<string | null>(null);
   const [setQuotaId, setSetQuotaId] = useState<string | null>(null);
   const [quotaLoading, setQuotaLoading] = useState<string | null>(null);
+  const [addDaysId, setAddDaysId] = useState<string | null>(null);
+  const [addDaysLoading, setAddDaysLoading] = useState<string | null>(null);
+  const [editRolesId, setEditRolesId] = useState<string | null>(null);
+  const [editRolesLoading, setEditRolesLoading] = useState<string | null>(null);
 
   const filtered = keys.filter((key) => {
     const q = search.toLowerCase();
@@ -71,6 +96,7 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
   function closeInlineEditors() {
     setEditRpmId(null);
     setSetQuotaId(null);
+    setAddDaysId(null);
   }
 
   async function revokeKey(keyId: string) {
@@ -178,6 +204,60 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
     }
   }
 
+  const ADD_DAYS_PRESETS = [
+    { days: 7, label: "+7" },
+    { days: 14, label: "+14" },
+    { days: 28, label: "+28" },
+    { days: 30, label: "+30" },
+  ] as const;
+
+  async function addDays(key: Key, days: number) {
+    setAddDaysLoading(key.id);
+    try {
+      const data = await api<{ key: { expires_at: string }; days_added: number }>(`/admin/keys/${key.id}/add-days`, {
+        method: "POST",
+        body: JSON.stringify({ days })
+      });
+      const newDate = new Date(data.key.expires_at);
+      toast(`+${days} hari · ${key.buyer_name} → ${newDate.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}`);
+      setAddDaysId(null);
+      onRefresh();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to add days", "error");
+    } finally {
+      setAddDaysLoading(null);
+    }
+  }
+
+  /** Get effective roles for a key: DB access_roles + name-match + is_ultra. */
+  function getKeyRoles(key: Key): string[] {
+    const roles = new Set<string>();
+    const dbRoles = Array.isArray(key.access_roles) ? key.access_roles : [];
+    for (const r of dbRoles) roles.add(String(r));
+    if (isSuperAdminName(key.buyer_name)) roles.add("dev");
+    if (isSupporterName(key.buyer_name)) roles.add("supporter");
+    if (isUltraKey(key.is_ultra, key.quota_tokens)) roles.add("ultra");
+    return Array.from(roles);
+  }
+
+  async function saveRoles(key: Key, roles: string[]) {
+    setEditRolesLoading(key.id);
+    try {
+      await api(`/admin/keys/${key.id}/roles`, {
+        method: "PATCH",
+        body: JSON.stringify({ roles })
+      });
+      const label = roles.length ? roles.join(" + ") : "no roles";
+      toast(`Roles updated · ${key.buyer_name} → ${label}`);
+      setEditRolesId(null);
+      onRefresh();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to update roles", "error");
+    } finally {
+      setEditRolesLoading(null);
+    }
+  }
+
   const iconBtn =
     "h-8 w-8 p-0 shrink-0 inline-flex items-center justify-center rounded-lg border border-border bg-surface text-text-secondary hover:text-text-primary hover:bg-surface-tertiary hover:border-border-hover transition-colors disabled:opacity-50 shadow-sm";
   const iconBtnActiveDaily =
@@ -187,7 +267,7 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
   const iconBtnDanger =
     "h-8 w-8 p-0 shrink-0 inline-flex items-center justify-center rounded-lg border border-red-500/30 bg-danger text-white hover:bg-red-600 transition-colors disabled:opacity-50 shadow-sm";
 
-  // Per-row actions: Copy · ∞ · RPM · Daily · Delete
+  // Per-row actions: Copy · ∞ · RPM · Daily · AddDays · Role · Delete
   // Extend + Add Tokens live in the top toolbar (near Create) — no row duplicates.
   function ActionButtons({ keyRow, compact = false }: { keyRow: Key; compact?: boolean }) {
     if (keyRow.revoked_at) {
@@ -242,6 +322,33 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
         </button>
         <button
           type="button"
+          className={iconBtn}
+          title="Add days to expiry"
+          disabled={addDaysLoading === keyRow.id || !keyRow.expires_at}
+          onClick={() => {
+            setAddDaysId(addDaysId === keyRow.id ? null : keyRow.id);
+            setEditRpmId(null);
+            setSetQuotaId(null);
+          }}
+        >
+          <CalendarPlus className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          className={iconBtn}
+          title="Manage roles"
+          disabled={editRolesLoading === keyRow.id}
+          onClick={() => {
+            setEditRolesId(editRolesId === keyRow.id ? null : keyRow.id);
+            setSetQuotaId(null);
+            setAddDaysId(null);
+            setEditRpmId(null);
+          }}
+        >
+          <UserCog className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
           className={iconBtnDanger}
           title="Delete key"
           disabled={revoking === keyRow.id}
@@ -280,7 +387,106 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
             </p>
           </div>
         )}
+        {addDaysId === keyRow.id && (
+          <div className="mt-2 p-2.5 rounded-md bg-surface-secondary border border-border space-y-2">
+            <div className="text-[11px] font-medium text-text-secondary">
+              Perpanjang hari · {keyRow.buyer_name}
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {ADD_DAYS_PRESETS.map((p) => (
+                <button
+                  key={p.days}
+                  type="button"
+                  disabled={addDaysLoading === keyRow.id}
+                  onClick={() => void addDays(keyRow, p.days)}
+                  className="h-8 px-2.5 rounded-lg border border-emerald-500/35 bg-emerald-500/10 text-xs font-semibold text-emerald-700 dark:text-emerald-200 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
+                >
+                  {p.label} hari
+                </button>
+              ))}
+              <Button size="sm" variant="secondary" onClick={() => setAddDaysId(null)}>Cancel</Button>
+            </div>
+            <p className="text-[10px] text-text-muted leading-snug">
+              Tambahan hari dari expiry yang sudah ada.
+            </p>
+          </div>
+        )}
       </>
+    );
+  }
+
+  function RoleEditor({ keyRow }: { keyRow: Key }) {
+    const currentRoles = getKeyRoles(keyRow);
+    const isInherited = (role: string) => {
+      if (role === "dev") return isSuperAdminName(keyRow.buyer_name);
+      if (role === "supporter") return isSupporterName(keyRow.buyer_name);
+      if (role === "ultra") return isUltraKey(keyRow.is_ultra, keyRow.quota_tokens) && !(Array.isArray(keyRow.access_roles) && keyRow.access_roles.includes("ultra"));
+      return false;
+    };
+    const allRoles: { id: string; label: string; color: string }[] = [
+      { id: "dev", label: "Dev", color: "fuchsia" },
+      { id: "supporter", label: "Supporter", color: "amber" },
+      { id: "ultra", label: "Ultra", color: "cyan" },
+    ];
+    const [selected, setSelected] = useState<Set<string>>(new Set(currentRoles));
+    const toggle = (role: string) => {
+      const next = new Set(selected);
+      if (next.has(role)) next.delete(role);
+      else next.add(role);
+      setSelected(next);
+    };
+
+    const colorClasses: Record<string, string> = {
+      fuchsia: "border-fuchsia-400/50 bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-300",
+      amber: "border-amber-400/50 bg-amber-500/15 text-amber-700 dark:text-amber-300",
+      cyan: "border-cyan-400/50 bg-cyan-500/15 text-cyan-700 dark:text-cyan-300",
+    };
+    const colorClassesOff: Record<string, string> = {
+      fuchsia: "border-border bg-surface text-text-muted hover:border-fuchsia-400/40",
+      amber: "border-border bg-surface text-text-muted hover:border-amber-400/40",
+      cyan: "border-border bg-surface text-text-muted hover:border-cyan-400/40",
+    };
+
+    if (editRolesId !== keyRow.id) return null;
+
+    return (
+      <div className="mt-2 p-2.5 rounded-md bg-surface-secondary border border-border space-y-2">
+        <div className="text-[11px] font-medium text-text-secondary">
+          Manage roles · {keyRow.buyer_name}
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {allRoles.map((r) => {
+            const active = selected.has(r.id);
+            const inherited = isInherited(r.id);
+            return (
+              <button
+                key={r.id}
+                type="button"
+                disabled={editRolesLoading === keyRow.id || inherited}
+                onClick={() => toggle(r.id)}
+                className={`h-8 px-2.5 rounded-lg border text-xs font-semibold transition-colors disabled:opacity-50 ${
+                  active ? colorClasses[r.color] : colorClassesOff[r.color]
+                }`}
+                title={inherited ? `${r.label} — inherited from name (cannot remove)` : (active ? `Remove ${r.label}` : `Add ${r.label}`)}
+              >
+                {r.label}
+                {inherited && <span className="ml-1 text-[9px] opacity-60">name</span>}
+              </button>
+            );
+          })}
+          <Button
+            size="sm"
+            disabled={editRolesLoading === keyRow.id}
+            onClick={() => void saveRoles(keyRow, Array.from(selected))}
+          >
+            Save
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => setEditRolesId(null)}>Cancel</Button>
+        </div>
+        <p className="text-[10px] text-text-muted leading-snug">
+          Roles grant access to role-restricted models. Inherited roles (name-match / ultra package) cannot be removed here.
+        </p>
+      </div>
     );
   }
 
@@ -294,6 +500,7 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
         ) : (
           <Badge variant="success">Active</Badge>
         )}
+        <PackagePill packageId={keyRow.package_id} />
         {isUnlimitedKey(keyRow) && (
           <span className="inline-flex items-center gap-1 rounded-full border border-violet-400/30 bg-violet-500/10 px-2 py-0.5 text-[10px] font-semibold text-violet-600 dark:text-violet-300 whitespace-nowrap">
             <InfinityIcon className="h-2.5 w-2.5" strokeWidth={2.6} />
@@ -312,12 +519,12 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-xl font-semibold tracking-tight text-text-primary">API Keys</h2>
-          <p className="text-sm text-text-muted mt-0.5">Manage buyer API keys · {filtered.length} shown</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+      <PageHeader
+        icon={<KeyRound className="h-5 w-5 text-primary-500" />}
+        title="API Keys"
+        subtitle={`Manage buyer API keys · ${filtered.length} shown`}
+        actions={
+          <>
           <Button variant="secondary" size="sm" onClick={() => setBulkUpdateOpen(true)}>
             <Settings2 className="h-4 w-4" />
             <span className="hidden sm:inline">Bulk</span>
@@ -334,8 +541,9 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
             <Plus className="h-4 w-4" />
             <span className="hidden sm:inline">Create</span>
           </Button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
@@ -359,7 +567,7 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
             const color = pct > 90 ? "bg-red-500" : pct > 70 ? "bg-yellow-500" : "bg-primary-500";
             const displayed = showFullKey === key.id ? fullKey(key) : key.key_prefix;
             return (
-              <div key={key.id} className="border border-border rounded-xl p-4 space-y-3 bg-surface shadow-sm">
+              <div key={key.id} className={`border border-border rounded-xl p-4 space-y-3 bg-surface shadow-sm${roleRowClassName(key.buyer_name, key.quota_tokens, key.is_ultra) ? " " + roleRowClassName(key.buyer_name, key.quota_tokens, key.is_ultra) : ""}`}>
                 <div className="flex items-start justify-between gap-3">
                   {editingNameId === key.buyer_id ? (
                     <div className="flex items-center gap-2 flex-1">
@@ -375,11 +583,11 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className={`font-medium text-sm truncate ${buyerNameClassName(key.buyer_name, key.quota_tokens)}`}>{key.buyer_name}</span>
+                      <span className={`font-medium text-sm truncate ${buyerNameClassName(key.buyer_name, key.quota_tokens, key.is_ultra)}`}>{key.buyer_name}</span>
                       {isSuperAdminName(key.buyer_name) ? <SuperAdminBadge /> : null}
                       {isSupporterName(key.buyer_name) ? <SupporterBadge /> : null}
                       {isHelperName(key.buyer_name) ? <HelperBadge /> : null}
-                      {!isSuperAdminName(key.buyer_name) && !isSupporterName(key.buyer_name) && !isHelperName(key.buyer_name) && isUltraQuota(key.quota_tokens) ? <UltraBadge /> : null}
+                      {!isSuperAdminName(key.buyer_name) && !isSupporterName(key.buyer_name) && !isHelperName(key.buyer_name) && isUltraKey(key.is_ultra, key.quota_tokens) ? <UltraBadge /> : null}
                       <button
                         onClick={() => { setEditingNameId(key.buyer_id); setEditNameValue(key.buyer_name); }}
                         className="text-text-muted hover:text-text-primary transition-colors shrink-0"
@@ -437,6 +645,7 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
                 <div className="pt-1 border-t border-border">
                   <ActionButtons keyRow={key} />
                   <InlineEditor keyRow={key} />
+                  <RoleEditor keyRow={key} />
                 </div>
               </div>
             );
@@ -449,14 +658,14 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="whitespace-nowrap min-w-[140px]">Name</TableHead>
-              <TableHead className="whitespace-nowrap min-w-[180px]">API Key</TableHead>
-              <TableHead className="whitespace-nowrap">Requests</TableHead>
-              <TableHead className="whitespace-nowrap">RPM</TableHead>
-              <TableHead className="whitespace-nowrap min-w-[180px]">Token Usage</TableHead>
-              <TableHead className="whitespace-nowrap min-w-[90px]">Sisa</TableHead>
+              <TableHead className="whitespace-nowrap min-w-[100px] max-w-[160px]">Name</TableHead>
+              <TableHead className="whitespace-nowrap min-w-[110px] max-w-[140px]">API Key</TableHead>
+              <TableHead className="whitespace-nowrap text-right">Requests</TableHead>
+              <TableHead className="whitespace-nowrap text-center">RPM</TableHead>
+              <TableHead className="whitespace-nowrap min-w-[100px] max-w-[120px]">Token Usage</TableHead>
+              <TableHead className="whitespace-nowrap min-w-[65px] max-w-[90px]">Sisa</TableHead>
               <TableHead className="whitespace-nowrap">Status</TableHead>
-              <TableHead className="whitespace-nowrap min-w-[180px]">Actions</TableHead>
+              <TableHead className="whitespace-nowrap min-w-[130px] max-w-[145px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -467,27 +676,27 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
               const effectiveQuota = getEffectiveQuota(key);
               const displayed = showFullKey === key.id ? fullKey(key) : key.key_prefix;
               return (
-              <TableRow key={key.id}>
-                <TableCell className="font-medium text-text-primary align-top py-4">
+              <TableRow key={key.id} className={roleRowClassName(key.buyer_name, key.quota_tokens, key.is_ultra) || undefined}>
+                <TableCell className="font-medium text-text-primary align-top py-2.5 max-w-[160px]">
                   {editingNameId === key.buyer_id ? (
                     <div className="flex items-center gap-2">
                       <input
                         type="text"
                         value={editNameValue}
                         onChange={(e) => setEditNameValue(e.target.value)}
-                        className="h-8 w-36 rounded border border-border bg-surface px-2 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-primary-500"
+                        className="h-8 w-28 rounded border border-border bg-surface px-2 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-primary-500"
                         autoFocus
                       />
                       <Button size="sm" onClick={updateBuyerName} loading={editNameLoading}>Save</Button>
                       <Button size="sm" variant="secondary" onClick={() => setEditingNameId(null)}>Cancel</Button>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2">
-                      <span className={buyerNameClassName(key.buyer_name, key.quota_tokens)}>{key.buyer_name}</span>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`font-medium text-sm truncate ${buyerNameClassName(key.buyer_name, key.quota_tokens)}`}>{key.buyer_name}</span>
                       {isSuperAdminName(key.buyer_name) ? <SuperAdminBadge /> : null}
                       {isSupporterName(key.buyer_name) ? <SupporterBadge /> : null}
                       {isHelperName(key.buyer_name) ? <HelperBadge /> : null}
-                      {!isSuperAdminName(key.buyer_name) && !isSupporterName(key.buyer_name) && !isHelperName(key.buyer_name) && isUltraQuota(key.quota_tokens) ? <UltraBadge /> : null}
+                      {!isSuperAdminName(key.buyer_name) && !isSupporterName(key.buyer_name) && !isHelperName(key.buyer_name) && isUltraKey(key.is_ultra, key.quota_tokens) ? <UltraBadge /> : null}
                       <button
                         onClick={() => { setEditingNameId(key.buyer_id); setEditNameValue(key.buyer_name); }}
                         className="text-text-muted hover:text-text-primary transition-colors"
@@ -498,9 +707,9 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
                     </div>
                   )}
                 </TableCell>
-                <TableCell className="align-top py-4">
+                <TableCell className="align-top py-2.5 max-w-[140px]">
                   <div className="flex items-center gap-1.5">
-                    <code className="text-xs bg-surface-tertiary px-2 py-1 rounded-md font-mono max-w-[200px] truncate" title={displayed}>
+                    <code className="text-xs bg-surface-tertiary px-1.5 py-0.5 rounded-md font-mono max-w-[100px] truncate" title={displayed}>
                       {displayed}
                     </code>
                     <button
@@ -513,16 +722,16 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
                     <CopyButton text={fullKey(key)} />
                   </div>
                 </TableCell>
-                <TableCell className="align-top py-4 tabular-nums">{Number(key.used_requests).toLocaleString()}</TableCell>
-                <TableCell className="align-top py-4">
+                <TableCell className="align-top py-2.5 tabular-nums">{Number(key.used_requests).toLocaleString()}</TableCell>
+                <TableCell className="align-top py-2.5">
                   {key.rate_limit_rpm ? (
                     <span className="text-text-primary font-medium tabular-nums">{key.rate_limit_rpm}</span>
                   ) : (
                     <span className="text-text-muted italic">default</span>
                   )}
                 </TableCell>
-                <TableCell className="align-top py-4">
-                  <div className="space-y-1.5 min-w-[160px]">
+                <TableCell className="align-top py-2.5 max-w-[120px]">
+                  <div className="space-y-1.5 min-w-[80px]">
                     <div className="text-sm">
                       <span className="tabular-nums">{formatTokens(key.used_tokens)}</span>
                       <span className="text-text-muted mx-1">/</span>
@@ -536,7 +745,7 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
                       const color = pct > 90 ? "bg-red-500" : pct > 70 ? "bg-yellow-500" : "bg-primary-500";
                       return (
                         <div className="flex items-center gap-2">
-                          <div className="w-28 h-2 bg-surface-tertiary rounded-full">
+                          <div className="w-20 h-2 bg-surface-tertiary rounded-full">
                             <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${pct}%` }} />
                           </div>
                           <span className="text-xs text-text-muted tabular-nums w-8">{pct.toFixed(0)}%</span>
@@ -545,7 +754,7 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
                     })()}
                   </div>
                 </TableCell>
-                <TableCell className="align-top py-4">
+                <TableCell className="align-top py-2.5 max-w-[90px]">
                   {(() => {
                     const r = formatRemaining(key.expires_at);
                     const cls =
@@ -554,18 +763,19 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
                       r.tone === "ok" ? "text-emerald-400" :
                       "text-text-muted";
                     return (
-                      <span className={`text-sm font-medium tabular-nums ${cls}`} title={key.expires_at || "No expiry"}>
+                      <span className={`text-xs font-medium tabular-nums ${cls}`} title={key.expires_at || "No expiry"}>
                         {r.label}
                       </span>
                     );
                   })()}
                 </TableCell>
-                <TableCell className="align-top py-4">
+                <TableCell className="align-top py-2.5">
                   <StatusBlock keyRow={key} />
                 </TableCell>
-                <TableCell className="align-top py-4">
+                <TableCell className="align-top py-2.5">
                   <ActionButtons keyRow={key} compact />
                   <InlineEditor keyRow={key} />
+                  <RoleEditor keyRow={key} />
                 </TableCell>
               </TableRow>
               );

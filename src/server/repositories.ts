@@ -136,13 +136,14 @@ export async function createApiKeyRecord(params: {
   dailyQuotaTokens?: number | null;
   packageId?: string | null;
   rateLimitRpm?: number | null;
+  isUltra?: boolean;
 }) {
   const client = await queryClient();
   try {
     await client.query("begin");
     const created = await client.query<{ id: string; key_prefix: string }>(
-      `insert into api_keys (buyer_id, label, key_prefix, key_hash, key_plain, expires_at, quota_tokens, quota_requests, daily_reset, daily_quota_tokens, package_id, rate_limit_rpm)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      `insert into api_keys (buyer_id, label, key_prefix, key_hash, key_plain, expires_at, quota_tokens, quota_requests, daily_reset, daily_quota_tokens, package_id, rate_limit_rpm, is_ultra)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        returning id, key_prefix`,
       [
         params.buyerId,
@@ -156,7 +157,8 @@ export async function createApiKeyRecord(params: {
         params.dailyReset ?? false,
         params.dailyQuotaTokens ?? null,
         params.packageId ?? null,
-        params.rateLimitRpm ?? null
+        params.rateLimitRpm ?? null,
+        params.isUltra ?? false
       ]
     );
 

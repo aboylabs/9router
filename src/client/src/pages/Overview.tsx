@@ -1,14 +1,10 @@
-import { Users, Key, Activity, Coins } from "lucide-react";
+import { Users, Key, Activity, Coins, LayoutDashboard } from "lucide-react";
 import { MetricCard } from "../components/MetricCard";
+import { PageHeader } from "../components/PageHeader";
 import { Card, CardHeader, CardTitle } from "../components/ui/Card";
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from "../components/ui/Table";
-import { Badge } from "../components/ui/Badge";
-import { SuperAdminBadge } from "../components/SuperAdminBadge";
-import { SupporterBadge } from "../components/SupporterBadge";
-import { HelperBadge } from "../components/HelperBadge";
-import { UltraBadge } from "../components/UltraBadge";
-import { formatDateShort, formatNumber, formatTokens, buyerNameClassName, isSuperAdminName, isSupporterName, isHelperName, isUltraQuota } from "../lib/utils";
-import type { Overview as OverviewData, ChartPoint, Key as KeyType } from "../hooks/useDashboard";
+import { Leaderboard } from "./Leaderboard";
+import { formatNumber, formatTokens } from "../lib/utils";
+import type { Overview as OverviewData, ChartPoint } from "../hooks/useDashboard";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 interface OverviewProps {
@@ -16,30 +12,27 @@ interface OverviewProps {
   chartData: ChartPoint[];
   chartRange: string;
   setChartRange: (range: string) => void;
-  keys: KeyType[];
 }
 
 const RANGE_OPTIONS = [
   { value: "15m", label: "15 Min" },
-  { value: "1h", label: "1 Jam" },
-  { value: "6h", label: "6 Jam" },
-  { value: "12h", label: "12 Jam" },
-  { value: "1d", label: "1 Hari" },
-  { value: "3d", label: "3 Hari" },
-  { value: "7d", label: "7 Hari" },
-  { value: "1M", label: "1 Bulan" },
+  { value: "1h", label: "1 Hour" },
+  { value: "6h", label: "6 Hours" },
+  { value: "12h", label: "12 Hours" },
+  { value: "1d", label: "1 Day" },
+  { value: "3d", label: "3 Days" },
+  { value: "7d", label: "7 Days" },
+  { value: "1M", label: "1 Month" },
 ];
 
-export function Overview({ overview, chartData, chartRange, setChartRange, keys }: OverviewProps) {
-  // Recent keys (last 5)
-  const recentKeys = keys.slice(0, 5);
-
+export function Overview({ overview, chartData, chartRange, setChartRange }: OverviewProps) {
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold tracking-tight text-text-primary">Dashboard</h2>
-        <p className="text-sm text-text-muted mt-0.5">Overview of your API gateway</p>
-      </div>
+      <PageHeader
+        icon={<LayoutDashboard className="h-5 w-5 text-primary-500" />}
+        title="Dashboard"
+        subtitle="Overview of your API gateway"
+      />
 
       {/* Metrics */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
@@ -155,121 +148,8 @@ export function Overview({ overview, chartData, chartRange, setChartRange, keys 
         )}
       </Card>
 
-      {/* Recent Keys */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent API Keys</CardTitle>
-        </CardHeader>
-
-        {/* Mobile card view */}
-        <div className="lg:hidden space-y-3 p-4 pt-0">
-          {recentKeys.length === 0 ? (
-            <p className="text-sm text-text-muted text-center py-4">No keys created yet</p>
-          ) : (
-            recentKeys.map((key) => {
-              const pct = key.quota_tokens ? Math.min(100, (Number(key.used_tokens) / Number(key.quota_tokens)) * 100) : 0;
-              const color = pct > 90 ? "bg-red-500" : pct > 70 ? "bg-yellow-500" : "bg-primary-500";
-              return (
-                <div key={key.id} className="border border-border rounded-lg p-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className={`font-medium text-sm truncate ${buyerNameClassName(key.buyer_name, key.quota_tokens)}`}>{key.buyer_name}</span>
-                      {isSuperAdminName(key.buyer_name) ? <SuperAdminBadge /> : null}
-                      {isSupporterName(key.buyer_name) ? <SupporterBadge /> : null}
-                      {isHelperName(key.buyer_name) ? <HelperBadge /> : null}
-                      {!isSuperAdminName(key.buyer_name) && !isSupporterName(key.buyer_name) && !isHelperName(key.buyer_name) && isUltraQuota(key.quota_tokens) ? <UltraBadge /> : null}
-                    </div>
-                    {key.revoked_at ? (
-                      <Badge variant="danger">Revoked</Badge>
-                    ) : key.expires_at && new Date(key.expires_at) < new Date() ? (
-                      <Badge variant="warning">Expired</Badge>
-                    ) : (
-                      <Badge variant="success">Active</Badge>
-                    )}
-                  </div>
-                  <code className="text-xs bg-surface-tertiary px-1.5 py-0.5 rounded">{key.key_prefix}</code>
-                  <div className="flex items-center justify-between text-xs text-text-muted">
-                    <span>{formatTokens(key.used_tokens)} / {key.quota_tokens ? formatTokens(key.quota_tokens) : "unlimited"}</span>
-                    <span>{key.expires_at ? formatDateShort(key.expires_at) : "No expiry"}</span>
-                  </div>
-                  {key.quota_tokens && (
-                    <div className="w-full h-1.5 bg-surface-tertiary rounded-full">
-                      <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${pct}%` }} />
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          )}
-        </div>
-
-        {/* Desktop table view */}
-        <div className="hidden lg:block">
-          <div className="overflow-x-auto rounded-lg border border-border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="whitespace-nowrap">Buyer</TableHead>
-                  <TableHead className="whitespace-nowrap">Prefix</TableHead>
-                  <TableHead className="whitespace-nowrap">Usage</TableHead>
-                  <TableHead className="whitespace-nowrap">Expiry</TableHead>
-                  <TableHead className="whitespace-nowrap">Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-            {recentKeys.length === 0 ? (
-              <TableEmpty colSpan={5} message="No keys created yet" />
-            ) : (
-              recentKeys.map((key) => (
-                <TableRow key={key.id}>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-1.5">
-                      <span className={buyerNameClassName(key.buyer_name, key.quota_tokens)}>{key.buyer_name}</span>
-                      {isSuperAdminName(key.buyer_name) ? <SuperAdminBadge /> : null}
-                      {isSupporterName(key.buyer_name) ? <SupporterBadge /> : null}
-                      {isHelperName(key.buyer_name) ? <HelperBadge /> : null}
-                      {!isSuperAdminName(key.buyer_name) && !isSupporterName(key.buyer_name) && !isHelperName(key.buyer_name) && isUltraQuota(key.quota_tokens) ? <UltraBadge /> : null}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <code className="text-xs bg-surface-tertiary px-1.5 py-0.5 rounded">{key.key_prefix}</code>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <span>{formatTokens(key.used_tokens)}</span>
-                      <span className="text-text-muted">/</span>
-                      <span>{key.quota_tokens ? formatTokens(key.quota_tokens) : "unlimited"}</span>
-                    </div>
-                    {key.quota_tokens && (() => {
-                      const pct = Math.min(100, (Number(key.used_tokens) / Number(key.quota_tokens)) * 100);
-                      const color = pct > 90 ? "bg-red-500" : pct > 70 ? "bg-yellow-500" : "bg-primary-500";
-                      return (
-                        <div className="w-24 h-1.5 bg-surface-tertiary rounded-full mt-1">
-                          <div
-                            className={`h-full ${color} rounded-full transition-all`}
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                      );
-                    })()}</TableCell>
-                  <TableCell>{key.expires_at ? formatDateShort(key.expires_at) : "No expiry"}</TableCell>
-                  <TableCell>
-                    {key.revoked_at ? (
-                      <Badge variant="danger">Revoked</Badge>
-                    ) : key.expires_at && new Date(key.expires_at) < new Date() ? (
-                      <Badge variant="warning">Expired</Badge>
-                    ) : (
-                      <Badge variant="success">Active</Badge>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-            </Table>
-          </div>
-        </div>
-      </Card>
+      {/* Leaderboard */}
+      <Leaderboard />
     </div>
   );
 }

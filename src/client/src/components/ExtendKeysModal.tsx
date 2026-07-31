@@ -14,11 +14,20 @@ interface ExtendKeysModalProps {
   keys: Key[];
 }
 
+const ADD_DAYS_PRESETS = [
+  { days: 7, label: "+7" },
+  { days: 14, label: "+14" },
+  { days: 28, label: "+28" },
+  { days: 30, label: "+30" },
+] as const;
+
 export function ExtendKeysModal({ open, onOpenChange, onSuccess, keys }: ExtendKeysModalProps) {
   const { toast } = useToast();
   const [mode, setMode] = useState<"all" | "select">("all");
+  const [extendMode, setExtendMode] = useState<"date" | "days">("date");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [expiresAt, setExpiresAt] = useState("");
+  const [daysInput, setDaysInput] = useState("");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -38,6 +47,9 @@ export function ExtendKeysModal({ open, onOpenChange, onSuccess, keys }: ExtendK
 
   const expiresDate = new Date(expiresAt);
   const dateValid = expiresAt && !isNaN(expiresDate.getTime()) && expiresDate > new Date();
+
+  const parsedDays = parseInt(daysInput, 10);
+  const daysValid = !isNaN(parsedDays) && parsedDays >= 1 && parsedDays <= 3650;
 
   const minDate = new Date();
   minDate.setDate(minDate.getDate() + 1);
@@ -62,14 +74,20 @@ export function ExtendKeysModal({ open, onOpenChange, onSuccess, keys }: ExtendK
 
   function resetForm() {
     setMode("all");
+    setExtendMode("date");
     setSelectedIds(new Set());
     setExpiresAt("");
+    setDaysInput("");
     setSearch("");
   }
 
   async function submit() {
-    if (!dateValid) {
+    if (extendMode === "date" && !dateValid) {
       toast("Enter a valid future date", "error");
+      return;
+    }
+    if (extendMode === "days" && !daysValid) {
+      toast("Enter valid days (1-3650)", "error");
       return;
     }
     if (mode === "select" && selectedIds.size === 0) {
@@ -79,18 +97,32 @@ export function ExtendKeysModal({ open, onOpenChange, onSuccess, keys }: ExtendK
 
     setLoading(true);
     try {
-      const payload: { expires_at: string; all?: boolean; keyIds?: string[] } = { expires_at: expiresAt };
-      if (mode === "all") {
-        payload.all = true;
+      if (extendMode === "days") {
+        const days = parsedDays;
+        const payload: { days: number; all?: boolean; keyIds?: string[] } = { days };
+        if (mode === "all") {
+          payload.all = true;
+        } else {
+          payload.keyIds = Array.from(selectedIds);
+        }
+        const data = await api<{ updated: number }>(`/admin/keys/add-days`, {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        toast(`+${days} hari untuk ${data.updated} key aktif`);
       } else {
-        payload.keyIds = Array.from(selectedIds);
+        const payload: { expires_at: string; all?: boolean; keyIds?: string[] } = { expires_at: expiresAt };
+        if (mode === "all") {
+          payload.all = true;
+        } else {
+          payload.keyIds = Array.from(selectedIds);
+        }
+        const data = await api<{ updated: number }>(`/admin/keys/extend`, {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        toast(`Extended ${data.updated} active key${data.updated !== 1 ? "s" : ""} to ${formatDateShort(expiresAt)}`);
       }
-
-      const data = await api<{ updated: number }>("/admin/keys/extend", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-      toast(`Extended ${data.updated} active key${data.updated !== 1 ? "s" : ""} to ${formatDateShort(expiresAt)}`);
       onOpenChange(false);
       resetForm();
       onSuccess();
@@ -100,6 +132,11 @@ export function ExtendKeysModal({ open, onOpenChange, onSuccess, keys }: ExtendK
       setLoading(false);
     }
   }
+
+  const isDisabled =
+    (extendMode === "date" && !dateValid) ||
+    (extendMode === "days" && !daysValid) ||
+    (mode === "select" && selectedIds.size === 0);
 
   return (
     <Dialog open={open} onOpenChange={(value) => { onOpenChange(value); if (!value) resetForm(); }}>
@@ -112,11 +149,40 @@ export function ExtendKeysModal({ open, onOpenChange, onSuccess, keys }: ExtendK
             </span>
           </DialogTitle>
           <DialogDescription>
-            Set a new expiry date for active, non-revoked keys
+            Perpanjang hari atau set tanggal expiry baru untuk key aktif
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 mt-4">
+          {/* Mode: date vs days */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-text-primary">Method</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setExtendMode("days")}
+                className={`flex-1 rounded-md border px-3 py-2 text-sm transition-colors ${
+                  extendMode === "days"
+                    ? "border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300"
+                    : "border-border bg-surface text-text-muted hover:border-text-muted"
+                }`}
+              >
+                Add Days (+N)
+              </button>
+              <button
+                type="button"
+                onClick={() => setExtendMode("date")}
+                className={`flex-1 rounded-md border px-3 py-2 text-sm transition-colors ${
+                  extendMode === "date"
+                    ? "border-primary-500 bg-primary-500/10 text-primary-500"
+                    : "border-border bg-surface text-text-muted hover:border-text-muted"
+                }`}
+              >
+                Set Date
+              </button>
+            </div>
+          </div>
+
           <div className="space-y-2">
             <label className="text-sm font-medium text-text-primary">Target</label>
             <div className="flex gap-2">
@@ -196,16 +262,47 @@ export function ExtendKeysModal({ open, onOpenChange, onSuccess, keys }: ExtendK
             </div>
           )}
 
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-text-primary">New expiry date</label>
-            <input
-              type="date"
-              min={minDateStr}
-              value={expiresAt}
-              onChange={(event) => setExpiresAt(event.target.value)}
-              className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors"
-            />
-          </div>
+          {extendMode === "date" ? (
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-text-primary">New expiry date</label>
+              <input
+                type="date"
+                min={minDateStr}
+                value={expiresAt}
+                onChange={(event) => setExpiresAt(event.target.value)}
+                className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors"
+              />
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-text-primary">Days to add</label>
+              <div className="flex gap-2">
+                {ADD_DAYS_PRESETS.map((p) => (
+                  <button
+                    key={p.days}
+                    type="button"
+                    onClick={() => setDaysInput(String(p.days))}
+                    className={`h-9 px-3 rounded-md border text-sm font-medium transition-colors ${
+                      daysInput === String(p.days)
+                        ? "border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300"
+                        : "border-border bg-surface text-text-muted hover:border-text-muted"
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+                <input
+                  type="number"
+                  min={1}
+                  max={3650}
+                  placeholder="custom"
+                  value={daysInput}
+                  onChange={(event) => setDaysInput(event.target.value)}
+                  className="h-9 w-24 rounded-md border border-border bg-surface px-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-colors"
+                />
+              </div>
+            </div>
+          )}
 
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="secondary" onClick={() => { onOpenChange(false); resetForm(); }}>
@@ -214,9 +311,9 @@ export function ExtendKeysModal({ open, onOpenChange, onSuccess, keys }: ExtendK
             <Button
               onClick={submit}
               loading={loading}
-              disabled={!dateValid || (mode === "select" && selectedIds.size === 0)}
+              disabled={isDisabled}
             >
-              Extend Keys
+              {extendMode === "days" ? `Add${daysValid ? ` +${parsedDays}` : ""} Days` : "Extend Keys"}
             </Button>
           </div>
         </div>

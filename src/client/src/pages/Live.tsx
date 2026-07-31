@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Radio, RefreshCw } from "lucide-react";
 import { Button } from "../components/ui/Button";
+import { PageHeader } from "../components/PageHeader";
 import { Badge } from "../components/ui/Badge";
 import { Card, CardHeader, CardTitle } from "../components/ui/Card";
 import { CopyButton } from "../components/CopyButton";
@@ -16,7 +17,8 @@ import {
   isSuperAdminName,
   isSupporterName,
   isHelperName,
-  isUltraQuota
+  isUltraKey,
+  roleRowClassName
 } from "../lib/utils";
 
 type LiveEntry = {
@@ -25,6 +27,7 @@ type LiveEntry = {
   buyer_name: string;
   buyer_email: string;
   quota_tokens?: string | null;
+  is_ultra?: boolean;
   request_count: number;
   last_request_at: string;
   total_tokens: string;
@@ -56,23 +59,21 @@ export function Live() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold tracking-tight text-text-primary flex items-center gap-2">
-            <Radio className="h-5 w-5 text-green-500 animate-pulse" />
-            Live Usage
-          </h2>
-          <p className="text-sm text-text-muted mt-0.5">Active API keys in the last 5 minutes</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-text-muted">
-            Updated: {lastRefresh.toLocaleTimeString("id-ID", { timeZone: "Asia/Jakarta", hour: "numeric", minute: "2-digit", second: "2-digit", hour12: false })}
-          </span>
-          <Button variant="outline" size="sm" onClick={fetchLive}>
-            <RefreshCw className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        icon={<Radio className="h-5 w-5 text-green-500 animate-pulse" />}
+        title="Live Usage"
+        subtitle="Active API keys in the last 5 minutes"
+        actions={
+          <>
+            <span className="text-xs text-text-muted">
+              Updated: {lastRefresh.toLocaleTimeString("id-ID", { timeZone: "Asia/Jakarta", hour: "numeric", minute: "2-digit", second: "2-digit", hour12: false })}
+            </span>
+            <Button variant="outline" size="sm" onClick={fetchLive} title="Refresh">
+              <RefreshCw className="h-3.5 w-3.5" />
+            </Button>
+          </>
+        }
+      />
 
       {/* Summary */}
       <div className="grid grid-cols-3 gap-2 sm:gap-3">
@@ -112,18 +113,18 @@ export function Live() {
       ) : (
         <div className="space-y-3">
           {active.map((entry) => (
-            <Card key={entry.key_id}>
+            <Card key={entry.key_id} className={roleRowClassName(entry.buyer_name, entry.quota_tokens, entry.is_ultra) || undefined}>
               <div className="p-4 space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse shrink-0" />
-                    <span className={`font-medium text-sm truncate ${buyerNameClassName(entry.buyer_name, entry.quota_tokens)}`}>
+                    <span className={`font-medium text-sm truncate ${buyerNameClassName(entry.buyer_name, entry.quota_tokens, entry.is_ultra)}`}>
                       {entry.buyer_name}
                     </span>
                     {isSuperAdminName(entry.buyer_name) ? <SuperAdminBadge /> : null}
                     {isSupporterName(entry.buyer_name) ? <SupporterBadge /> : null}
                     {isHelperName(entry.buyer_name) ? <HelperBadge /> : null}
-                    {!isSuperAdminName(entry.buyer_name) && !isSupporterName(entry.buyer_name) && !isHelperName(entry.buyer_name) && isUltraQuota(entry.quota_tokens) ? <UltraBadge /> : null}
+                    {!isSuperAdminName(entry.buyer_name) && !isSupporterName(entry.buyer_name) && !isHelperName(entry.buyer_name) && isUltraKey(entry.is_ultra, entry.quota_tokens) ? <UltraBadge /> : null}
                   </div>
                   <Badge variant="info">{entry.request_count} req</Badge>
                 </div>

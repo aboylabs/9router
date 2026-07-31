@@ -10,7 +10,7 @@ import {
   isAllowedUpstreamModelId
 } from "./model-alias.js";
 import { createSession, clearSession, readSession, requireAdmin, getActiveSessions, revokeSession, revokeAllOtherSessions } from "./session.js";
-import { createApiKeyRecord, createBuyerWithApiKeyRecord, invalidateApiKeyCache } from "./repositories.js";
+import { createApiKeyRecord, invalidateApiKeyCache } from "./repositories.js";
 import { generateApiKey, apiKeyPrefix, hashApiKey, hashPassword, verifyPassword } from "./security.js";
 import { FixedWindowRateLimiter, chatRateLimiter } from "./rate-limiter.js";
 
@@ -51,12 +51,7 @@ import {
 import {
   CREATE_KEY_PACKAGE_IDS,
   CREATE_KEY_PACKAGES_BY_ID,
-  CREATABLE_PACKAGE_IDS,
-  DEFAULT_CREATE_KEY_PACKAGE_ID,
-  DEFAULT_PACKAGE_ID,
-  PRESET_PACKAGES_BY_ID,
-  salesBucketForPackageId,
-  salesPriceForPackageId
+  DEFAULT_CREATE_KEY_PACKAGE_ID
 } from "../shared/package-catalog.js";
 
 /** Get current time in Indonesia (WIB/GMT+7) as ISO string */
@@ -64,21 +59,9 @@ function nowMYT(): Date {
   return new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" }));
 }
 
-/** Get expires_at: N hours from now, returned as ISO string */
-function expiresInHours(hours: number): string {
-  const now = Date.now();
-  return new Date(now + hours * 60 * 60 * 1000).toISOString();
-}
-
 const loginSchema = z.object({
   email: z.string().min(1),
   password: z.string().min(1)
-});
-
-const buyerSchema = z.object({
-  name: z.string().min(1),
-  email: z.string().email().optional().nullable(),
-  notes: z.string().optional().nullable()
 });
 
 const modelAccessRoleSchema = z.enum(MODEL_ACCESS_ROLES);
@@ -128,19 +111,13 @@ const keySchema = z.object({
 type AlwaysAvailableModel = { id: string; upstream_model: string; display_name: string };
 const ALWAYS_AVAILABLE_MODELS: AlwaysAvailableModel[] = [];
 
-const buyerPackageSchema = z.object({
-  name: z.string().min(1),
-  email: z.string().email().optional().nullable(),
-  notes: z.string().optional().nullable(),
-  package_id: z.enum(CREATABLE_PACKAGE_IDS).default(DEFAULT_PACKAGE_ID),
-});
-
 // Create API Key from public Prices packages (Starter/Pro/Business/Ultra).
 // packageId drives quota_tokens + rate_limit_rpm; days defaults to package.defaultDays (28).
 const createKeySchema = z.object({
   name: z.string().min(1),
   days: z.number().int().positive().optional(),
   packageId: z.enum(CREATE_KEY_PACKAGE_IDS).default(DEFAULT_CREATE_KEY_PACKAGE_ID),
+  unlimitedQuota: z.boolean().optional().default(false),
 });
 
 const upstreamModelSchema = z.object({
@@ -168,7 +145,9 @@ async function activeAllowedModelIds() {
   return result.rows.map((row) => row.id);
 }
 
-/** Key ids matching one or more access roles (union). */
+/** Key ids matching one or more access roles (union).
+ *  Checks both name-match (legacy) AND per-key access_roles DB column.
+ */
 async function keyIdsForAccessRoles(roles: ModelAccessRole[]): Promise<string[]> {
   const normalized = normalizeAccessRoles(roles);
   if (!normalized.length) return [];
@@ -178,16 +157,23 @@ async function keyIdsForAccessRoles(roles: ModelAccessRole[]): Promise<string[]>
   let i = 1;
 
   if (normalized.includes("dev")) {
+    // Name-match (legacy) OR explicit access_roles column
     conditions.push(`lower(trim(b.name)) = $${i++}`);
     params.push("super admin");
+    conditions.push(`$${i++} = any(coalesce(k.access_roles, '{}'::text[]))`);
+    params.push("dev");
   }
   if (normalized.includes("supporter")) {
     conditions.push(`lower(trim(b.name)) = any($${i++}::text[])`);
-    params.push(["gilbert arias", "yuop"]);
+    params.push(["gilbert arias", "yuop", "attta rebelution"]);
+    conditions.push(`$${i++} = any(coalesce(k.access_roles, '{}'::text[]))`);
+    params.push("supporter");
   }
   if (normalized.includes("ultra")) {
-    conditions.push(`k.quota_tokens = $${i++}`);
+    // Ultra role: is_ultra flag OR access_roles column OR legacy 500M quota
+    conditions.push(`(k.is_ultra = true or k.quota_tokens = $${i++} or $${i++} = any(coalesce(k.access_roles, '{}'::text[])))`);
     params.push(ULTRA_QUOTA_TOKENS);
+    params.push("ultra");
   }
 
   const result = await query<{ id: string }>(
@@ -400,8 +386,9 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     const label = `${pkg.label} · ${days} hari`;
 
     const modelIds = await activeAllowedModelIds();
-    // Ultra package also gets models restricted to ultra role.
-    if (pkg.quotaTokens === ULTRA_QUOTA_TOKENS) {
+    // Ultra role is a dedicated flag on the package; grant ultra-restricted models.
+    const isUltraPackage = pkg.id === "ultra";
+    if (isUltraPackage) {
       const ultraModels = await modelIdsWithAccessRole("ultra");
       for (const id of ultraModels) {
         if (!modelIds.includes(id)) modelIds.push(id);
@@ -416,13 +403,14 @@ export async function registerAdminRoutes(app: FastifyInstance) {
       label,
       apiKey,
       expiresAt,
-      quotaTokens: pkg.quotaTokens,
+      quotaTokens: parsed.data.unlimitedQuota ? null : pkg.quotaTokens,
       quotaRequests: null,
       modelIds,
       dailyReset: false,
       dailyQuotaTokens: null,
       packageId: pkg.id,
-      rateLimitRpm: pkg.rateLimitRpm
+      rateLimitRpm: pkg.rateLimitRpm,
+      isUltra: isUltraPackage
     });
     invalidateApiKeyCache();
 
@@ -442,7 +430,7 @@ export async function registerAdminRoutes(app: FastifyInstance) {
       package: {
         id: pkg.id,
         label: pkg.label,
-        quota_tokens: pkg.quotaTokens,
+        quota_tokens: parsed.data.unlimitedQuota ? null : pkg.quotaTokens,
         daily_quota_tokens: null,
         daily_reset: false,
         rate_limit_rpm: pkg.rateLimitRpm,
@@ -533,6 +521,55 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     return { updated: result.rowCount || 0, expires_at };
   });
 
+  // --- Add days to key expiry (per-key) ---
+  app.post("/admin/keys/:keyId/add-days", async (request, reply) => {
+    const params = z.object({ keyId: z.string().uuid() }).safeParse(request.params);
+    if (!params.success) return reply.code(400).send({ error: "Invalid key id" });
+
+    const body = z.object({ days: z.number().int().min(1).max(3650) }).safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ error: "Invalid payload. Requires { days: number (1-3650) }" });
+
+    const result = await query<{ id: string; expires_at: string }>(
+      `UPDATE api_keys SET expires_at = GREATEST(expires_at, NOW()) + make_interval(days => $1) WHERE id = $2 AND deleted_at IS NULL AND expires_at IS NOT NULL RETURNING id, expires_at`,
+      [body.data.days, params.data.keyId]
+    );
+    if (!result.rowCount) return reply.code(404).send({ error: "Key not found or has no expiry" });
+
+    return { key: result.rows[0], days_added: body.data.days };
+  });
+
+  // --- Add days to key expiry (bulk) ---
+  app.post("/admin/keys/add-days", async (request, reply) => {
+    const body = z.object({
+      all: z.boolean().optional(),
+      keyIds: z.array(z.string().uuid()).optional(),
+      days: z.number().int().min(1).max(3650)
+    }).safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ error: "Invalid payload. Requires { days, all?: true, keyIds?: string[] }" });
+
+    const { all, keyIds, days } = body.data;
+    if (!all && (!keyIds || keyIds.length === 0)) {
+      return reply.code(400).send({ error: "Must provide 'all: true' or 'keyIds' array" });
+    }
+
+    let result;
+    const activeFilter = `deleted_at IS NULL AND revoked_at IS NULL AND expires_at IS NOT NULL AND expires_at > NOW() AND is_hidden = false`;
+
+    if (all) {
+      result = await query(
+        `UPDATE api_keys SET expires_at = expires_at + make_interval(days => $1) WHERE ${activeFilter}`,
+        [days]
+      );
+    } else {
+      result = await query(
+        `UPDATE api_keys SET expires_at = expires_at + make_interval(days => $1) WHERE id = ANY($2) AND ${activeFilter}`,
+        [days, keyIds]
+      );
+    }
+
+    return { updated: result.rowCount || 0, days_added: days };
+  });
+
   // --- Add tokens to keys ---
   app.post("/admin/keys/add-tokens", async (request, reply) => {
     const body = z.object({
@@ -609,67 +646,6 @@ export async function registerAdminRoutes(app: FastifyInstance) {
        order by b.created_at desc`
     );
     return { buyers: result.rows };
-  });
-
-  app.post("/admin/buyers", async (request, reply) => {
-    const parsed = buyerSchema.safeParse(request.body);
-    if (!parsed.success) return reply.code(400).send({ error: "Invalid buyer payload" });
-
-    const result = await query(
-      `insert into buyers (name, email, notes) values ($1, $2, $3) returning *`,
-      [parsed.data.name, parsed.data.email ?? null, parsed.data.notes ?? null]
-    );
-    return reply.code(201).send({ buyer: result.rows[0] });
-  });
-
-  app.post("/admin/buyer-packages", async (request, reply) => {
-    const parsed = buyerPackageSchema.safeParse(request.body);
-    if (!parsed.success) return reply.code(400).send({ error: "Invalid buyer package payload" });
-
-    const pkg = PRESET_PACKAGES_BY_ID[parsed.data.package_id];
-    const pkgId = pkg.id;
-    const pkgLabel = pkg.label;
-    const pkgQuota = pkg.quotaTokens;
-    const pkgExpiryHours = pkg.expiryHours;
-    const pkgDailyReset = pkg.dailyReset;
-    const pkgDailyQuota = pkg.dailyQuotaTokens;
-
-    const apiKey = generateApiKey();
-    const expiresAt = expiresInHours(pkgExpiryHours);
-    const modelIds = await activeAllowedModelIds();
-    if (!modelIds.length) {
-      return reply.code(500).send({ error: "No active white-label models are configured" });
-    }
-
-    const created = await createBuyerWithApiKeyRecord({
-      name: parsed.data.name,
-      email: parsed.data.email ?? null,
-      notes: parsed.data.notes ?? null,
-      keyLabel: pkgLabel,
-      apiKey,
-      expiresAt,
-      quotaTokens: pkgQuota,
-      quotaRequests: null,
-      modelIds,
-      dailyReset: pkgDailyReset,
-      dailyQuotaTokens: pkgDailyQuota,
-      packageId: pkgId
-    });
-    invalidateApiKeyCache();
-
-    return reply.code(201).send({
-      apiKey,
-      package: {
-        id: pkgId,
-        label: pkgLabel,
-        quota_tokens: pkgQuota,
-        daily_quota_tokens: pkgDailyQuota,
-        daily_reset: pkgDailyReset,
-        expires_at: expiresAt
-      },
-      ...created,
-      warning: "This API key is shown once. Store it now."
-    });
   });
 
   app.get("/admin/models", async () => {
@@ -892,7 +868,8 @@ export async function registerAdminRoutes(app: FastifyInstance) {
       `select k.id, k.buyer_id, b.name as buyer_name, b.email as buyer_email,
         k.label, k.key_prefix, k.key_plain, k.expires_at,
         k.revoked_at, k.deleted_at, k.quota_tokens, k.quota_requests, k.used_tokens, k.used_requests, k.created_at,
-        k.daily_reset, k.daily_quota_tokens, k.package_id, k.rate_limit_rpm
+        k.daily_reset, k.daily_quota_tokens, k.package_id, k.rate_limit_rpm, k.is_ultra,
+        k.access_roles
        from api_keys k
        join buyers b on b.id = k.buyer_id
        where k.deleted_at is null and k.revoked_at is null and k.is_hidden = false
@@ -1060,6 +1037,57 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     };
   });
 
+  // --- Set per-key access roles (dev / supporter / ultra) ---
+  app.patch("/admin/keys/:keyId/roles", async (request, reply) => {
+    const params = z.object({ keyId: z.string().uuid() }).safeParse(request.params);
+    if (!params.success) return reply.code(400).send({ error: "Invalid key id" });
+
+    const body = z.object({
+      roles: z.array(z.enum(MODEL_ACCESS_ROLES))
+    }).safeParse(request.body);
+    if (!body.success) {
+      return reply.code(400).send({ error: "Invalid payload. Requires { roles: string[] } where each role is one of: dev, supporter, ultra" });
+    }
+
+    const roles = normalizeAccessRoles(body.data.roles);
+
+    const result = await query<{ id: string; access_roles: string[] | null }>(
+      `UPDATE api_keys SET access_roles = $2::text[] WHERE id = $1 AND deleted_at IS NULL RETURNING id, access_roles`,
+      [params.data.keyId, roles]
+    );
+    if (!result.rowCount) return reply.code(404).send({ error: "Key not found" });
+
+    // Sync is_ultra flag: if 'ultra' in roles, set is_ultra = true for backward compat
+    if (roles.includes("ultra")) {
+      await query(`UPDATE api_keys SET is_ultra = true WHERE id = $1`, [params.data.keyId]);
+    } else {
+      // If 'ultra' was removed and it was only set via access_roles, clear the flag
+      // But keep is_ultra=true if key was created as Ultra package (has ultra quota)
+      const ultraCheck = await query<{ quota_tokens: string | null; package_id: string | null }>(
+        `SELECT quota_tokens, package_id FROM api_keys WHERE id = $1`,
+        [params.data.keyId]
+      );
+      const k = ultraCheck.rows[0];
+      if (k && k.package_id !== "ultra" && k.quota_tokens !== String(ULTRA_QUOTA_TOKENS)) {
+        await query(`UPDATE api_keys SET is_ultra = false WHERE id = $1`, [params.data.keyId]);
+      }
+    }
+
+    invalidateApiKeyCache();
+    // Re-sync restricted model grants for this key
+    await syncKeyRestrictedModelAccess(params.data.keyId);
+
+    const fresh = await query(
+      `SELECT id, access_roles, is_ultra FROM api_keys WHERE id = $1 LIMIT 1`,
+      [params.data.keyId]
+    );
+    return {
+      ok: true,
+      key: fresh.rows[0],
+      roles
+    };
+  });
+
   // --- Toggle daily reset for a key (quota resets at 00:00 WIB) ---
   app.patch("/admin/keys/:keyId/daily-reset", async (request, reply) => {
     const params = z.object({ keyId: z.string().uuid() }).safeParse(request.params);
@@ -1191,7 +1219,7 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     const result = await query(
       `select ue.created_at, ue.agent_id, ue.endpoint, ue.model_id, ue.status_code, ue.success,
         ue.prompt_tokens, ue.completion_tokens, ue.total_tokens, ue.estimated, ue.cost_estimate, ue.latency_ms,
-        b.name as buyer_name, k.key_prefix, k.quota_tokens
+        b.name as buyer_name, k.key_prefix, k.quota_tokens, k.is_ultra
        from usage_events ue
        left join buyers b on b.id = ue.buyer_id
        left join api_keys k on k.id = ue.api_key_id
@@ -1199,31 +1227,6 @@ export async function registerAdminRoutes(app: FastifyInstance) {
        limit 250`
     );
     return { events: result.rows };
-  });
-
-  app.get("/admin/usage/by-buyer", async () => {
-    const result = await query(
-      `select b.name as buyer_name, count(ue.id)::integer as requests,
-        coalesce(sum(ue.total_tokens), 0)::bigint as total_tokens,
-        coalesce(sum(ue.cost_estimate), 0)::numeric as cost_estimate
-       from buyers b
-       left join usage_events ue on ue.buyer_id = b.id
-       group by b.id
-       order by total_tokens desc`
-    );
-    return { rows: result.rows };
-  });
-
-  app.get("/admin/usage/by-agent", async () => {
-    const result = await query(
-      `select agent_id, count(*)::integer as requests,
-        coalesce(sum(total_tokens), 0)::bigint as total_tokens,
-        coalesce(sum(cost_estimate), 0)::numeric as cost_estimate
-       from usage_events
-       group by agent_id
-       order by total_tokens desc`
-    );
-    return { rows: result.rows };
   });
 
   app.get("/admin/buyers/:buyerId/usage", async (request, reply) => {
@@ -1249,6 +1252,7 @@ export async function registerAdminRoutes(app: FastifyInstance) {
         k.key_prefix,
         k.id as key_id,
         k.quota_tokens,
+        k.is_ultra,
         b.name as buyer_name,
         b.email as buyer_email,
         count(ue.id)::int as request_count,
@@ -1260,7 +1264,7 @@ export async function registerAdminRoutes(app: FastifyInstance) {
        join buyers b on b.id = k.buyer_id
        where ue.created_at > now() - interval '5 minutes'
          and k.is_hidden = false
-       group by k.id, k.key_prefix, k.quota_tokens, b.name, b.email
+       group by k.id, k.key_prefix, k.quota_tokens, k.is_ultra, b.name, b.email
        order by max(ue.created_at) desc`
     );
     return { active: result.rows };
@@ -1279,6 +1283,7 @@ export async function registerAdminRoutes(app: FastifyInstance) {
         k.expires_at,
         k.created_at as key_created_at,
         k.quota_tokens,
+        k.is_ultra,
         COUNT(ue.id)::int as total_requests,
         COALESCE(SUM(ue.total_tokens), 0)::bigint as total_tokens,
         COALESCE(SUM(ue.prompt_tokens), 0)::bigint as prompt_tokens,
@@ -1288,7 +1293,7 @@ export async function registerAdminRoutes(app: FastifyInstance) {
       JOIN api_keys k ON k.id = ue.api_key_id
       JOIN buyers b ON b.id = k.buyer_id
       WHERE k.is_hidden = false
-      GROUP BY b.id, b.name, b.email, k.id, k.label, k.key_prefix, k.expires_at, k.created_at, k.quota_tokens
+      GROUP BY b.id, b.name, b.email, k.id, k.label, k.key_prefix, k.expires_at, k.created_at, k.quota_tokens, k.is_ultra
       HAVING COUNT(ue.id) > 0
       ORDER BY total_requests DESC
       LIMIT 100`
@@ -1787,76 +1792,6 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     return { synced, removed: 0, message: `Synced ${synced} models from upstream, 0 removed` };
   });
 
-  // --- Sales ---
-  app.get("/admin/sales", async (request, reply) => {
-    const params = request.query as { from?: string; to?: string };
-    const now = new Date();
-    const today = now.toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
-    const fromDate = params.from || today;
-    const toDate = params.to || today;
-
-    const result = await query<{ date: string; package_id: string | null; units: string }>(
-      `SELECT
-        DATE(created_at AT TIME ZONE 'Asia/Jakarta')::text as date,
-        package_id,
-        COUNT(*)::bigint as units
-       FROM api_keys
-        WHERE created_at >= ($1::date AT TIME ZONE 'Asia/Jakarta')
-          AND created_at < (($2::date + interval '1 day') AT TIME ZONE 'Asia/Jakarta')
-GROUP BY DATE(created_at AT TIME ZONE 'Asia/Jakarta'), package_id
-        ORDER BY date DESC`,
-      [fromDate, toDate]
-    );
-
-    const daysByDate = new Map<string, {
-      date: string;
-      paket_a: number;
-      paket_b: number;
-      legacy: number;
-      units: number;
-      total_rp: number;
-    }>();
-
-    for (const row of result.rows) {
-      const units = Number(row.units);
-      const day = daysByDate.get(row.date) ?? {
-        date: row.date,
-        paket_a: 0,
-        paket_b: 0,
-        legacy: 0,
-        units: 0,
-        total_rp: 0,
-      };
-      const bucket = salesBucketForPackageId(row.package_id);
-
-      if (bucket === "a") day.paket_a += units;
-      else if (bucket === "b") day.paket_b += units;
-      else day.legacy += units;
-
-      day.units += units;
-      day.total_rp += units * salesPriceForPackageId(row.package_id);
-      daysByDate.set(row.date, day);
-    }
-
-    const days = Array.from(daysByDate.values()).sort((a, b) => b.date.localeCompare(a.date));
-
-    const todayRow = days.find((d) => d.date === today);
-    const yesterdayDate = new Date(now);
-    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-    const yesterdayStr = yesterdayDate.toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
-    const yesterdayRow = days.find((d) => d.date === yesterdayStr);
-
-    const summary = {
-      total_units: days.reduce((s, d) => s + d.units, 0),
-      total_rp: days.reduce((s, d) => s + d.total_rp, 0),
-      today_units: todayRow?.units ?? 0,
-      today_rp: todayRow?.total_rp ?? 0,
-      yesterday_units: yesterdayRow?.units ?? 0,
-      yesterday_rp: yesterdayRow?.total_rp ?? 0,
-    };
-
-    return { days, summary };
-  });
 }
 
 export async function seedSystemSettings() {
