@@ -165,7 +165,7 @@ async function keyIdsForAccessRoles(roles: ModelAccessRole[]): Promise<string[]>
   }
   if (normalized.includes("supporter")) {
     conditions.push(`lower(trim(b.name)) = any($${i++}::text[])`);
-    params.push(["gilbert arias", "yuop", "attta rebelution"]);
+    params.push(["gilbert arias", "yuop", "attta rebelution", "aditya sandy"]);
     conditions.push(`$${i++} = any(coalesce(k.access_roles, '{}'::text[]))`);
     params.push("supporter");
   }
@@ -619,7 +619,7 @@ export async function registerAdminRoutes(app: FastifyInstance) {
         `select count(*) as requests, coalesce(sum(total_tokens), 0) as tokens, coalesce(sum(cost_estimate), 0) as cost
          from usage_events WHERE status_code != 400`
       ),
-      query<{ count: string }>(`select count(*) from api_keys`)
+      query<{ count: string }>(`select count(*) from api_keys where is_hidden = false`)
     ]);
 
     return {

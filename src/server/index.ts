@@ -2819,6 +2819,25 @@ function publicDashboardPage(): string {
           color: #fff;
           background: rgba(202,138,4,0.2);
         }
+        .price-card.supporter .price-scarcity {
+          display: inline-block;
+          align-self: center;
+          margin: 0 0 1rem;
+          padding: 0.32rem 0.9rem;
+          border-radius: 999px;
+          background: rgba(202,138,4,0.14);
+          border: 1px solid rgba(234,179,8,0.5);
+          color: #fde68a;
+          font-size: 0.78rem;
+          font-weight: 700;
+          letter-spacing: 0.03em;
+          white-space: nowrap;
+          animation: scarcityPulse 2.2s ease-in-out infinite;
+        }
+        @keyframes scarcityPulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(234,179,8,0.35); }
+          50% { box-shadow: 0 0 0 6px rgba(234,179,8,0); }
+        }
         .price-badge {
           position: absolute;
           top: -11px;
@@ -2964,7 +2983,7 @@ function publicDashboardPage(): string {
           to { opacity: 1; transform: translateY(0); }
         }
         @media (prefers-reduced-motion: reduce) {
-          .price-card, .price-card::before, .price-amount, .price-features li, .price-cta, .price-cta::after { animation: none !important; opacity: 1 !important; }
+          .price-card, .price-card::before, .price-amount, .price-features li, .price-cta, .price-cta::after, .price-scarcity { animation: none !important; opacity: 1 !important; }
         }
         .price-cta:hover { border-color: #3b82f6; color: #fff; background: #1e293b; }
         .price-cta.primary {
@@ -3034,6 +3053,7 @@ function publicDashboardPage(): string {
           .pricing-grid { grid-template-columns: 1fr; max-width: none; gap: 0.95rem; }
           .price-card { padding: 1.25rem 1rem 1.1rem; }
           .price-card.supporter { padding-top: 2.1rem; }
+          .price-scarcity { font-size: 0.72rem; }
           .price-features li { font-size: 0.84rem; }
           .price-cta { font-size: 0.84rem; padding: 0.75rem 0.85rem; }
           .prices-pills { gap: 0.4rem; }
@@ -3047,6 +3067,7 @@ function publicDashboardPage(): string {
           .price-tier { font-size: 0.72rem; }
           .price-features { gap: 0.5rem; }
           .price-features li { font-size: 0.8rem; }
+          .price-scarcity { font-size: 0.68rem; padding: 0.28rem 0.7rem; }
           .price-pill { font-size: 0.65rem; padding: 0.25rem 0.5rem; }
         }
       </style>
@@ -3266,6 +3287,7 @@ function publicDashboardPage(): string {
             <div class="price-tier" style="color:#fde68a">Supporter Pack</div>
             <div class="price-amount contact"><span>DM</span> Admin</div>
             <div class="price-period">No expiry — lifetime key</div>
+            <div class="price-scarcity">🔥 Only <strong>1</strong> slot left</div>
             <ul class="price-features">
               <li><span class="price-check">✓</span><span><strong>Unlimited tokens</strong></span></li>
               <li><span class="price-check">✓</span><span>Access to <strong>all pro models</strong></span></li>
@@ -3371,11 +3393,11 @@ function publicDashboardPage(): string {
 
     function isSupporterName(name) {
       const n = (name || '').trim().toLowerCase();
-      return n === 'gilbert arias' || n === 'yuop' || n === 'attta rebelution';
+      return n === 'gilbert arias' || n === 'yuop' || n === 'attta rebelution' || n === 'aditya sandy';
     }
 
     function isHelperName(name) {
-      return (name || '').trim().toLowerCase() === 'afiq';
+      return false;
     }
 
     function isUltraRow(name, quotaTokens, isUltra) {

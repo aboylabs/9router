@@ -7,10 +7,10 @@
 export const SUPER_ADMIN_NAME = "super admin";
 
 /** Supporter / donatur roster (lowercase). Extend when promoting someone. */
-export const SUPPORTER_NAMES = ["gilbert arias", "yuop", "attta rebelution"] as const;
+export const SUPPORTER_NAMES = ["gilbert arias", "yuop", "attta rebelution", "aditya sandy"] as const;
 
 /** Helper / builder roster (lowercase). Not auto-granted restricted models. */
-export const HELPER_NAMES = ["afiq"] as const;
+export const HELPER_NAMES = [] as const;
 
 /** Per-model access roles that can be toggled independently in Models menu. */
 export const MODEL_ACCESS_ROLES = ["dev", "supporter", "ultra"] as const;

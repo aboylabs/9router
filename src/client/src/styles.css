@@ -285,7 +285,6 @@
   50% { background-position: 100% 50%; }
 }
 .sa-row-highlight {
-  position: relative;
   background: linear-gradient(90deg,
     rgba(168,85,247,0.03) 0%,
     rgba(232,121,249,0.02) 50%,
@@ -293,7 +292,12 @@
   background-size: 200% 100%;
   animation: sa-row-glow 4s ease-in-out infinite;
 }
-.sa-row-highlight::before {
+/* Left accent bar on first cell — uses td::before to avoid TR pseudo
+   creating an anonymous table-cell that shifts column alignment. */
+.sa-row-highlight > td:first-child {
+  position: relative;
+}
+.sa-row-highlight > td:first-child::before {
   content: '';
   position: absolute;
   left: 0; top: 0; bottom: 0;
@@ -301,6 +305,7 @@
   border-radius: 2px;
   background: linear-gradient(180deg, #c4b5fd, #e879f9, #f0abfc);
   box-shadow: 0 0 4px rgba(232,121,249,0.35);
+  z-index: 1;
 }
 
 /* prefers-reduced-motion: disable all SA animations */
@@ -312,6 +317,7 @@
   .sa-sparkle-1,
   .sa-sparkle-2,
   .sa-row-highlight,
+  .sa-row-highlight::after,
   .sp-name-anim,
   .sp-badge-anim,
   .sp-badge-anim::after,
@@ -423,7 +429,6 @@
   50% { background-position: 100% 50%; }
 }
 .sp-row-highlight {
-  position: relative;
   background: linear-gradient(90deg,
     rgba(250,204,21,0.03) 0%,
     rgba(251,191,36,0.02) 50%,
@@ -431,7 +436,10 @@
   background-size: 200% 100%;
   animation: sp-row-glow 4s ease-in-out infinite;
 }
-.sp-row-highlight::before {
+.sp-row-highlight > td:first-child {
+  position: relative;
+}
+.sp-row-highlight > td:first-child::before {
   content: '';
   position: absolute;
   left: 0; top: 0; bottom: 0;
@@ -439,6 +447,7 @@
   border-radius: 2px;
   background: linear-gradient(180deg, #fef9c3, #fde047, #fbbf24);
   box-shadow: 0 0 4px rgba(250,204,21,0.35);
+  z-index: 1;
 }
 
 /* ════════════════════════════════════════════════════
@@ -530,7 +539,6 @@
   50% { background-position: 100% 50%; }
 }
 .ul-row-highlight {
-  position: relative;
   background: linear-gradient(90deg,
     rgba(14,165,233,0.03) 0%,
     rgba(34,211,238,0.02) 50%,
@@ -538,7 +546,10 @@
   background-size: 200% 100%;
   animation: ul-row-glow 4s ease-in-out infinite;
 }
-.ul-row-highlight::before {
+.ul-row-highlight > td:first-child {
+  position: relative;
+}
+.ul-row-highlight > td:first-child::before {
   content: '';
   position: absolute;
   left: 0; top: 0; bottom: 0;
@@ -546,4 +557,5 @@
   border-radius: 2px;
   background: linear-gradient(180deg, #bae6fd, #22d3ee, #60a5fa);
   box-shadow: 0 0 4px rgba(34,211,238,0.35);
+  z-index: 1;
 }

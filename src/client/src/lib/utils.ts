@@ -77,28 +77,31 @@ export function formatTokens(value: number | string): string {
 }
 
 /** Super Admin buyer — purple name styling across admin UI */
-export function isSuperAdminName(name: string | null | undefined): boolean {
-  return (name || "").trim().toLowerCase() === "super admin";
+export function isSuperAdminName(name: string | null | undefined, accessRoles?: string[] | null): boolean {
+  if ((name || "").trim().toLowerCase() === "super admin") return true;
+  return Array.isArray(accessRoles) && accessRoles.includes("dev");
 }
 
 /**
  * Supporter / donatur buyers — bright yellow name + badge.
  * Name-match list (extend as needed). Currently: GILBERT ARIAS, yuop.
  */
-const SUPPORTER_NAMES = new Set(["gilbert arias", "yuop", "attta rebelution"]);
+const SUPPORTER_NAMES = new Set(["gilbert arias", "yuop", "attta rebelution", "aditya sandy"]);
 
-export function isSupporterName(name: string | null | undefined): boolean {
-  return SUPPORTER_NAMES.has((name || "").trim().toLowerCase());
+export function isSupporterName(name: string | null | undefined, accessRoles?: string[] | null): boolean {
+  if (SUPPORTER_NAMES.has((name || "").trim().toLowerCase())) return true;
+  return Array.isArray(accessRoles) && accessRoles.includes("supporter");
 }
 
 /**
  * Helper / Builder buyers — emerald name + badge (helped build the server).
- * Name-match list (extend as needed). Currently: Afiq.
+ * Name-match list (extend as needed). Currently: none.
  */
-const HELPER_NAMES = new Set(["afiq"]);
+const HELPER_NAMES = new Set<string>([]);
 
-export function isHelperName(name: string | null | undefined): boolean {
-  return HELPER_NAMES.has((name || "").trim().toLowerCase());
+export function isHelperName(name: string | null | undefined, accessRoles?: string[] | null): boolean {
+  if (HELPER_NAMES.has((name || "").trim().toLowerCase())) return true;
+  return Array.isArray(accessRoles) && accessRoles.includes("helper");
 }
 
 /** Known product token quotas (exact match). */
@@ -128,21 +131,22 @@ export function isUltraKey(isUltra?: boolean | null, quotaTokens?: number | stri
 export function buyerNameClassName(
   name: string | null | undefined,
   quotaTokens?: number | string | null,
-  isUltra?: boolean | null
+  isUltra?: boolean | null,
+  accessRoles?: string[] | null
 ): string {
-  if (isSuperAdminName(name)) {
+  if (isSuperAdminName(name, accessRoles)) {
     return [
       "font-semibold",
       "sa-name-anim",
     ].join(" ");
   }
-  if (isSupporterName(name)) {
+  if (isSupporterName(name, accessRoles)) {
     return [
       "font-semibold",
       "sp-name-anim",
     ].join(" ");
   }
-  if (isHelperName(name)) {
+  if (isHelperName(name, accessRoles)) {
     return [
       "font-semibold",
       "bg-gradient-to-r from-emerald-600 via-teal-500 to-green-600",
@@ -172,11 +176,12 @@ export function buyerNameClassName(
 export function roleRowClassName(
   name: string | null | undefined,
   quotaTokens?: number | string | null,
-  isUltra?: boolean | null
+  isUltra?: boolean | null,
+  accessRoles?: string[] | null
 ): string {
-  if (isSuperAdminName(name)) return "sa-row-highlight";
-  if (isSupporterName(name)) return "sp-row-highlight";
-  if (isHelperName(name)) return ""; // helper — no row highlight for now
+  if (isSuperAdminName(name, accessRoles)) return "sa-row-highlight";
+  if (isSupporterName(name, accessRoles)) return "sp-row-highlight";
+  if (isHelperName(name, accessRoles)) return ""; // helper — no row highlight for now
   if (isUltraKey(isUltra, quotaTokens)) return "ul-row-highlight";
   return "";
 }

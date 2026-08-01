@@ -242,6 +242,14 @@ Response header `x-9router-upstream` shows which upstream handled the request.
 
 ## Changelog
 
+### v1.5.0 (2026-08-01)
+- **feat**: Per-key access roles (`api_keys.access_roles`) — RoleEditor (Dev/Supporter/Ultra) per key, `PATCH /admin/keys/:keyId/roles`, role detection merges DB roles + name-match rosters + package flags
+- **feat**: Supporter roster + aditya sandy (shared rosters, admin routes, public panel)
+- **feat**: Public Prices — Supporter Pack "Only 1 slot left" scarcity pill (gold/amber, pulse animation, responsive font, reduced-motion aware)
+- **fix**: Admin key count excludes hidden keys
+- **fix**: Row-highlight accent bar moved from `tr::before` to `td:first-child::before` (pseudo-element column-shift trap)
+- **fix**: Role badge sizing (16px hierarchy), table Name column width, truncate/`flex-1` collapse fixes in Keys table
+
 ### v1.4.0 (2026-07-26)
 - **feat**: Per-model access roles (Dev / Supporter / Ultra) — `models.access_roles`, Access modal in admin Models, snapshot rewrite of `buyer_model_access`; restricted models stay publicly visible with role badges
 - **feat**: Shared role rosters `src/shared/buyer-roles.ts` (client+server); Ultra = exact 500M quota keys

@@ -234,8 +234,8 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
     const roles = new Set<string>();
     const dbRoles = Array.isArray(key.access_roles) ? key.access_roles : [];
     for (const r of dbRoles) roles.add(String(r));
-    if (isSuperAdminName(key.buyer_name)) roles.add("dev");
-    if (isSupporterName(key.buyer_name)) roles.add("supporter");
+    if (isSuperAdminName(key.buyer_name, key.access_roles)) roles.add("dev");
+    if (isSupporterName(key.buyer_name, key.access_roles)) roles.add("supporter");
     if (isUltraKey(key.is_ultra, key.quota_tokens)) roles.add("ultra");
     return Array.from(roles);
   }
@@ -418,6 +418,8 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
   function RoleEditor({ keyRow }: { keyRow: Key }) {
     const currentRoles = getKeyRoles(keyRow);
     const isInherited = (role: string) => {
+      // Only name-match / package roles are inherited (cannot be removed).
+      // DB access_roles are always removable via Save.
       if (role === "dev") return isSuperAdminName(keyRow.buyer_name);
       if (role === "supporter") return isSupporterName(keyRow.buyer_name);
       if (role === "ultra") return isUltraKey(keyRow.is_ultra, keyRow.quota_tokens) && !(Array.isArray(keyRow.access_roles) && keyRow.access_roles.includes("ultra"));
@@ -582,12 +584,12 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
                       <Button size="sm" variant="secondary" onClick={() => setEditingNameId(null)}>Cancel</Button>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className={`font-medium text-sm truncate ${buyerNameClassName(key.buyer_name, key.quota_tokens, key.is_ultra)}`}>{key.buyer_name}</span>
-                      {isSuperAdminName(key.buyer_name) ? <SuperAdminBadge /> : null}
-                      {isSupporterName(key.buyer_name) ? <SupporterBadge /> : null}
-                      {isHelperName(key.buyer_name) ? <HelperBadge /> : null}
-                      {!isSuperAdminName(key.buyer_name) && !isSupporterName(key.buyer_name) && !isHelperName(key.buyer_name) && isUltraKey(key.is_ultra, key.quota_tokens) ? <UltraBadge /> : null}
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className={`font-medium text-sm truncate min-w-0 ${buyerNameClassName(key.buyer_name, key.quota_tokens, key.is_ultra, key.access_roles)}`}>{key.buyer_name}</span>
+                      {isSuperAdminName(key.buyer_name, key.access_roles) ? <SuperAdminBadge /> : null}
+                      {isSupporterName(key.buyer_name, key.access_roles) ? <SupporterBadge /> : null}
+                      {isHelperName(key.buyer_name, key.access_roles) ? <HelperBadge /> : null}
+                      {!isSuperAdminName(key.buyer_name, key.access_roles) && !isSupporterName(key.buyer_name, key.access_roles) && !isHelperName(key.buyer_name, key.access_roles) && isUltraKey(key.is_ultra, key.quota_tokens) ? <UltraBadge /> : null}
                       <button
                         onClick={() => { setEditingNameId(key.buyer_id); setEditNameValue(key.buyer_name); }}
                         className="text-text-muted hover:text-text-primary transition-colors shrink-0"
@@ -658,7 +660,7 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="whitespace-nowrap min-w-[100px] max-w-[160px]">Name</TableHead>
+              <TableHead className="whitespace-nowrap min-w-[200px] w-[200px]">Name</TableHead>
               <TableHead className="whitespace-nowrap min-w-[110px] max-w-[140px]">API Key</TableHead>
               <TableHead className="whitespace-nowrap text-right">Requests</TableHead>
               <TableHead className="whitespace-nowrap text-center">RPM</TableHead>
@@ -676,8 +678,8 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
               const effectiveQuota = getEffectiveQuota(key);
               const displayed = showFullKey === key.id ? fullKey(key) : key.key_prefix;
               return (
-              <TableRow key={key.id} className={roleRowClassName(key.buyer_name, key.quota_tokens, key.is_ultra) || undefined}>
-                <TableCell className="font-medium text-text-primary align-top py-2.5 max-w-[160px]">
+              <TableRow key={key.id} className={roleRowClassName(key.buyer_name, key.quota_tokens, key.is_ultra, key.access_roles) || undefined}>
+                <TableCell className="font-medium text-text-primary align-top py-2.5">
                   {editingNameId === key.buyer_id ? (
                     <div className="flex items-center gap-2">
                       <input
@@ -691,15 +693,15 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
                       <Button size="sm" variant="secondary" onClick={() => setEditingNameId(null)}>Cancel</Button>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className={`font-medium text-sm truncate ${buyerNameClassName(key.buyer_name, key.quota_tokens)}`}>{key.buyer_name}</span>
-                      {isSuperAdminName(key.buyer_name) ? <SuperAdminBadge /> : null}
-                      {isSupporterName(key.buyer_name) ? <SupporterBadge /> : null}
-                      {isHelperName(key.buyer_name) ? <HelperBadge /> : null}
-                      {!isSuperAdminName(key.buyer_name) && !isSupporterName(key.buyer_name) && !isHelperName(key.buyer_name) && isUltraKey(key.is_ultra, key.quota_tokens) ? <UltraBadge /> : null}
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className={`font-medium text-sm truncate min-w-0 ${buyerNameClassName(key.buyer_name, key.quota_tokens, key.is_ultra, key.access_roles)}`}>{key.buyer_name}</span>
+                      {isSuperAdminName(key.buyer_name, key.access_roles) ? <SuperAdminBadge /> : null}
+                      {isSupporterName(key.buyer_name, key.access_roles) ? <SupporterBadge /> : null}
+                      {isHelperName(key.buyer_name, key.access_roles) ? <HelperBadge /> : null}
+                      {!isSuperAdminName(key.buyer_name, key.access_roles) && !isSupporterName(key.buyer_name, key.access_roles) && !isHelperName(key.buyer_name, key.access_roles) && isUltraKey(key.is_ultra, key.quota_tokens) ? <UltraBadge /> : null}
                       <button
                         onClick={() => { setEditingNameId(key.buyer_id); setEditNameValue(key.buyer_name); }}
-                        className="text-text-muted hover:text-text-primary transition-colors"
+                        className="text-text-muted hover:text-text-primary transition-colors shrink-0"
                         title="Edit name"
                       >
                         <Edit className="h-3.5 w-3.5" />
