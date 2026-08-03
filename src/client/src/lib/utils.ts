@@ -86,7 +86,7 @@ export function isSuperAdminName(name: string | null | undefined, accessRoles?: 
  * Supporter / donatur buyers — bright yellow name + badge.
  * Name-match list (extend as needed). Currently: GILBERT ARIAS, yuop.
  */
-const SUPPORTER_NAMES = new Set(["gilbert arias", "yuop", "attta rebelution", "aditya sandy"]);
+const SUPPORTER_NAMES = new Set(["gilbert arias", "yuop", "attta rebelution", "aditya sandy", "dono"]);
 
 export function isSupporterName(name: string | null | undefined, accessRoles?: string[] | null): boolean {
   if (SUPPORTER_NAMES.has((name || "").trim().toLowerCase())) return true;

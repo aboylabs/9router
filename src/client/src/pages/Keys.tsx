@@ -426,8 +426,6 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
       return false;
     };
     const allRoles: { id: string; label: string; color: string }[] = [
-      { id: "dev", label: "Dev", color: "fuchsia" },
-      { id: "supporter", label: "Supporter", color: "amber" },
       { id: "ultra", label: "Ultra", color: "cyan" },
     ];
     const [selected, setSelected] = useState<Set<string>>(new Set(currentRoles));
@@ -634,8 +632,7 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
                 </div>
 
                 <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-text-muted">
-                  <span>Requests: <span className="text-text-primary font-medium">{Number(key.used_requests).toLocaleString()}</span></span>
-                  <span className="text-right">RPM: <span className="text-text-primary font-medium">{key.rate_limit_rpm ? `${key.rate_limit_rpm}` : "default"}</span></span>
+                  <span>RPM: <span className="text-text-primary font-medium">{key.rate_limit_rpm ? `${key.rate_limit_rpm}` : "default"}</span></span>
                   <span className="col-span-2">Sisa: <span className={`font-medium ${
                     (() => {
                       const r = formatRemaining(key.expires_at);
@@ -662,7 +659,6 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
             <TableRow>
               <TableHead className="whitespace-nowrap min-w-[200px] w-[200px]">Name</TableHead>
               <TableHead className="whitespace-nowrap min-w-[110px] max-w-[140px]">API Key</TableHead>
-              <TableHead className="whitespace-nowrap text-right">Requests</TableHead>
               <TableHead className="whitespace-nowrap text-center">RPM</TableHead>
               <TableHead className="whitespace-nowrap min-w-[100px] max-w-[120px]">Token Usage</TableHead>
               <TableHead className="whitespace-nowrap min-w-[65px] max-w-[90px]">Sisa</TableHead>
@@ -672,7 +668,7 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
           </TableHeader>
           <TableBody>
           {filtered.length === 0 ? (
-            <TableEmpty colSpan={8} message={search ? "No keys match your search" : "No API keys created yet"} />
+            <TableEmpty colSpan={7} message={search ? "No keys match your search" : "No API keys created yet"} />
           ) : (
             filtered.map((key) => {
               const effectiveQuota = getEffectiveQuota(key);
@@ -724,7 +720,6 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
                     <CopyButton text={fullKey(key)} />
                   </div>
                 </TableCell>
-                <TableCell className="align-top py-2.5 tabular-nums">{Number(key.used_requests).toLocaleString()}</TableCell>
                 <TableCell className="align-top py-2.5">
                   {key.rate_limit_rpm ? (
                     <span className="text-text-primary font-medium tabular-nums">{key.rate_limit_rpm}</span>

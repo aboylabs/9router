@@ -165,7 +165,7 @@ async function keyIdsForAccessRoles(roles: ModelAccessRole[]): Promise<string[]>
   }
   if (normalized.includes("supporter")) {
     conditions.push(`lower(trim(b.name)) = any($${i++}::text[])`);
-    params.push(["gilbert arias", "yuop", "attta rebelution", "aditya sandy"]);
+    params.push(["gilbert arias", "yuop", "attta rebelution", "aditya sandy", "dono"]);
     conditions.push(`$${i++} = any(coalesce(k.access_roles, '{}'::text[]))`);
     params.push("supporter");
   }

@@ -2819,6 +2819,27 @@ function publicDashboardPage(): string {
           color: #fff;
           background: rgba(202,138,4,0.2);
         }
+        .price-card.supporter .price-scarcity.soldout {
+          background: rgba(239,68,68,0.14);
+          border-color: rgba(248,113,113,0.55);
+          color: #fecaca;
+          animation: none;
+        }
+        .price-card.supporter .price-cta.soldout-cta,
+        .price-card.supporter .price-cta.soldout-cta:hover {
+          pointer-events: none;
+          cursor: not-allowed;
+          user-select: none;
+          border-color: rgba(148,163,184,0.4);
+          border-style: dashed;
+          color: #94a3b8;
+          background: rgba(51,65,85,0.35);
+          animation: ctaSlideUp 0.5s cubic-bezier(0.22,1,0.36,1) 0.5s forwards, soldoutGlow 2.6s ease-in-out infinite;
+        }
+        @keyframes soldoutGlow {
+          0%, 100% { text-shadow: none; }
+          50% { text-shadow: 0 0 12px rgba(253,230,138,0.45); }
+        }
         .price-card.supporter .price-scarcity {
           display: inline-block;
           align-self: center;
@@ -3287,7 +3308,7 @@ function publicDashboardPage(): string {
             <div class="price-tier" style="color:#fde68a">Supporter Pack</div>
             <div class="price-amount contact"><span>DM</span> Admin</div>
             <div class="price-period">No expiry — lifetime key</div>
-            <div class="price-scarcity">🔥 Only <strong>1</strong> slot left</div>
+            <div class="price-scarcity soldout">🚫 SOLD OUT — <strong>0</strong> slot left</div>
             <ul class="price-features">
               <li><span class="price-check">✓</span><span><strong>Unlimited tokens</strong></span></li>
               <li><span class="price-check">✓</span><span>Access to <strong>all pro models</strong></span></li>
@@ -3296,7 +3317,7 @@ function publicDashboardPage(): string {
               <li><span class="price-check">✓</span><span>Rate limit <strong>custom RPM</strong></span></li>
               <li><span class="price-check">✓</span><span>Priority support & early access</span></li>
             </ul>
-            <a class="price-cta" href="https://t.me/routers9" target="_blank" rel="noopener">Contact Admin</a>
+            <span class="price-cta soldout-cta" aria-disabled="true">Sold Out · Opening Soon — Stay Tuned ✨</span>
           </div>
         </div>
 
@@ -3393,7 +3414,7 @@ function publicDashboardPage(): string {
 
     function isSupporterName(name) {
       const n = (name || '').trim().toLowerCase();
-      return n === 'gilbert arias' || n === 'yuop' || n === 'attta rebelution' || n === 'aditya sandy';
+      return n === 'gilbert arias' || n === 'yuop' || n === 'attta rebelution' || n === 'aditya sandy' || n === 'dono';
     }
 
     function isHelperName(name) {
@@ -4098,9 +4119,9 @@ function publicDashboardPage(): string {
           let meta;
           if (isPriv) {
             const labels = roles.map(function(r) {
-              if (r === 'dev') return 'Super Admin (DEV)';
+              if (r === 'dev') return 'DEV';
               if (r === 'supporter') return 'Supporter';
-              if (r === 'ultra') return 'Ultra (500M)';
+              if (r === 'ultra') return 'Ultra';
               return r;
             });
             meta = '<span style="font-size:0.72rem;color:#fbbf24">Access: ' + labels.join(' · ') + '</span>';
@@ -4115,10 +4136,13 @@ function publicDashboardPage(): string {
           const grokBadge = cardBrand === 'grok' ? '<span class="grok-badge" title="Grok model">&#10022; Grok</span>' : '';
           const glmBadge = cardBrand === 'glm' ? '<span class="glm-badge" title="GLM model">&#10022; GLM</span>' : '';
           const deepseekBadge = cardBrand === 'deepseek' ? '<span class="deepseek-badge" title="DeepSeek model">&#10022; DeepSeek</span>' : '';
+          // Privileged: role badge moves to bottom meta row so it never clips the card frame
+          const topBadge = isPriv ? '' : badge;
+          const metaBadge = isPriv ? badge : '';
           html += '<div class="model-card' + cardClass + '" data-id="' + escapeHtml(m.id) + '" role="button" tabindex="0" title="Copy ' + escapeHtml(m.id) + '">' +
-            '<div class="model-card-top"><div class="model-card-name">' + escapeHtml(name) + '</div>' + claudeBadge + kimiBadge + qwenBadge + grokBadge + glmBadge + deepseekBadge + badge + '</div>' +
+            '<div class="model-card-top"><div class="model-card-name">' + escapeHtml(name) + '</div>' + claudeBadge + kimiBadge + qwenBadge + grokBadge + glmBadge + deepseekBadge + topBadge + '</div>' +
             '<div class="model-card-id">' + escapeHtml(m.id) + '</div>' +
-            '<div class="model-card-meta">' + meta + '</div></div>';
+            '<div class="model-card-meta">' + metaBadge + meta + '</div></div>';
         });
         html += '</div>';
         content.innerHTML = html;
