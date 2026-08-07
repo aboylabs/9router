@@ -986,7 +986,7 @@ function publicDashboardPage(): string {
       background-clip: text;
       color: transparent;
       filter: drop-shadow(0 0 10px rgba(192,132,252,0.55));
-      animation: saNameShine 3.2s ease-in-out infinite;
+      animation: saNameShine 3.2s ease-in-out;
     }
     @keyframes saNameShine {
       0%, 100% {
@@ -1019,7 +1019,7 @@ function publicDashboardPage(): string {
         linear-gradient(90deg, rgba(168,85,247,0.38), rgba(217,70,239,0.24), rgba(236,72,153,0.3));
       box-shadow: 0 0 14px rgba(192,132,252,0.45), 0 0 28px rgba(217,70,239,0.18);
       white-space: nowrap;
-      animation: saBadgePulse 2.4s ease-in-out infinite;
+      animation: saBadgePulse 2.4s ease-in-out;
     }
     .sa-badge::after {
       content: '';
@@ -1062,7 +1062,7 @@ function publicDashboardPage(): string {
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
-      animation: saNameShine 2.6s linear infinite;
+      animation: saNameShine 2.6s linear;
     }
     .sa-badge .sa-sparkle {
       position: absolute;
@@ -1100,7 +1100,7 @@ function publicDashboardPage(): string {
         rgba(232,121,249,0.05) 50%,
         rgba(236,72,153,0.08) 100%);
       background-size: 200% 100%;
-      animation: saRowGlow 4s ease-in-out infinite;
+      animation: saRowGlow 4s ease-in-out;
     }
     .sa-row-highlight td {
       background: inherit !important;
@@ -1133,7 +1133,7 @@ function publicDashboardPage(): string {
       background-clip: text;
       color: transparent;
       filter: drop-shadow(0 0 12px rgba(250,204,21,0.65));
-      animation: spNameShine 3s ease-in-out infinite;
+      animation: spNameShine 3s ease-in-out;
     }
     @keyframes spNameShine {
       0%, 100% {
@@ -1166,7 +1166,7 @@ function publicDashboardPage(): string {
         linear-gradient(90deg, rgba(250,204,21,0.4), rgba(251,191,36,0.28), rgba(245,158,11,0.34));
       box-shadow: 0 0 16px rgba(250,204,21,0.6), 0 0 30px rgba(245,158,11,0.22);
       white-space: nowrap;
-      animation: spBadgePulse 2.2s ease-in-out infinite;
+      animation: spBadgePulse 2.2s ease-in-out;
     }
     .sp-badge::after {
       content: '';
@@ -1213,13 +1213,13 @@ function publicDashboardPage(): string {
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
-      animation: spNameShine 2.4s linear infinite;
+      animation: spNameShine 2.4s linear;
     }
     @keyframes roleShimmerSweep {
-      0%, 20% { left: -130%; opacity: 0; }
+      0%, 20% { transform: translateX(0) skewX(-22deg); opacity: 0; }
       35% { opacity: 1; }
-      55% { left: 140%; opacity: 0.9; }
-      100% { left: 140%; opacity: 0; }
+      55% { transform: translateX(491%) skewX(-22deg); opacity: 0.9; }
+      100% { transform: translateX(491%) skewX(-22deg); opacity: 0; }
     }
     @media (prefers-reduced-motion: reduce) {
       .sa-name, .sa-badge, .sa-badge::after, .sa-badge svg, .sa-badge .sa-dev,
@@ -1230,7 +1230,9 @@ function publicDashboardPage(): string {
       .sp-row-highlight,
       .ul-name, .ul-badge, .ul-badge::after, .ul-badge svg, .ul-badge .ul-label,
       .ul-badge .ul-sparkle, .ul-badge .ul-sparkle-1, .ul-badge .ul-sparkle-2,
-      .ul-row-highlight {
+      .ul-row-highlight,
+      .pro-name, .pro-badge, .pro-badge::after, .pro-badge svg, .pro-badge .pro-label,
+      .pro-row-highlight {
         animation: none !important;
       }
     }
@@ -1287,6 +1289,91 @@ function publicDashboardPage(): string {
       text-shadow: 0 0 16px rgba(34,211,238,0.55);
       filter: drop-shadow(0 0 10px rgba(34,211,238,0.45));
     }
+
+    /* Pro badge — blue/indigo */
+    .pro-name {
+      font-weight: 700;
+      background: linear-gradient(90deg, #bfdbfe 0%, #60a5fa 45%, #818cf8 100%);
+      background-size: 220% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      filter: drop-shadow(0 0 10px rgba(96,165,250,0.45));
+      animation: ulNameShine 2.8s ease-in-out;
+    }
+    .pro-badge {
+      position: relative;
+      overflow: hidden;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.28rem;
+      margin-left: 0.4rem;
+      vertical-align: middle;
+      padding: 0.12rem 0.45rem 0.12rem 0.32rem;
+      border-radius: 0.375rem;
+      font-size: 0.62rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      line-height: 1;
+      color: #bfdbfe;
+      border: 1px solid rgba(96, 165, 250, 0.5);
+      background: linear-gradient(90deg, rgba(59,130,246,0.28), rgba(96,165,250,0.2), rgba(129,140,248,0.26));
+      box-shadow: 0 0 14px rgba(96,165,250,0.5), 0 0 28px rgba(59,130,246,0.18);
+      white-space: nowrap;
+      animation: proPulse 2.4s ease-in-out;
+    }
+    @keyframes proPulse {
+      0%, 100% { box-shadow: 0 0 14px rgba(96,165,250,0.5), 0 0 28px rgba(59,130,246,0.18); transform: scale(1); }
+      50% { box-shadow: 0 0 20px rgba(96,165,250,0.7), 0 0 36px rgba(59,130,246,0.3); transform: scale(1.02); }
+    }
+    .pro-badge svg {
+      width: 11px;
+      height: 11px;
+      flex-shrink: 0;
+      color: #93c5fd;
+      stroke: currentColor;
+      fill: currentColor;
+      animation: ulIconFlicker 2.6s ease-in-out infinite;
+    }
+    .pro-badge .pro-label {
+      background: linear-gradient(90deg, #bfdbfe, #60a5fa, #818cf8);
+      background-size: 200% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      animation: ulNameShine 2.8s linear;
+    }
+    .pro-badge::after {
+      content: '';
+      position: absolute;
+      top: 0; left: -130%;
+      width: 55%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.42), transparent);
+      transform: skewX(-22deg);
+      pointer-events: none;
+      animation: ulShimmerSweep 2.8s ease-in-out infinite;
+    }
+    /* Pro row highlight */
+    .pro-row-highlight {
+      position: relative;
+      background: linear-gradient(90deg,
+        rgba(59,130,246,0.08) 0%,
+        rgba(96,165,250,0.05) 50%,
+        rgba(129,140,248,0.08) 100%);
+      background-size: 200% 100%;
+      animation: ulRowGlow 4s ease-in-out;
+    }
+    .pro-row-highlight td { background: inherit !important; }
+    .pro-row-highlight td:first-child { position: relative; }
+    .pro-row-highlight td:first-child::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 3px;
+      background: linear-gradient(180deg, #bfdbfe, #60a5fa, #818cf8);
+      box-shadow: 0 0 8px rgba(96,165,250,0.5);
+      z-index: 1;
+    }
     .ul-badge {
       display: inline-flex;
       align-items: center;
@@ -1304,7 +1391,7 @@ function publicDashboardPage(): string {
       background: linear-gradient(90deg, rgba(14,165,233,0.28), rgba(34,211,238,0.2), rgba(59,130,246,0.26));
       box-shadow: 0 0 14px rgba(34,211,238,0.5), 0 0 28px rgba(14,165,233,0.18);
       white-space: nowrap;
-      animation: ultraPulse 2.4s ease-in-out infinite;
+      animation: ultraPulse 2.4s ease-in-out;
     }
     .ul-badge svg {
       width: 11px;
@@ -1320,7 +1407,7 @@ function publicDashboardPage(): string {
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
-      animation: ulNameShine 2.8s linear infinite;
+      animation: ulNameShine 2.8s linear;
     }
     @keyframes ulNameShine {
       0%, 100% { background-position: 0% 50%; }
@@ -1335,7 +1422,7 @@ function publicDashboardPage(): string {
       background-clip: text;
       color: transparent;
       filter: drop-shadow(0 0 10px rgba(34,211,238,0.45));
-      animation: ulNameShine 2.8s ease-in-out infinite;
+      animation: ulNameShine 2.8s ease-in-out;
     }
     /* Ultra shimmer sweep */
     .ul-badge::after {
@@ -1349,10 +1436,10 @@ function publicDashboardPage(): string {
       animation: ulShimmerSweep 2.8s ease-in-out infinite;
     }
     @keyframes ulShimmerSweep {
-      0%, 20% { left: -130%; opacity: 0; }
+      0%, 20% { transform: translateX(0) skewX(-22deg); opacity: 0; }
       35% { opacity: 1; }
-      55% { left: 140%; opacity: 0.9; }
-      100% { left: 140%; opacity: 0; }
+      55% { transform: translateX(491%) skewX(-22deg); opacity: 0.9; }
+      100% { transform: translateX(491%) skewX(-22deg); opacity: 0; }
     }
     .ul-badge { position: relative; overflow: hidden; }
     /* Ultra icon flicker */
@@ -1430,7 +1517,7 @@ function publicDashboardPage(): string {
         rgba(251,191,36,0.05) 50%,
         rgba(245,158,11,0.08) 100%);
       background-size: 200% 100%;
-      animation: spRowGlow 4s ease-in-out infinite;
+      animation: spRowGlow 4s ease-in-out;
     }
     .sp-row-highlight td { background: inherit !important; }
     .sp-row-highlight td:first-child { position: relative; }
@@ -1455,7 +1542,7 @@ function publicDashboardPage(): string {
         rgba(34,211,238,0.05) 50%,
         rgba(59,130,246,0.08) 100%);
       background-size: 200% 100%;
-      animation: ulRowGlow 4s ease-in-out infinite;
+      animation: ulRowGlow 4s ease-in-out;
     }
     .ul-row-highlight td { background: inherit !important; }
     .ul-row-highlight td:first-child { position: relative; }
@@ -1511,10 +1598,10 @@ function publicDashboardPage(): string {
     .rank-2::after { animation: rankShimmerSweep 3.1s ease-in-out infinite 0.35s; }
     .rank-3::after { animation: rankShimmerSweep 3.4s ease-in-out infinite 0.7s; }
     @keyframes rankShimmerSweep {
-      0%, 18% { left: -120%; opacity: 0; }
+      0%, 18% { transform: translateX(0) skewX(-22deg); opacity: 0; }
       35% { opacity: 1; }
-      55% { left: 140%; opacity: 0.85; }
-      100% { left: 140%; opacity: 0; }
+      55% { transform: translateX(473%) skewX(-22deg); opacity: 0.85; }
+      100% { transform: translateX(473%) skewX(-22deg); opacity: 0; }
     }
     .rank-medal {
       font-size: 0.78rem;
@@ -1537,7 +1624,7 @@ function publicDashboardPage(): string {
       border: 1px solid rgba(252,211,77,0.55);
       box-shadow: 0 0 0 0 rgba(251,191,36,0.35), 0 0 16px rgba(251,191,36,0.35);
       text-shadow: 0 0 10px rgba(251,191,36,0.55);
-      animation: rankGoldPulse 2.2s ease-in-out infinite;
+      animation: rankGoldPulse 2.2s ease-in-out;
     }
     .rank-2 {
       color: #f8fafc;
@@ -1547,7 +1634,7 @@ function publicDashboardPage(): string {
       border: 1px solid rgba(226,232,240,0.45);
       box-shadow: 0 0 14px rgba(226,232,240,0.18);
       text-shadow: 0 0 8px rgba(248,250,252,0.35);
-      animation: rankSilverShimmer 2.8s ease-in-out infinite;
+      animation: rankSilverShimmer 2.8s ease-in-out;
     }
     .rank-3 {
       color: #ffedd5;
@@ -1557,7 +1644,7 @@ function publicDashboardPage(): string {
       border: 1px solid rgba(251,146,60,0.48);
       box-shadow: 0 0 14px rgba(251,146,60,0.22);
       text-shadow: 0 0 8px rgba(251,146,60,0.4);
-      animation: rankBronzeGlow 2.6s ease-in-out infinite;
+      animation: rankBronzeGlow 2.6s ease-in-out;
     }
     @keyframes rankGoldPulse {
       0%, 100% {
@@ -1614,17 +1701,17 @@ function publicDashboardPage(): string {
     tr.top-1 td:not(.rank) {
       background:
         linear-gradient(90deg, rgba(251,191,36,0.16), rgba(251,191,36,0.05) 42%, rgba(251,191,36,0.015) 70%, transparent);
-      animation: topRowGold 2.8s ease-in-out infinite;
+      animation: topRowGold 2.8s ease-in-out;
     }
     tr.top-2 td:not(.rank) {
       background:
         linear-gradient(90deg, rgba(226,232,240,0.12), rgba(226,232,240,0.04) 42%, rgba(226,232,240,0.01) 70%, transparent);
-      animation: topRowSilver 3.2s ease-in-out infinite;
+      animation: topRowSilver 3.2s ease-in-out;
     }
     tr.top-3 td:not(.rank) {
       background:
         linear-gradient(90deg, rgba(251,146,60,0.13), rgba(251,146,60,0.04) 42%, rgba(251,146,60,0.01) 70%, transparent);
-      animation: topRowBronze 3s ease-in-out infinite;
+      animation: topRowBronze 3s ease-in-out;
     }
     /* Rank cell keeps own badge animation; still tint the cell softly */
     tr.top-1 td.rank {
@@ -1636,9 +1723,9 @@ function publicDashboardPage(): string {
     tr.top-3 td.rank {
       background: linear-gradient(90deg, rgba(251,146,60,0.13), rgba(251,146,60,0.03) 80%, transparent);
     }
-    tr.top-1 td.rank-1 { animation: rankGoldPulse 2.2s ease-in-out infinite; }
-    tr.top-2 td.rank-2 { animation: rankSilverShimmer 2.8s ease-in-out infinite; }
-    tr.top-3 td.rank-3 { animation: rankBronzeGlow 2.6s ease-in-out infinite; }
+    tr.top-1 td.rank-1 { animation: rankGoldPulse 2.2s ease-in-out; }
+    tr.top-2 td.rank-2 { animation: rankSilverShimmer 2.8s ease-in-out; }
+    tr.top-3 td.rank-3 { animation: rankBronzeGlow 2.6s ease-in-out; }
     tr.top-1 td:first-child::before,
     tr.top-2 td:first-child::before,
     tr.top-3 td:first-child::before {
@@ -1652,17 +1739,17 @@ function publicDashboardPage(): string {
     tr.top-1 td:first-child::before {
       background: linear-gradient(180deg, #fde68a, #f59e0b, #fde68a);
       box-shadow: 0 0 12px rgba(251,191,36,0.65);
-      animation: topEdgePulseGold 2.2s ease-in-out infinite;
+      animation: topEdgePulseGold 2.2s ease-in-out;
     }
     tr.top-2 td:first-child::before {
       background: linear-gradient(180deg, #f8fafc, #94a3b8, #f8fafc);
       box-shadow: 0 0 10px rgba(226,232,240,0.45);
-      animation: topEdgePulseSilver 2.6s ease-in-out infinite;
+      animation: topEdgePulseSilver 2.6s ease-in-out;
     }
     tr.top-3 td:first-child::before {
       background: linear-gradient(180deg, #fdba74, #c2410c, #fdba74);
       box-shadow: 0 0 10px rgba(251,146,60,0.5);
-      animation: topEdgePulseBronze 2.4s ease-in-out infinite;
+      animation: topEdgePulseBronze 2.4s ease-in-out;
     }
     @keyframes topEdgePulseGold {
       0%, 100% { opacity: 0.7; box-shadow: 0 0 8px rgba(251,191,36,0.4); }
@@ -1843,7 +1930,7 @@ function publicDashboardPage(): string {
       color: #fbbf24;
       border-color: rgba(245,158,11,0.45);
       background: linear-gradient(135deg, rgba(120,53,15,0.35), rgba(15,23,42,0.7));
-      animation: claudeGlow 2.4s ease-in-out infinite;
+      animation: claudeGlow 2.4s ease-in-out;
     }
     .model-tag.claude::after {
       content: '';
@@ -1871,9 +1958,9 @@ function publicDashboardPage(): string {
       50% { box-shadow: 0 0 16px rgba(245,158,11,0.55), 0 0 30px rgba(245,158,11,0.18), 0 4px 12px rgba(0,0,0,0.12); }
     }
     @keyframes claudeShimmer {
-      0% { left: -150%; }
-      55% { left: 150%; }
-      100% { left: 150%; }
+      0% { transform: translateX(0); }
+      55% { transform: translateX(500%); }
+      100% { transform: translateX(500%); }
     }
     @keyframes claudeSpark {
       0%, 100% { transform: scale(1); opacity: 0.85; }
@@ -1887,7 +1974,7 @@ function publicDashboardPage(): string {
       color: #22d3ee;
       border-color: rgba(34,211,238,0.45);
       background: linear-gradient(135deg, rgba(8,51,68,0.35), rgba(15,23,42,0.7));
-      animation: kimiGlow 2.4s ease-in-out infinite;
+      animation: kimiGlow 2.4s ease-in-out;
     }
     .model-tag.kimi::after {
       content: '';
@@ -1915,9 +2002,9 @@ function publicDashboardPage(): string {
       50% { box-shadow: 0 0 16px rgba(34,211,238,0.55), 0 0 30px rgba(34,211,238,0.18), 0 4px 12px rgba(0,0,0,0.12); }
     }
     @keyframes kimiShimmer {
-      0% { left: -150%; }
-      55% { left: 150%; }
-      100% { left: 150%; }
+      0% { transform: translateX(0); }
+      55% { transform: translateX(500%); }
+      100% { transform: translateX(500%); }
     }
     @keyframes kimiSpark {
       0%, 100% { transform: scale(1); opacity: 0.85; }
@@ -1931,7 +2018,7 @@ function publicDashboardPage(): string {
       color: #a78bfa;
       border-color: rgba(167,139,250,0.45);
       background: linear-gradient(135deg, rgba(76,29,149,0.35), rgba(15,23,42,0.7));
-      animation: qwenGlow 2.4s ease-in-out infinite;
+      animation: qwenGlow 2.4s ease-in-out;
     }
     .model-tag.qwen::after {
       content: '';
@@ -1959,9 +2046,9 @@ function publicDashboardPage(): string {
       50% { box-shadow: 0 0 16px rgba(167,139,250,0.55), 0 0 30px rgba(167,139,250,0.18), 0 4px 12px rgba(0,0,0,0.12); }
     }
     @keyframes qwenShimmer {
-      0% { left: -150%; }
-      55% { left: 150%; }
-      100% { left: 150%; }
+      0% { transform: translateX(0); }
+      55% { transform: translateX(500%); }
+      100% { transform: translateX(500%); }
     }
     @keyframes qwenSpark {
       0%, 100% { transform: scale(1); opacity: 0.85; }
@@ -1975,7 +2062,7 @@ function publicDashboardPage(): string {
       color: #f8fafc;
       border-color: rgba(148,163,184,0.50);
       background: linear-gradient(135deg, rgba(100,116,139,0.30), rgba(51,65,85,0.45), rgba(15,23,42,0.7));
-      animation: grokGlow 2.4s ease-in-out infinite;
+      animation: grokGlow 2.4s ease-in-out;
     }
     .model-tag.grok::after {
       content: '';
@@ -2003,9 +2090,9 @@ function publicDashboardPage(): string {
       50% { box-shadow: 0 0 18px rgba(203,213,225,0.60), 0 0 34px rgba(148,163,184,0.22), 0 4px 12px rgba(0,0,0,0.12); }
     }
     @keyframes grokShimmer {
-      0% { left: -150%; }
-      55% { left: 150%; }
-      100% { left: 150%; }
+      0% { transform: translateX(0); }
+      55% { transform: translateX(500%); }
+      100% { transform: translateX(500%); }
     }
     @keyframes grokSpark {
       0%, 100% { transform: scale(1); opacity: 0.85; }
@@ -2019,7 +2106,7 @@ function publicDashboardPage(): string {
       color: #fb7185;
       border-color: rgba(244,63,94,0.45);
       background: linear-gradient(135deg, rgba(76,5,45,0.35), rgba(15,23,42,0.7));
-      animation: glmGlow 2.4s ease-in-out infinite;
+      animation: glmGlow 2.4s ease-in-out;
     }
     .model-tag.glm::after {
       content: '';
@@ -2047,9 +2134,9 @@ function publicDashboardPage(): string {
       50% { box-shadow: 0 0 16px rgba(244,63,94,0.55), 0 0 30px rgba(244,63,94,0.18), 0 4px 12px rgba(0,0,0,0.12); }
     }
     @keyframes glmShimmer {
-      0% { left: -150%; }
-      55% { left: 150%; }
-      100% { left: 150%; }
+      0% { transform: translateX(0); }
+      55% { transform: translateX(500%); }
+      100% { transform: translateX(500%); }
     }
     @keyframes glmSpark {
       0%, 100% { transform: scale(1); opacity: 0.85; }
@@ -2063,7 +2150,7 @@ function publicDashboardPage(): string {
       color: #818cf8;
       border-color: rgba(79,70,229,0.45);
       background: linear-gradient(135deg, rgba(30,27,75,0.35), rgba(15,23,42,0.7));
-      animation: deepseekGlow 2.4s ease-in-out infinite;
+      animation: deepseekGlow 2.4s ease-in-out;
     }
     .model-tag.deepseek::after {
       content: '';
@@ -2091,11 +2178,95 @@ function publicDashboardPage(): string {
       50% { box-shadow: 0 0 16px rgba(79,70,229,0.55), 0 0 30px rgba(79,70,229,0.18), 0 4px 12px rgba(0,0,0,0.12); }
     }
     @keyframes deepseekShimmer {
-      0% { left: -150%; }
-      55% { left: 150%; }
-      100% { left: 150%; }
+      0% { transform: translateX(0); }
+      55% { transform: translateX(500%); }
+      100% { transform: translateX(500%); }
     }
     @keyframes deepseekSpark {
+      0%, 100% { transform: scale(1); opacity: 0.85; }
+      50% { transform: scale(1.25); opacity: 1; }
+    }
+
+    /* === GPT MODEL TAG (emerald glow pulse + shimmer sweep) === */
+    .model-tag.gpt {
+      position: relative;
+      overflow: hidden;
+      color: #34d399;
+      border-color: rgba(16,185,129,0.45);
+      background: linear-gradient(135deg, rgba(6,78,59,0.35), rgba(15,23,42,0.7));
+      animation: gptGlow 2.4s ease-in-out;
+    }
+    .model-tag.gpt::after {
+      content: '';
+      position: absolute;
+      top: 0; left: -150%;
+      width: 60%; height: 100%;
+      background: linear-gradient(105deg, transparent, rgba(167,243,208,0.32), transparent);
+      animation: gptShimmer 2.8s ease-in-out infinite;
+      pointer-events: none;
+    }
+    .model-tag.gpt .gpt-spark {
+      color: #6ee7b7;
+      margin-right: 0.3rem;
+      display: inline-block;
+      animation: gptSpark 2.4s ease-in-out infinite;
+    }
+    .model-tag.gpt:hover {
+      border-color: rgba(16,185,129,0.75);
+      background: linear-gradient(135deg, rgba(6,78,59,0.5), rgba(15,23,42,0.7));
+      color: #a7f3d0;
+      transform: translateY(-1px);
+    }
+    @keyframes gptGlow {
+      0%, 100% { box-shadow: 0 0 6px rgba(16,185,129,0.22), 0 4px 12px rgba(0,0,0,0.12); }
+      50% { box-shadow: 0 0 16px rgba(16,185,129,0.55), 0 0 30px rgba(16,185,129,0.18), 0 4px 12px rgba(0,0,0,0.12); }
+    }
+    @keyframes gptShimmer {
+      0% { transform: translateX(0); }
+      55% { transform: translateX(500%); }
+      100% { transform: translateX(500%); }
+    }
+    @keyframes gptSpark {
+      0%, 100% { transform: scale(1); opacity: 0.85; }
+      50% { transform: scale(1.25); opacity: 1; }
+    }
+
+    /* === META MODEL TAG (Meta blue glow pulse + shimmer sweep) === */
+    .model-tag.meta {
+      position: relative;
+      overflow: hidden;
+      color: #7dd3fc;
+      border-color: rgba(56,189,248,0.45);
+      background: linear-gradient(135deg, rgba(12,74,110,0.35), rgba(15,23,42,0.7));
+      animation: metaGlow 2.4s ease-in-out;
+    }
+    .model-tag.meta::after {
+      content: '';
+      position: absolute;
+      top: 0; left: -150%;
+      width: 60%; height: 100%;
+      background: linear-gradient(105deg, transparent, rgba(125,211,252,0.32), transparent);
+      animation: metaShimmer 2.8s ease-in-out infinite;
+      pointer-events: none;
+    }
+    .model-tag.meta .meta-spark {
+      color: #38bdf8;
+      margin-right: 0.3rem;
+      display: inline-block;
+      animation: metaSpark 2.4s ease-in-out infinite;
+    }
+    .model-tag.meta:hover {
+      border-color: rgba(56,189,248,0.75);
+      background: linear-gradient(135deg, rgba(12,74,110,0.5), rgba(15,23,42,0.7));
+      color: #bae6fd;
+      transform: translateY(-1px);
+    }
+    @keyframes metaShimmer {
+      0% { transform: translateX(0); }
+      55% { transform: translateX(500%); }
+      100% { transform: translateX(500%); }
+    }
+    @keyframes metaSpark {
       0%, 100% { transform: scale(1); opacity: 0.85; }
       50% { transform: scale(1.25); opacity: 1; }
     }
@@ -2106,7 +2277,9 @@ function publicDashboardPage(): string {
       .model-tag.qwen, .model-tag.qwen::after, .model-tag.qwen .qwen-spark,
       .model-tag.grok, .model-tag.grok::after, .model-tag.grok .grok-spark,
       .model-tag.glm, .model-tag.glm::after, .model-tag.glm .glm-spark,
-      .model-tag.deepseek, .model-tag.deepseek::after, .model-tag.deepseek .deepseek-spark { animation: none; }
+      .model-tag.deepseek, .model-tag.deepseek::after, .model-tag.deepseek .deepseek-spark,
+      .model-tag.gpt, .model-tag.gpt::after, .model-tag.gpt .gpt-spark,
+      .model-tag.meta, .model-tag.meta::after, .model-tag.meta .meta-spark { animation: none; }
     }
 
     /* === ZEBRA + ROW HOVER === */
@@ -2169,7 +2342,7 @@ function publicDashboardPage(): string {
       background:
         radial-gradient(120% 90% at 100% 0%, rgba(245,158,11,0.16), transparent 55%),
         linear-gradient(180deg, rgba(30,41,59,0.75), rgba(15,23,42,0.6));
-      animation: claudeGlow 2.8s ease-in-out infinite;
+      animation: claudeGlow 2.8s ease-in-out;
     }
     .model-card.claude-card:hover { border-color: rgba(245,158,11,0.7); }
     .claude-badge {
@@ -2184,7 +2357,7 @@ function publicDashboardPage(): string {
       background:
         radial-gradient(120% 90% at 100% 0%, rgba(34,211,238,0.16), transparent 55%),
         linear-gradient(180deg, rgba(30,41,59,0.75), rgba(15,23,42,0.6));
-      animation: kimiGlow 2.8s ease-in-out infinite;
+      animation: kimiGlow 2.8s ease-in-out;
     }
     .model-card.kimi-card:hover { border-color: rgba(34,211,238,0.7); }
     .kimi-badge {
@@ -2199,7 +2372,7 @@ function publicDashboardPage(): string {
       background:
         radial-gradient(120% 90% at 100% 0%, rgba(167,139,250,0.16), transparent 55%),
         linear-gradient(180deg, rgba(30,41,59,0.75), rgba(15,23,42,0.6));
-      animation: qwenGlow 2.8s ease-in-out infinite;
+      animation: qwenGlow 2.8s ease-in-out;
     }
     .model-card.qwen-card:hover { border-color: rgba(167,139,250,0.7); }
     .qwen-badge {
@@ -2215,7 +2388,7 @@ function publicDashboardPage(): string {
         radial-gradient(120% 90% at 100% 0%, rgba(203,213,225,0.18), transparent 55%),
         radial-gradient(100% 80% at 0% 100%, rgba(100,116,139,0.10), transparent 50%),
         linear-gradient(180deg, rgba(30,41,59,0.75), rgba(15,23,42,0.6));
-      animation: grokGlow 2.8s ease-in-out infinite;
+      animation: grokGlow 2.8s ease-in-out;
     }
     .model-card.grok-card:hover { border-color: rgba(203,213,225,0.75); }
     .grok-badge {
@@ -2233,7 +2406,7 @@ function publicDashboardPage(): string {
         radial-gradient(100% 80% at 0% 100%, rgba(100,116,139,0.10), transparent 50%),
         linear-gradient(180deg, rgba(30,41,59,0.75), rgba(15,23,42,0.6)) !important;
       box-shadow: 0 0 0 1px rgba(148,163,184,0.12), 0 12px 32px rgba(148,163,184,0.12);
-      animation: grokGlow 2.8s ease-in-out infinite !important;
+      animation: grokGlow 2.8s ease-in-out !important;
     }
     .model-card.free.grok-card:hover {
       border-color: rgba(203,213,225,0.75) !important;
@@ -2246,7 +2419,7 @@ function publicDashboardPage(): string {
         radial-gradient(120% 90% at 100% 0%, rgba(251,113,133,0.20), transparent 55%),
         radial-gradient(100% 80% at 0% 100%, rgba(168,85,247,0.14), transparent 50%),
         linear-gradient(180deg, rgba(30,20,40,0.82), rgba(15,23,42,0.6));
-      animation: glmGlow 2.8s ease-in-out infinite;
+      animation: glmGlow 2.8s ease-in-out;
       position: relative;
       overflow: hidden;
     }
@@ -2271,9 +2444,9 @@ function publicDashboardPage(): string {
       padding: 0.22rem 0.55rem; border-radius: 999px;
     }
     @keyframes glmCardShimmer {
-      0% { left: -150%; }
-      55% { left: 150%; }
-      100% { left: 150%; }
+      0% { transform: translateX(0); }
+      55% { transform: translateX(500%); }
+      100% { transform: translateX(500%); }
     }
     /* === DEEPSEEK CARD (deep indigo) === */
     .model-card.deepseek-card {
@@ -2282,7 +2455,7 @@ function publicDashboardPage(): string {
         radial-gradient(120% 90% at 100% 0%, rgba(99,102,241,0.20), transparent 55%),
         radial-gradient(100% 80% at 0% 100%, rgba(67,56,202,0.14), transparent 50%),
         linear-gradient(180deg, rgba(15,12,50,0.82), rgba(15,23,42,0.6));
-      animation: deepseekGlow 2.8s ease-in-out infinite;
+      animation: deepseekGlow 2.8s ease-in-out;
     }
     .model-card.deepseek-card:hover {
       border-color: rgba(79,70,229,0.8);
@@ -2303,15 +2476,92 @@ function publicDashboardPage(): string {
         radial-gradient(100% 80% at 0% 100%, rgba(67,56,202,0.14), transparent 50%),
         linear-gradient(180deg, rgba(15,12,50,0.82), rgba(15,23,42,0.6)) !important;
       box-shadow: 0 0 0 1px rgba(79,70,229,0.12), 0 12px 32px rgba(79,70,229,0.12);
-      animation: deepseekGlow 2.8s ease-in-out infinite !important;
+      animation: deepseekGlow 2.8s ease-in-out !important;
     }
     .model-card.free.deepseek-card:hover {
       border-color: rgba(79,70,229,0.8) !important;
       box-shadow: 0 0 0 1px rgba(79,70,229,0.28), 0 16px 40px rgba(79,70,229,0.22);
     }
+    /* === GPT CARD (emerald) === */
+    .model-card.gpt-card {
+      border-color: rgba(16,185,129,0.50);
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(52,211,153,0.20), transparent 55%),
+        radial-gradient(100% 80% at 0% 100%, rgba(5,150,105,0.14), transparent 50%),
+        linear-gradient(180deg, rgba(6,40,29,0.82), rgba(15,23,42,0.6));
+      animation: gptGlow 2.8s ease-in-out;
+    }
+    .model-card.gpt-card:hover {
+      border-color: rgba(16,185,129,0.8);
+      transform: translateY(-2px);
+    }
+    .gpt-badge {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      font-size: 0.68rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase;
+      color: #6ee7b7; background: rgba(16,185,129,0.14);
+      border: 1px solid rgba(16,185,129,0.35);
+      padding: 0.22rem 0.55rem; border-radius: 999px;
+    }
+    /* GPT unlimited card: override .free with emerald */
+    .model-card.free.gpt-card {
+      border-color: rgba(16,185,129,0.50) !important;
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(52,211,153,0.20), transparent 55%),
+        radial-gradient(100% 80% at 0% 100%, rgba(5,150,105,0.14), transparent 50%),
+        linear-gradient(180deg, rgba(6,40,29,0.82), rgba(15,23,42,0.6)) !important;
+      box-shadow: 0 0 0 1px rgba(16,185,129,0.12), 0 12px 32px rgba(16,185,129,0.12);
+      animation: gptGlow 2.8s ease-in-out !important;
+    }
+    .model-card.free.gpt-card:hover {
+      border-color: rgba(16,185,129,0.8) !important;
+      box-shadow: 0 0 0 1px rgba(16,185,129,0.28), 0 16px 40px rgba(16,185,129,0.22);
+    }
+    /* === META CARD (Meta blue) === */
+    .model-card.meta-card {
+      border-color: rgba(56,189,248,0.50);
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(56,189,248,0.22), transparent 55%),
+        radial-gradient(100% 80% at 0% 100%, rgba(2,132,199,0.16), transparent 50%),
+        linear-gradient(180deg, rgba(8,28,52,0.85), rgba(15,23,42,0.6));
+      animation: metaGlow 2.8s ease-in-out;
+    }
+    .model-card.meta-card:hover {
+      border-color: rgba(56,189,248,0.85);
+      box-shadow: 0 0 0 1px rgba(56,189,248,0.28), 0 16px 40px rgba(56,189,248,0.22);
+    }
+    .meta-badge {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      font-size: 0.68rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase;
+      color: #7dd3fc; background: rgba(56,189,248,0.14);
+      border: 1px solid rgba(56,189,248,0.35);
+      padding: 0.22rem 0.55rem; border-radius: 999px;
+    }
+    @keyframes metaGlow {
+      0%, 100% { box-shadow: 0 0 0 1px rgba(56,189,248,0.14), 0 12px 32px rgba(9,134,255,0.10); }
+      50% { box-shadow: 0 0 0 1px rgba(56,189,248,0.32), 0 14px 36px rgba(9,134,255,0.20); }
+    }
+    /* Privileged Meta card: override the default amber .privileged with Meta blue */
+    .model-card.privileged.meta-card {
+      border-color: rgba(56,189,248,0.50) !important;
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(56,189,248,0.22), transparent 55%),
+        radial-gradient(100% 80% at 0% 100%, rgba(2,132,199,0.16), transparent 50%),
+        linear-gradient(180deg, rgba(8,28,52,0.85), rgba(15,23,42,0.6)) !important;
+      box-shadow: 0 0 0 1px rgba(56,189,248,0.14), 0 12px 32px rgba(9,134,255,0.12);
+      animation: metaGlow 2.8s ease-in-out !important;
+    }
+    .model-card.privileged.meta-card:hover {
+      border-color: rgba(56,189,248,0.85) !important;
+      box-shadow: 0 0 0 1px rgba(56,189,248,0.30), 0 16px 40px rgba(9,134,255,0.22) !important;
+    }
+    /* Keep privileged Meta card text/shine blue instead of the default amber */
+    .model-card.privileged.meta-card .model-card-id { color: #7dd3fc; }
+    .model-card.privileged.meta-card::after {
+      background: linear-gradient(105deg, transparent, rgba(125,211,252,0.18), transparent) !important;
+    }
     @media (prefers-reduced-motion: reduce) {
       tr.row-new td, tr.row-enter,
-      .chart-line-anim, .chart-fade-in, .model-card.claude-card, .model-card.kimi-card, .model-card.qwen-card, .model-card.grok-card, .model-card.glm-card, .model-card.glm-card::after, .model-card.deepseek-card { animation: none !important; }
+      .chart-line-anim, .chart-fade-in, .model-card.claude-card, .model-card.kimi-card, .model-card.qwen-card, .model-card.grok-card, .model-card.glm-card, .model-card.glm-card::after, .model-card.deepseek-card, .model-card.gpt-card, .model-card.meta-card { animation: none !important; }
       .chart-line-anim { stroke-dashoffset: 0; }
     }
 
@@ -2343,7 +2593,7 @@ function publicDashboardPage(): string {
         radial-gradient(90% 80% at 0% 100%, rgba(167,139,250,0.14), transparent 50%),
         rgba(15,23,42,0.72);
       box-shadow: 0 0 0 1px rgba(56,189,248,0.12), 0 12px 32px rgba(14,165,233,0.12);
-      animation: freeCardGlow 2.8s ease-in-out infinite;
+      animation: freeCardGlow 2.8s ease-in-out;
     }
     .model-card.free:hover {
       border-color: rgba(125,211,252,0.7);
@@ -2357,7 +2607,7 @@ function publicDashboardPage(): string {
         radial-gradient(100% 80% at 0% 100%, rgba(168,85,247,0.14), transparent 50%),
         linear-gradient(180deg, rgba(30,20,40,0.82), rgba(15,23,42,0.6)) !important;
       box-shadow: 0 0 0 1px rgba(244,63,94,0.12), 0 12px 32px rgba(244,63,94,0.12);
-      animation: glmGlow 2.8s ease-in-out infinite !important;
+      animation: glmGlow 2.8s ease-in-out !important;
     }
     .model-card.free.glm-card:hover {
       border-color: rgba(244,63,94,0.8) !important;
@@ -2370,7 +2620,7 @@ function publicDashboardPage(): string {
         radial-gradient(90% 80% at 0% 100%, rgba(244,114,182,0.12), transparent 50%),
         rgba(15,23,42,0.75);
       box-shadow: 0 0 0 1px rgba(251,191,36,0.14), 0 12px 32px rgba(245,158,11,0.12);
-      animation: privilegedGlow 2.8s ease-in-out infinite;
+      animation: privilegedGlow 2.8s ease-in-out;
     }
     .model-card.privileged::after {
       content: '';
@@ -2390,9 +2640,9 @@ function publicDashboardPage(): string {
       50% { box-shadow: 0 0 0 1px rgba(251,191,36,0.30), 0 14px 36px rgba(244,114,182,0.18); }
     }
     @keyframes privilegedShimmer {
-      0% { left: -150%; }
-      55% { left: 150%; }
-      100% { left: 150%; }
+      0% { transform: translateX(0); }
+      55% { transform: translateX(500%); }
+      100% { transform: translateX(500%); }
     }
     @keyframes freeCardGlow {
       0%, 100% { box-shadow: 0 0 0 1px rgba(56,189,248,0.12), 0 12px 32px rgba(14,165,233,0.10); }
@@ -2440,7 +2690,7 @@ function publicDashboardPage(): string {
       color: #082f49;
       background: linear-gradient(135deg, #7dd3fc 0%, #a78bfa 55%, #f0abfc 100%);
       box-shadow: 0 0 16px rgba(56,189,248,0.35);
-      animation: freeBadgePulse 2.2s ease-in-out infinite;
+      animation: freeBadgePulse 2.2s ease-in-out;
       white-space: nowrap;
     }
     .free-badge svg { width: 11px; height: 11px; }
@@ -2462,7 +2712,7 @@ function publicDashboardPage(): string {
       color: #422006;
       background: linear-gradient(135deg, #fde047 0%, #fbbf24 45%, #f472b6 100%);
       box-shadow: 0 0 16px rgba(251,191,36,0.35);
-      animation: privilegedBadgePulse 2.2s ease-in-out infinite;
+      animation: privilegedBadgePulse 2.2s ease-in-out;
       white-space: nowrap;
     }
     @keyframes privilegedBadgePulse {
@@ -2712,16 +2962,16 @@ function publicDashboardPage(): string {
 
         .pricing-grid {
           display: grid;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
+          grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 1.1rem;
           margin-bottom: 1.5rem;
-          max-width: 1080px;
+          max-width: 760px;
         }
         @media (min-width: 1280px) {
           .pricing-grid {
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            max-width: 860px;
-            gap: 1.1rem;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            max-width: 1240px;
+            gap: 1rem;
           }
         }
         .price-card {
@@ -2751,6 +3001,7 @@ function publicDashboardPage(): string {
         }
         .price-card:nth-child(2)::before { animation-delay: 2.5s; }
         .price-card:nth-child(3)::before { animation-delay: 1.25s; }
+        .price-card:nth-child(4)::before { animation-delay: 3.75s; }
         .price-card > * { position: relative; z-index: 2; }
         .price-card:hover {
           transform: translateY(-6px) scale(1.02);
@@ -2763,8 +3014,8 @@ function publicDashboardPage(): string {
           to { opacity: 1; transform: translateY(0) scale(1); }
         }
         @keyframes priceCardShimmer {
-          0%, 100% { left: -150%; }
-          50% { left: 150%; }
+          0%, 100% { transform: translateX(0) skewX(-18deg); }
+          50% { transform: translateX(500%) skewX(-18deg); }
         }
         .price-card.featured {
           border-color: rgba(124,58,237,0.55);
@@ -2776,13 +3027,29 @@ function publicDashboardPage(): string {
           border-color: rgba(34,211,238,0.5);
           background: linear-gradient(180deg, rgba(14,165,233,0.18) 0%, rgba(30,41,59,0.95) 42%, rgba(15,23,42,0.9) 100%);
           box-shadow: 0 0 0 1px rgba(34,211,238,0.18), 0 16px 40px rgba(14,165,233,0.12);
-          animation: priceCardEnter 0.55s cubic-bezier(0.22,1,0.36,1) both, ultraGlowPulse 3s ease-in-out infinite 0.55s;
+          animation: priceCardEnter 0.55s cubic-bezier(0.22,1,0.36,1) both, ultraGlowPulse 3s ease-in-out 0.55s;
         }
         @keyframes ultraGlowPulse {
           0%, 100% { box-shadow: 0 0 0 1px rgba(34,211,238,0.18), 0 16px 40px rgba(14,165,233,0.12); }
           50% { box-shadow: 0 0 0 1px rgba(34,211,238,0.35), 0 16px 50px rgba(14,165,233,0.22); }
         }
         .price-card.ultra:hover { border-color: #67e8f9; animation: priceCardEnter 0.55s cubic-bezier(0.22,1,0.36,1) both; }
+        .price-card.pro {
+          border-color: rgba(96,165,250,0.5);
+          background: linear-gradient(180deg, rgba(59,130,246,0.16) 0%, rgba(30,41,59,0.95) 42%, rgba(15,23,42,0.9) 100%);
+          box-shadow: 0 0 0 1px rgba(96,165,250,0.18), 0 16px 40px rgba(59,130,246,0.10);
+        }
+        .price-card.pro:hover { border-color: #93c5fd; }
+        .price-card.pro .price-cta {
+          border-color: rgba(96,165,250,0.55);
+          color: #bfdbfe;
+          background: rgba(59,130,246,0.1);
+        }
+        .price-card.pro .price-cta:hover {
+          border-color: #93c5fd;
+          color: #fff;
+          background: rgba(59,130,246,0.22);
+        }
         .price-card.ultra .price-badge {
           background: linear-gradient(90deg, #0ea5e9, #22d3ee);
           color: #082f49;
@@ -2834,7 +3101,7 @@ function publicDashboardPage(): string {
           border-style: dashed;
           color: #94a3b8;
           background: rgba(51,65,85,0.35);
-          animation: ctaSlideUp 0.5s cubic-bezier(0.22,1,0.36,1) 0.5s forwards, soldoutGlow 2.6s ease-in-out infinite;
+          animation: ctaSlideUp 0.5s cubic-bezier(0.22,1,0.36,1) 0.5s forwards, soldoutGlow 2.6s ease-in-out;
         }
         @keyframes soldoutGlow {
           0%, 100% { text-shadow: none; }
@@ -2853,7 +3120,7 @@ function publicDashboardPage(): string {
           font-weight: 700;
           letter-spacing: 0.03em;
           white-space: nowrap;
-          animation: scarcityPulse 2.2s ease-in-out infinite;
+          animation: scarcityPulse 2.2s ease-in-out;
         }
         @keyframes scarcityPulse {
           0%, 100% { box-shadow: 0 0 0 0 rgba(234,179,8,0.35); }
@@ -3091,6 +3358,23 @@ function publicDashboardPage(): string {
           .price-scarcity { font-size: 0.68rem; padding: 0.28rem 0.7rem; }
           .price-pill { font-size: 0.65rem; padding: 0.25rem 0.5rem; }
         }
+        /* === MOBILE PERF: kill infinite animations on phones/tablets ===
+           172+ infinite CSS animations (badge glow/shimmer/sparkle, row glow,
+           rank shimmer, price card shimmer) animate paint-heavy props
+           (box-shadow, filter, background-position) and melt mobile CPUs.
+           On touch/small screens, let every animation play at most once so
+           one-shot entrances (pageIn, rowSlideIn) still work but loops stop. */
+        @media (max-width: 768px), (pointer: coarse) {
+          *, *::before, *::after {
+            animation-iteration-count: 1 !important;
+          }
+        }
+        /* === DESKTOP PERF: pause animations while off-screen ===
+           Applied by IntersectionObserver (see script bottom). Pausing the
+           container pauses all descendant + pseudo-element animations too. */
+        .anim-off, .anim-off *, .anim-off *::before, .anim-off *::after {
+          animation-play-state: paused !important;
+        }
       </style>
 </head>
 <body>
@@ -3262,9 +3546,11 @@ function publicDashboardPage(): string {
           <div class="prices-hero-sub">
             All plans include <strong style="color:#86efac">unlimited models</strong>.
             Starter gets <strong style="color:#c4b5fd">limited pro models</strong>,
+            Pro gets <strong style="color:#93c5fd">pro models</strong>,
             Ultra gets <strong style="color:#67e8f9">all pro models</strong>,
             Supporter gets <strong style="color:#fde68a">all pro models + unlimited tokens</strong>.
             Rate limit: Starter <strong style="color:#93c5fd">10 RPM</strong>,
+            Pro <strong style="color:#93c5fd">25 RPM</strong>,
             Ultra <strong style="color:#67e8f9">50 RPM</strong>,
             Supporter <strong style="color:#fde68a">custom RPM</strong>.
             Order via Telegram.
@@ -3272,7 +3558,7 @@ function publicDashboardPage(): string {
           <div class="prices-pills">
             <span class="price-pill purple">Pro Model</span>
             <span class="price-pill green">Unlimited Model</span>
-            <span class="price-pill blue">10 / 50 RPM</span>
+            <span class="price-pill blue">10 / 25 / 50 RPM</span>
             <span class="price-pill yellow">No Expiry Key</span>
             <span class="price-pill yellow">Instant Activation</span>
           </div>
@@ -3289,6 +3575,18 @@ function publicDashboardPage(): string {
               <li><span class="price-check">✓</span><span>Rate limit <strong>10 RPM</strong></span></li>
             </ul>
             <a class="price-cta" href="https://t.me/routers9" target="_blank" rel="noopener">Order via Telegram</a>
+          </div>
+
+          <div class="price-card pro">
+            <div class="price-tier" style="color:#93c5fd">Pro</div>
+            <div class="price-amount"><span class="price-cur">Rp</span>300.000<span class="price-alt"> · $20</span></div>
+            <div class="price-period">28-day active period</div>
+            <ul class="price-features">
+              <li><span class="price-check">✓</span><span>Access to <strong>pro models</strong></span></li>
+              <li><span class="price-check">✓</span><span>All <strong>unlimited model</strong> included</span></li>
+              <li><span class="price-check">✓</span><span>Rate limit <strong>25 RPM</strong></span></li>
+            </ul>
+            <a class="price-cta" href="https://t.me/routers9" target="_blank" rel="noopener">Order Pro</a>
           </div>
 
           <div class="price-card ultra">
@@ -3328,7 +3626,7 @@ function publicDashboardPage(): string {
           <p class="warn"><strong>⚠️ No guarantee that any specific model will be available forever.</strong> Models may change at any time without prior notice.</p>
           <p class="order-line"><strong>How to order:</strong> chat Telegram
           <a href="https://t.me/routers9" target="_blank" rel="noopener">@routers9</a>
-          → pick a plan (Starter / Ultra / Supporter) → pay → key delivered instantly.
+          → pick a plan (Starter / Pro / Ultra / Supporter) → pay → key delivered instantly.
           Supporter Pack price is custom — DM admin for details. Contact admin for purchase or renewal.</p>
         </div>
       </div>
@@ -3414,7 +3712,7 @@ function publicDashboardPage(): string {
 
     function isSupporterName(name) {
       const n = (name || '').trim().toLowerCase();
-      return n === 'gilbert arias' || n === 'yuop' || n === 'attta rebelution' || n === 'aditya sandy' || n === 'dono';
+      return n === 'gilbert arias' || n === 'yuop' || n === 'attta rebelution' || n === 'aditya sandy' || n === 'dono' || n === 'dna' || n === 'brother rogers' || n === 'ichigo kurosaki';
     }
 
     function isHelperName(name) {
@@ -3427,10 +3725,15 @@ function publicDashboardPage(): string {
       return isUltra === true || isUltra === 'true' || isUltra === 't' || q === 500000000;
     }
 
-    function roleRowClass(name, quotaTokens, isUltra) {
+    function isProRow(accessRoles) {
+      return Array.isArray(accessRoles) && accessRoles.indexOf('pro') !== -1;
+    }
+
+    function roleRowClass(name, quotaTokens, isUltra, accessRoles) {
       if (isSuperAdminName(name)) return ' sa-row-highlight';
       if (isSupporterName(name)) return ' sp-row-highlight';
       if (isUltraRow(name, quotaTokens, isUltra)) return ' ul-row-highlight';
+      if (isProRow(accessRoles)) return ' pro-row-highlight';
       return '';
     }
 
@@ -3472,7 +3775,14 @@ function publicDashboardPage(): string {
       '<path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z" />' +
       '</svg><span class="ul-label">ULTRA</span></span>';
 
-    function buyerNameHtml(name, quotaTokens, isUltra) {
+    // Star-style SVG + PRO chip for keys with the per-key "pro" access role
+    const PRO_BADGE_HTML =
+      '<span class="pro-badge" title="Pro · role-restricted model access">' +
+      '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z" />' +
+      '</svg><span class="pro-label">PRO</span></span>';
+
+    function buyerNameHtml(name, quotaTokens, isUltra, accessRoles) {
       const display = name || '-';
       if (isSuperAdminName(name)) {
         return '<span class="sa-name">' + display + '</span>' + SA_DEV_BADGE_HTML;
@@ -3485,7 +3795,11 @@ function publicDashboardPage(): string {
       }
       const q = quotaTokens == null || quotaTokens === '' ? null : Number(quotaTokens);
       if (isUltra === true || isUltra === 'true' || isUltra === 't' || q === 500000000) {
-        return '<span class="ul-name">' + display + '</span>' + UL_BADGE_HTML;
+        const proSuffix = isProRow(accessRoles) ? PRO_BADGE_HTML : '';
+        return '<span class="ul-name">' + display + '</span>' + UL_BADGE_HTML + proSuffix;
+      }
+      if (isProRow(accessRoles)) {
+        return '<span class="pro-name">' + display + '</span>' + PRO_BADGE_HTML;
       }
       let style = '';
       if (q === 250000000) style = ' style="color:#6ee7b7;font-weight:700"';
@@ -3508,6 +3822,8 @@ function publicDashboardPage(): string {
       if (probe.indexOf('grok') !== -1) return 'grok';
       if (probe.indexOf('glm') !== -1) return 'glm';
       if (probe.indexOf('deepseek') !== -1 || probe.indexOf('ds-v4') !== -1 || probe.indexOf('dsv4') !== -1) return 'deepseek';
+      if (probe.indexOf('gpt') !== -1) return 'gpt';
+      if (probe.indexOf('muse') !== -1 || probe.indexOf('meta') !== -1) return 'meta';
       return '';
     }
     function isClaudeModel(id, name) { return modelBrand(id, name) === 'claude'; }
@@ -3516,6 +3832,7 @@ function publicDashboardPage(): string {
     function isGrokModel(id, name) { return modelBrand(id, name) === 'grok'; }
     function isGlmModel(id, name) { return modelBrand(id, name) === 'glm'; }
     function isDeepseekModel(id, name) { return modelBrand(id, name) === 'deepseek'; }
+    function isGptModel(id, name) { return modelBrand(id, name) === 'gpt'; }
 
     // Maps model_id → display_name (populated from /public/models on initial load)
     let modelNameMap = {};
@@ -3554,6 +3871,12 @@ function publicDashboardPage(): string {
       }
       if (brand === 'deepseek') {
         return '<span class="model-tag deepseek"><span class="deepseek-spark">&#10022;</span>' + display + '</span>';
+      }
+      if (brand === 'gpt') {
+        return '<span class="model-tag gpt"><span class="gpt-spark">&#10022;</span>' + display + '</span>';
+      }
+      if (brand === 'meta') {
+        return '<span class="model-tag meta"><span class="meta-spark">&#10022;</span>' + display + '</span>';
       }
       return '<span class="model-tag">' + display + '</span>';
     }
@@ -3791,7 +4114,7 @@ function publicDashboardPage(): string {
         '</tr></thead><tbody>';
       visibleRows.forEach((row, i) => {
         const rankClass = i < 3 ? ' rank-' + (i + 1) : '';
-        const topRowClass = i < 3 ? ' class="top-row top-' + (i + 1) + roleRowClass(row.buyer_name, row.quota_tokens, row.is_ultra) + '"' : (roleRowClass(row.buyer_name, row.quota_tokens, row.is_ultra) ? ' class="' + roleRowClass(row.buyer_name, row.quota_tokens, row.is_ultra).trim() + '"' : '');
+        const topRowClass = i < 3 ? ' class="top-row top-' + (i + 1) + roleRowClass(row.buyer_name, row.quota_tokens, row.is_ultra, row.access_roles) + '"' : (roleRowClass(row.buyer_name, row.quota_tokens, row.is_ultra, row.access_roles) ? ' class="' + roleRowClass(row.buyer_name, row.quota_tokens, row.is_ultra, row.access_roles).trim() + '"' : '');
         const medals = ['🥇', '🥈', '🥉'];
         const rankLabel = i < 3
           ? '<span class="rank-medal" aria-hidden="true">' + medals[i] + '</span><span>' + (i + 1) + '</span>'
@@ -3800,7 +4123,7 @@ function publicDashboardPage(): string {
         const daysClass = row.remaining_days !== null && row.remaining_days !== undefined
           ? (row.remaining_days <= 3 ? 'badge-red' : row.remaining_days <= 7 ? 'badge-yellow' : 'badge-green')
           : 'badge-blue';
-        html += '<tr' + topRowClass + '><td class="rank' + rankClass + '">' + rankLabel + '</td><td>' + buyerNameHtml(row.buyer_name, row.quota_tokens, row.is_ultra) + '</td><td>' + formatNum(row.total_requests) + '</td><td>' + formatQuotaCell(row) + '</td><td><span class="badge ' + daysClass + '">' + daysText + '</span></td><td>' + formatTime(row.last_request_at) + '</td></tr>';
+        html += '<tr' + topRowClass + '><td class="rank' + rankClass + '">' + rankLabel + '</td><td>' + buyerNameHtml(row.buyer_name, row.quota_tokens, row.is_ultra, row.access_roles) + '</td><td>' + formatNum(row.total_requests) + '</td><td>' + formatQuotaCell(row) + '</td><td><span class="badge ' + daysClass + '">' + daysText + '</span></td><td>' + formatTime(row.last_request_at) + '</td></tr>';
       });
       html += '</tbody></table></div>';
       if (inactiveRows.length > 0) {
@@ -3855,8 +4178,8 @@ function publicDashboardPage(): string {
           const models = (row.models_used || []).map(m => modelTagHtml(m)).join('');
           const rowKey = String(row.buyer_name || '') + '|' + String(row.last_request_at || '');
           const isNew = livePrevKeys !== null && !livePrevKeys.has(rowKey);
-          const rowClass = isNew ? ' class="row-new row-enter' + roleRowClass(row.buyer_name, row.quota_tokens, row.is_ultra) + '"' : (roleRowClass(row.buyer_name, row.quota_tokens, row.is_ultra) ? ' class="' + roleRowClass(row.buyer_name, row.quota_tokens, row.is_ultra).trim() + '"' : '');
-          html += '<tr' + rowClass + '><td>' + buyerNameHtml(row.buyer_name, row.quota_tokens, row.is_ultra) + '</td><td>' + formatNum(row.request_count) + '</td><td>' + formatTokens(row.total_tokens) + '</td><td>' + models + '</td><td title="' + formatTime(row.last_request_at) + '">' + timeAgo(row.last_request_at) + '</td></tr>';
+          const rowClass = isNew ? ' class="row-new row-enter' + roleRowClass(row.buyer_name, row.quota_tokens, row.is_ultra, row.access_roles) + '"' : (roleRowClass(row.buyer_name, row.quota_tokens, row.is_ultra, row.access_roles) ? ' class="' + roleRowClass(row.buyer_name, row.quota_tokens, row.is_ultra, row.access_roles).trim() + '"' : '');
+          html += '<tr' + rowClass + '><td>' + buyerNameHtml(row.buyer_name, row.quota_tokens, row.is_ultra, row.access_roles) + '</td><td>' + formatNum(row.request_count) + '</td><td>' + formatTokens(row.total_tokens) + '</td><td>' + models + '</td><td title="' + formatTime(row.last_request_at) + '">' + timeAgo(row.last_request_at) + '</td></tr>';
         });
         html += '</tbody></table></div>';
         content.innerHTML = html;
@@ -3891,8 +4214,8 @@ function publicDashboardPage(): string {
           const tokens = formatTokens(row.total_tokens);
           const latency = row.latency_ms ? row.latency_ms + 'ms' : '-';
           const isNew = usagePrevIds !== null && !usagePrevIds.has(evKey(row));
-          const rowClass = isNew ? ' class="row-new' + roleRowClass(row.buyer_name, row.quota_tokens, row.is_ultra) + '"' : (roleRowClass(row.buyer_name, row.quota_tokens, row.is_ultra) ? ' class="' + roleRowClass(row.buyer_name, row.quota_tokens, row.is_ultra).trim() + '"' : '');
-          html += '<tr' + rowClass + '><td title="' + formatTime(row.created_at) + '">' + timeAgo(row.created_at) + '</td><td>' + buyerNameHtml(row.buyer_name, row.quota_tokens, row.is_ultra) + '</td><td>' + modelTagHtml(row.model_id) + '</td><td>' + statusBadge + '</td><td>' + tokens + '</td><td>' + latency + '</td></tr>';
+          const rowClass = isNew ? ' class="row-new' + roleRowClass(row.buyer_name, row.quota_tokens, row.is_ultra, row.access_roles) + '"' : (roleRowClass(row.buyer_name, row.quota_tokens, row.is_ultra, row.access_roles) ? ' class="' + roleRowClass(row.buyer_name, row.quota_tokens, row.is_ultra, row.access_roles).trim() + '"' : '');
+          html += '<tr' + rowClass + '><td title="' + formatTime(row.created_at) + '">' + timeAgo(row.created_at) + '</td><td>' + buyerNameHtml(row.buyer_name, row.quota_tokens, row.is_ultra, row.access_roles) + '</td><td>' + modelTagHtml(row.model_id) + '</td><td>' + statusBadge + '</td><td>' + tokens + '</td><td>' + latency + '</td></tr>';
         });
         html += '</tbody></table></div>';
         content.innerHTML = html;
@@ -4106,6 +4429,7 @@ function publicDashboardPage(): string {
               if (r === 'dev') return 'Dev';
               if (r === 'supporter') return 'Supporter';
               if (r === 'ultra') return 'Ultra';
+              if (r === 'pro') return 'Pro';
               return r;
             });
             badge = '<span class="privileged-badge" title="Roles only: ' + labels.join(', ') + '">' + labels.join(' · ') + '</span>';
@@ -4115,13 +4439,14 @@ function publicDashboardPage(): string {
             badge = '<span class="metered-badge">Metered</span>';
           }
           const cardBrand = modelBrand(m.id, name);
-          const cardClass = (isPriv ? ' privileged' : (isFree ? ' free' : '')) + (cardBrand === 'claude' ? ' claude-card' : cardBrand === 'kimi' ? ' kimi-card' : cardBrand === 'qwen' ? ' qwen-card' : cardBrand === 'grok' ? ' grok-card' : cardBrand === 'glm' ? ' glm-card' : cardBrand === 'deepseek' ? ' deepseek-card' : '');
+          const cardClass = (isPriv ? ' privileged' : (isFree ? ' free' : '')) + (cardBrand === 'claude' ? ' claude-card' : cardBrand === 'kimi' ? ' kimi-card' : cardBrand === 'qwen' ? ' qwen-card' : cardBrand === 'grok' ? ' grok-card' : cardBrand === 'glm' ? ' glm-card' : cardBrand === 'deepseek' ? ' deepseek-card' : cardBrand === 'gpt' ? ' gpt-card' : cardBrand === 'meta' ? ' meta-card' : '');
           let meta;
           if (isPriv) {
             const labels = roles.map(function(r) {
               if (r === 'dev') return 'DEV';
               if (r === 'supporter') return 'Supporter';
               if (r === 'ultra') return 'Ultra';
+              if (r === 'pro') return 'Pro';
               return r;
             });
             meta = '<span style="font-size:0.72rem;color:#fbbf24">Access: ' + labels.join(' · ') + '</span>';
@@ -4136,13 +4461,15 @@ function publicDashboardPage(): string {
           const grokBadge = cardBrand === 'grok' ? '<span class="grok-badge" title="Grok model">&#10022; Grok</span>' : '';
           const glmBadge = cardBrand === 'glm' ? '<span class="glm-badge" title="GLM model">&#10022; GLM</span>' : '';
           const deepseekBadge = cardBrand === 'deepseek' ? '<span class="deepseek-badge" title="DeepSeek model">&#10022; DeepSeek</span>' : '';
+          const gptBadge = cardBrand === 'gpt' ? '<span class="gpt-badge" title="GPT model">&#10022; GPT</span>' : '';
+          const metaBadge = cardBrand === 'meta' ? '<span class="meta-badge" title="Meta model">&#10022; Meta</span>' : '';
           // Privileged: role badge moves to bottom meta row so it never clips the card frame
           const topBadge = isPriv ? '' : badge;
-          const metaBadge = isPriv ? badge : '';
+          const metaBadgePriv = isPriv ? badge : '';
           html += '<div class="model-card' + cardClass + '" data-id="' + escapeHtml(m.id) + '" role="button" tabindex="0" title="Copy ' + escapeHtml(m.id) + '">' +
-            '<div class="model-card-top"><div class="model-card-name">' + escapeHtml(name) + '</div>' + claudeBadge + kimiBadge + qwenBadge + grokBadge + glmBadge + deepseekBadge + topBadge + '</div>' +
+            '<div class="model-card-top"><div class="model-card-name">' + escapeHtml(name) + '</div>' + claudeBadge + kimiBadge + qwenBadge + grokBadge + glmBadge + deepseekBadge + gptBadge + metaBadge + topBadge + '</div>' +
             '<div class="model-card-id">' + escapeHtml(m.id) + '</div>' +
-            '<div class="model-card-meta">' + metaBadge + meta + '</div></div>';
+            '<div class="model-card-meta">' + metaBadgePriv + meta + '</div></div>';
         });
         html += '</div>';
         content.innerHTML = html;
@@ -4180,6 +4507,38 @@ function publicDashboardPage(): string {
         if (idEl) idEl.textContent = orig;
       }, 1400);
     }
+
+    // === DESKTOP PERF: pause animations while off-screen ===
+    // Observes table rows + cards; adds .anim-off (animation-play-state:
+    // paused) when out of viewport. MutationObserver re-scans after each
+    // polling re-render (leaderboard 45s / live 10s). Bonus: rows on
+    // inactive (display:none) pages report non-intersecting, so their
+    // animations pause too.
+    (function () {
+      if (!('IntersectionObserver' in window)) return;
+      var io = new IntersectionObserver(function (entries) {
+        for (var i = 0; i < entries.length; i++) {
+          var en = entries[i];
+          if (en.isIntersecting) en.target.classList.remove('anim-off');
+          else en.target.classList.add('anim-off');
+        }
+      }, { rootMargin: '150px 0px' });
+      var scanScheduled = false;
+      function scanAnim() {
+        scanScheduled = false;
+        var els = document.querySelectorAll('tbody tr, .price-card, .model-card, .stat-card');
+        for (var i = 0; i < els.length; i++) {
+          if (!els[i].__animIO) { els[i].__animIO = true; io.observe(els[i]); }
+        }
+      }
+      function scheduleScan() {
+        if (scanScheduled) return;
+        scanScheduled = true;
+        setTimeout(scanAnim, 200);
+      }
+      new MutationObserver(scheduleScan).observe(document.body, { childList: true, subtree: true });
+      scanAnim();
+    })();
 
     // Initial load
     loadLeaderboard();
