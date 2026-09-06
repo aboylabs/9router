@@ -32,7 +32,7 @@ interface CreateKeyResult {
     daily_quota_tokens: number | null;
     daily_reset: boolean;
     rate_limit_rpm?: number | null;
-    expires_at: string;
+    expires_at: string | null;
   };
 }
 
@@ -49,34 +49,55 @@ export function CreateKeyModal({ open, onOpenChange, onSuccess }: CreateKeyModal
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<CreateKeyResult | null>(null);
   const [userName, setUserName] = useState("");
-  const [packageId, setPackageId] = useState<CreateKeyPackageId>(DEFAULT_CREATE_KEY_PACKAGE_ID);
-  const [days, setDays] = useState(String(CREATE_KEY_PACKAGES.find((p) => p.id === DEFAULT_CREATE_KEY_PACKAGE_ID)?.defaultDays ?? 28));
-  const [unlimitedQuota, setUnlimitedQuota] = useState(false);
-
-  const selectedPkg = useMemo(
-    () => CREATE_KEY_PACKAGES.find((p) => p.id === packageId) ?? CREATE_KEY_PACKAGES[0],
-    [packageId]
-  );
+  const [rpm, setRpm] = useState("20");
+  const [days, setDays] = useState("28");
+  const [noExpiry, setNoExpiry] = useState(false);
+  const [unlimitedQuota, setUnlimitedQuota] = useState(true);
+  const [quotaTokensM, setQuotaTokensM] = useState("100");
+  const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (open) {
       setResult(null);
       setUserName("");
-      setPackageId(DEFAULT_CREATE_KEY_PACKAGE_ID);
-      setUnlimitedQuota(false);
-      const def = CREATE_KEY_PACKAGES.find((p) => p.id === DEFAULT_CREATE_KEY_PACKAGE_ID);
-      setDays(String(def?.defaultDays ?? 28));
+      setRpm("20");
+      setNoExpiry(false);
+      setUnlimitedQuota(true);
+      setQuotaTokensM("100");
+      setSelectedRoles(new Set());
+      setDays("28");
     }
   }, [open]);
 
-  // When package changes, reset days to that package's default (admin can still edit after).
-  useEffect(() => {
-    if (!open) return;
-    setDays(String(selectedPkg.defaultDays));
-  }, [packageId]); // eslint-disable-line react-hooks/exhaustive-deps -- intentional: only on package switch
-
   const daysNum = parseInt(days, 10);
-  const daysValid = !isNaN(daysNum) && daysNum > 0;
+  const daysValid = noExpiry || (!isNaN(daysNum) && daysNum > 0);
+
+  const rpmNum = parseInt(rpm, 10);
+  const rpmValid = !isNaN(rpmNum) && rpmNum >= 1 && rpmNum <= 500;
+
+  const AVAILABLE_ROLES: { id: string; label: string; color: string }[] = [
+    { id: "supporter", label: "Supporter", color: "amber" },
+    { id: "ultra", label: "Ultra", color: "cyan" },
+    { id: "pro", label: "Pro", color: "blue" },
+  ];
+
+  const toggleRole = (role: string) => {
+    const next = new Set(selectedRoles);
+    if (next.has(role)) next.delete(role);
+    else next.add(role);
+    setSelectedRoles(next);
+  };
+
+  const roleColorClasses: Record<string, string> = {
+    amber: "border-amber-400/50 bg-amber-500/15 text-amber-700 dark:text-amber-300",
+    cyan: "border-cyan-400/50 bg-cyan-500/15 text-cyan-700 dark:text-cyan-300",
+    blue: "border-blue-400/50 bg-blue-500/15 text-blue-700 dark:text-blue-300",
+  };
+  const roleColorClassesOff: Record<string, string> = {
+    amber: "border-border bg-surface text-text-muted hover:border-amber-400/40",
+    cyan: "border-border bg-surface text-text-muted hover:border-cyan-400/40",
+    blue: "border-border bg-surface text-text-muted hover:border-blue-400/40",
+  };
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -88,15 +109,23 @@ export function CreateKeyModal({ open, onOpenChange, onSuccess }: CreateKeyModal
       toast("Jumlah hari harus diisi dengan angka positif", "error");
       return;
     }
+    if (!rpmValid) {
+      toast("RPM harus antara 1 sampai 500", "error");
+      return;
+    }
     setLoading(true);
     try {
+      const qTokens = unlimitedQuota ? null : (parseInt(quotaTokensM, 10) * 1_000_000 || null);
       const data = await api<CreateKeyResult>("/admin/create-key", {
         method: "POST",
         body: JSON.stringify({
           name: userName.trim(),
-          days: daysNum,
-          packageId,
-          unlimitedQuota
+          days: noExpiry ? undefined : daysNum,
+          noExpiry,
+          rateLimitRpm: rpmNum,
+          unlimitedQuota,
+          quotaTokens: qTokens,
+          roles: Array.from(selectedRoles),
         })
       });
       setResult(data);
@@ -129,7 +158,7 @@ export function CreateKeyModal({ open, onOpenChange, onSuccess }: CreateKeyModal
         <DialogHeader>
           <DialogTitle>Create API Key</DialogTitle>
           <DialogDescription>
-            Pilih paket (kuota + RPM otomatis). Hari aktif default 28, bisa diubah.
+            Buat API key baru dengan konfigurasi role, limit RPM, dan masa aktif.
           </DialogDescription>
         </DialogHeader>
 
@@ -147,26 +176,42 @@ export function CreateKeyModal({ open, onOpenChange, onSuccess }: CreateKeyModal
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1.5">Paket</label>
-            <select
-              value={packageId}
-              onChange={(e) => setPackageId(e.target.value as CreateKeyPackageId)}
-              className="w-full px-3 py-2 rounded-md border border-border-primary bg-surface-primary text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            >
-              {CREATE_KEY_PACKAGES.map((pkg) => (
-                <option key={pkg.id} value={pkg.id}>
-                  {pkg.label} · {formatQuotaM(pkg.quotaTokens)} · {pkg.rateLimitRpm} RPM · {formatPriceId(pkg.priceRp)}
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-text-muted mt-1.5 leading-relaxed">
-              <span className="font-medium text-text-secondary">{selectedPkg.label}</span>
-              {" · "}
-              {unlimitedQuota ? "∞ tokens" : `${formatQuotaM(selectedPkg.quotaTokens)} tokens`}
-              {" · "}
-              {selectedPkg.rateLimitRpm} RPM
-              {" · "}
-              {formatPriceId(selectedPkg.priceRp)}
+            <label className="block text-sm font-medium text-text-secondary mb-1.5">Roles</label>
+            <div className="flex flex-wrap gap-1.5">
+              {AVAILABLE_ROLES.map((r) => {
+                const active = selectedRoles.has(r.id);
+                return (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => toggleRole(r.id)}
+                    className={`h-7 px-2.5 rounded-lg border text-xs font-semibold transition-colors ${
+                      active ? roleColorClasses[r.color] : roleColorClassesOff[r.color]
+                    }`}
+                  >
+                    {r.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-text-muted mt-1">
+              Role memberikan akses ke model khusus (Ultra / Pro / Supporter)
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-1.5">Rate Limit (RPM)</label>
+            <input
+              type="number"
+              min="1"
+              max="500"
+              value={rpm}
+              onChange={(e) => setRpm(e.target.value)}
+              placeholder="20"
+              className="w-full px-3 py-2 rounded-md border border-border-primary bg-surface-primary text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+            <p className="text-xs text-text-muted mt-1">
+              Maksimum request per menit (default 20 RPM)
             </p>
           </div>
 
@@ -178,27 +223,56 @@ export function CreateKeyModal({ open, onOpenChange, onSuccess }: CreateKeyModal
                 onChange={(e) => setUnlimitedQuota(e.target.checked)}
                 className="h-4 w-4 rounded border-border-primary text-primary-500 focus:ring-primary-500"
               />
-              <span className="text-sm font-medium text-text-secondary">Unlimited quota</span>
+              <span className="text-sm font-medium text-text-secondary">Unlimited quota (∞)</span>
             </label>
-            <p className="text-xs text-text-muted mt-1 ml-6">
-              Centang untuk membuat token tanpa batas (∞), abaikan kuota paket
-            </p>
+            {!unlimitedQuota && (
+              <div className="mt-2 flex items-center gap-2">
+                <input
+                  type="number"
+                  min="1"
+                  value={quotaTokensM}
+                  onChange={(e) => setQuotaTokensM(e.target.value)}
+                  placeholder="100"
+                  className="w-28 px-3 py-1.5 rounded-md border border-border-primary bg-surface-primary text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+                <span className="text-sm text-text-secondary">Juta tokens (M)</span>
+              </div>
+            )}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1.5">Aktif (hari)</label>
-            <input
-              type="number"
-              min="1"
-              value={days}
-              onChange={(e) => setDays(e.target.value)}
-              placeholder="28"
-              className="w-full px-3 py-2 rounded-md border border-border-primary bg-surface-primary text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            />
-            {days && daysValid && (
-              <p className="text-xs text-text-muted mt-1">
-                Expired: {new Date(Date.now() + daysNum * 24 * 60 * 60 * 1000).toLocaleDateString("id-ID", { year: "numeric", month: "long", day: "numeric" })}
-              </p>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-sm font-medium text-text-secondary">Masa Aktif</label>
+              <label className="flex items-center gap-1.5 cursor-pointer select-none text-xs font-medium text-violet-400">
+                <input
+                  type="checkbox"
+                  checked={noExpiry}
+                  onChange={(e) => setNoExpiry(e.target.checked)}
+                  className="h-3.5 w-3.5 rounded border-border-primary text-violet-500 focus:ring-violet-500"
+                />
+                <span>No Expired (∞)</span>
+              </label>
+            </div>
+            {!noExpiry ? (
+              <>
+                <input
+                  type="number"
+                  min="1"
+                  value={days}
+                  onChange={(e) => setDays(e.target.value)}
+                  placeholder="28"
+                  className="w-full px-3 py-2 rounded-md border border-border-primary bg-surface-primary text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+                {days && daysValid && (
+                  <p className="text-xs text-text-muted mt-1">
+                    Expired: {new Date(Date.now() + daysNum * 24 * 60 * 60 * 1000).toLocaleDateString("id-ID", { year: "numeric", month: "long", day: "numeric" })}
+                  </p>
+                )}
+              </>
+            ) : (
+              <div className="p-2.5 rounded-md border border-violet-400/30 bg-violet-500/10 text-xs font-medium text-violet-300">
+                Key tidak akan pernah expired (expires_at = null)
+              </div>
             )}
           </div>
 

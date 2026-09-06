@@ -178,37 +178,12 @@ def cleanup_old_backups(backup_dir, keep=7):
         print(f"  Cleaned up old backup: {f}")
 
 def main():
-    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Starting 9router backup...")
-    
-    config = load_config()
-    token = config["bot_token"]
-    chat_id = config["chat_id"]
-    
-    try:
-        filepath, filename, total_rows = create_backup(config)
-    except Exception as e:
-        msg = f"FAILED to create backup:\n{e}"
-        print(f"  ERROR: {msg}", file=sys.stderr)
-        send_telegram_message(token, chat_id, f"<b>9router Backup</b>\n\n{msg}")
-        sys.exit(1)
-    
-    wib = timezone(timedelta(hours=7))
-    now = datetime.now(wib)
-    caption = (
-        f"<b>9router Daily Backup</b>\n"
-        f"Date: {now.strftime('%Y-%m-%d %H:%M')} WIB\n"
-        f"Rows: {total_rows}\n"
-        f"Tables: {', '.join(config['tables'])}"
+    msg = (
+        "9router DB backup is DISABLED. "
+        "Refusing to export tables or send Telegram documents (key_plain leak)."
     )
-    
-    success = send_telegram_file(token, chat_id, filepath, filename, caption)
-    
-    if not success:
-        send_telegram_message(token, chat_id, "<b>9router Backup</b>\n\nBackup file created but failed to send to Telegram.")
-        sys.exit(1)
-    
-    cleanup_old_backups(config["backup_dir"])
-    print("Done!")
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {msg}", file=sys.stderr)
+    sys.exit(2)
 
 if __name__ == "__main__":
     main()

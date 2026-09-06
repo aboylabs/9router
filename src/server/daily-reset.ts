@@ -26,7 +26,6 @@ async function checkAndReset() {
        SET used_tokens = 0
        WHERE daily_reset = true
          AND deleted_at IS NULL
-         AND revoked_at IS NULL
          AND (expires_at IS NULL OR expires_at > now())`
     );
     const count = result.rowCount ?? 0;

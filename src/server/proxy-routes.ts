@@ -6,6 +6,7 @@ import { bearerToken } from "./security.js";
 import { apiKeyIsUsable, checkTokenQuota, findApiKey, modelForKey, publicModelsForKey, recordUsage } from "./repositories.js";
 import { callUpstream, streamUpstream } from "./upstream.js";
 import { costEstimate, estimateUsage, usageFromResponse } from "./usage.js";
+import { extractLastUserPrompt } from "./request-log.js";
 
 const chatCompletionSchema = z.object({
   model: z.string().min(1),
@@ -34,6 +35,16 @@ export function billSuccessfulUsage(usage: MeteredUsage): MeteredUsage {
 
 export function zeroFailedUsage(): MeteredUsage {
   return { promptTokens: 0, completionTokens: 0, totalTokens: 0, estimated: false };
+}
+
+function clientIp(request: { ip?: string; headers: Record<string, unknown> }): string | null {
+  const xf = request.headers["x-forwarded-for"];
+  let raw = "";
+  if (typeof xf === "string" && xf.trim()) raw = xf.split(",")[0].trim();
+  else if (Array.isArray(xf) && xf[0]) raw = String(xf[0]).split(",")[0].trim();
+  else raw = request.ip || "";
+  if (!raw || raw === "unknown") return null;
+  return raw.slice(0, 45);
 }
 
 type BuyerFacingUpstreamFailure = {
@@ -138,6 +149,8 @@ export async function registerProxyRoutes(app: FastifyInstance) {
       stream: parsed.data.stream === true
     };
     const agentId = String(request.headers["x-agent-id"] ?? "default");
+    const ipAddress = clientIp(request);
+    const promptSnap = extractLastUserPrompt(parsed.data);
 
     if (parsed.data.stream) {
       const streamBody = {
@@ -179,6 +192,9 @@ export async function registerProxyRoutes(app: FastifyInstance) {
             costEstimate: 0,
             latencyMs: Date.now() - started,
             errorCode: upstreamErrorCode,
+            ipAddress,
+            userPrompt: promptSnap.text,
+            promptTruncated: promptSnap.truncated,
             countTowardTokenQuota
           }).catch((err) => {
             request.log.error({ err, buyerId: apiKey.buyer_id, apiKeyId: apiKey.id }, "Failed to record usage");
@@ -287,6 +303,9 @@ export async function registerProxyRoutes(app: FastifyInstance) {
             costEstimate: estimatedCost,
             latencyMs: Date.now() - started,
             errorCode: upstream.status >= 400 ? "upstream_error" : null,
+            ipAddress,
+            userPrompt: promptSnap.text,
+            promptTruncated: promptSnap.truncated,
             countTowardTokenQuota
           }).catch((err) => {
             request.log.error({ err, buyerId: apiKey.buyer_id, apiKeyId: apiKey.id }, "Failed to record usage");
@@ -340,6 +359,9 @@ export async function registerProxyRoutes(app: FastifyInstance) {
         costEstimate: estimatedCost,
         latencyMs: Date.now() - started,
         errorCode: success ? null : upstream.errorCode ?? "upstream_error",
+        ipAddress,
+        userPrompt: promptSnap.text,
+        promptTruncated: promptSnap.truncated,
         countTowardTokenQuota
       }).catch((err) => {
         request.log.error({ err, buyerId: apiKey.buyer_id, apiKeyId: apiKey.id }, "Failed to record usage");

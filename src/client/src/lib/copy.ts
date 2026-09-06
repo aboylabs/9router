@@ -3,8 +3,8 @@ import { formatDateMY, formatNumber } from "./utils";
 export interface CopyKeyData {
   apiKey: string;
   quotaTokens: number | string | null;
-  expiresAt: string | null;
-  createdAt?: string | null;
+  expiresAt: string | Date | null;
+  createdAt?: string | Date | null;
   dailyReset?: boolean;
   dailyQuotaTokens?: number | string | null;
   email?: string;

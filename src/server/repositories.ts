@@ -72,7 +72,7 @@ export function checkTokenQuota(record: ApiKeyRecord) {
 export function apiKeyIsUsable(record: ApiKeyRecord, opts?: { skipTokenQuota?: boolean }) {
   if (record.is_hidden) return { ok: true as const };
   if (record.deleted_at) return { ok: false, code: "key_deleted", message: "API key has been deleted" };
-  if (record.revoked_at) return { ok: false, code: "key_revoked", message: "API key has been revoked" };
+  if (record.revoked_at) return { ok: false, code: "key_paused", message: "API key is paused" };
   if (record.expires_at && new Date(record.expires_at).getTime() <= Date.now()) {
     return { ok: false, code: "key_expired", message: "API key has expired" };
   }
@@ -137,13 +137,14 @@ export async function createApiKeyRecord(params: {
   packageId?: string | null;
   rateLimitRpm?: number | null;
   isUltra?: boolean;
+  accessRoles?: string[];
 }) {
   const client = await queryClient();
   try {
     await client.query("begin");
     const created = await client.query<{ id: string; key_prefix: string }>(
-      `insert into api_keys (buyer_id, label, key_prefix, key_hash, key_plain, expires_at, quota_tokens, quota_requests, daily_reset, daily_quota_tokens, package_id, rate_limit_rpm, is_ultra)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      `insert into api_keys (buyer_id, label, key_prefix, key_hash, key_plain, expires_at, quota_tokens, quota_requests, daily_reset, daily_quota_tokens, package_id, rate_limit_rpm, is_ultra, access_roles)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::text[])
        returning id, key_prefix`,
       [
         params.buyerId,
@@ -158,7 +159,8 @@ export async function createApiKeyRecord(params: {
         params.dailyQuotaTokens ?? null,
         params.packageId ?? null,
         params.rateLimitRpm ?? null,
-        params.isUltra ?? false
+        params.isUltra ?? false,
+        params.accessRoles ?? []
       ]
     );
 
@@ -257,6 +259,10 @@ export async function recordUsage(params: {
   costEstimate: number;
   latencyMs: number;
   errorCode?: string | null;
+  ipAddress?: string | null;
+  /** Last user message only (already truncated). Logged outside the billing transaction. */
+  userPrompt?: string | null;
+  promptTruncated?: boolean;
   /** When false, usage_events/rollups still log tokens but api_keys.used_tokens is not increased (quota-exempt models). Default true. */
   countTowardTokenQuota?: boolean;
 }) {
@@ -267,8 +273,8 @@ export async function recordUsage(params: {
     await client.query(
       `insert into usage_events
        (buyer_id, api_key_id, agent_id, endpoint, model_id, upstream_model, status_code, success,
-        prompt_tokens, completion_tokens, total_tokens, estimated, cost_estimate, latency_ms, error_code)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+        prompt_tokens, completion_tokens, total_tokens, estimated, cost_estimate, latency_ms, error_code, ip_address)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
       [
         params.buyerId ?? null,
         params.apiKeyId ?? null,
@@ -284,7 +290,8 @@ export async function recordUsage(params: {
         params.estimated,
         params.costEstimate,
         params.latencyMs,
-        params.errorCode ?? null
+        params.errorCode ?? null,
+        params.ipAddress ?? null
       ]
     );
 
@@ -328,6 +335,33 @@ export async function recordUsage(params: {
     throw error;
   } finally {
     client.release();
+  }
+
+  try {
+    await query(
+      `INSERT INTO request_logs
+       (buyer_id, api_key_id, model_id, status_code, success,
+        prompt_tokens, completion_tokens, total_tokens, latency_ms, error_code,
+        ip_address, user_prompt, prompt_truncated)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+      [
+        params.buyerId ?? null,
+        params.apiKeyId ?? null,
+        params.modelId ?? null,
+        params.statusCode,
+        params.success,
+        params.promptTokens,
+        params.completionTokens,
+        params.totalTokens,
+        params.latencyMs,
+        params.errorCode ?? null,
+        params.ipAddress ?? null,
+        params.userPrompt ?? null,
+        params.promptTruncated === true
+      ]
+    );
+  } catch (error) {
+    console.error("[request-log] Failed to insert request_logs row:", error);
   }
 }
 

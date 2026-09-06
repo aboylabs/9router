@@ -7,6 +7,7 @@ import { query } from "./db.js";
 
 const secret = new TextEncoder().encode(config.JWT_SECRET);
 const cookieName = "9router_admin";
+const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 export type AdminSession = {
   adminId: string;
@@ -31,11 +32,11 @@ export async function createSession(reply: FastifyReply, session: AdminSession, 
   const token = await new SignJWT(session)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("24h")
+    .setExpirationTime("30d")
     .sign(secret);
 
   const tokenHash = hashToken(token);
-  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  const expiresAt = new Date(Date.now() + SESSION_TTL_SECONDS * 1000).toISOString();
 
   // Save to database
   await query(
@@ -49,7 +50,7 @@ export async function createSession(reply: FastifyReply, session: AdminSession, 
     sameSite: "lax",
     secure: config.COOKIE_SECURE,
     path: "/",
-    maxAge: 60 * 60 * 24
+    maxAge: SESSION_TTL_SECONDS
   });
 }
 
@@ -107,6 +108,20 @@ export async function requireAdmin(request: FastifyRequest, reply: FastifyReply)
   }
 
   request.admin = session;
+  await maybeRefreshSession(request, reply, session);
+}
+
+export async function maybeRefreshSession(request: FastifyRequest, reply: FastifyReply, session: AdminSession) {
+  const token = request.cookies?.[cookieName];
+  if (!token) return;
+  try {
+    const verified = await jwtVerify(token, secret);
+    const expMs = (Number(verified.payload.exp) || 0) * 1000;
+    if (expMs - Date.now() > 7 * 24 * 60 * 60 * 1000) return;
+    await createSession(reply, session, request.ip, request.headers["user-agent"]);
+  } catch {
+    /* keep the existing cookie */
+  }
 }
 
 export async function getActiveSessions(adminId: string): Promise<SessionRecord[]> {

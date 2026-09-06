@@ -29,9 +29,8 @@ export function Overview({ overview, chartData, chartRange, setChartRange }: Ove
   return (
     <div className="space-y-6">
       <PageHeader
-        icon={<LayoutDashboard className="h-5 w-5 text-primary-500" />}
-        title="Dashboard"
-        subtitle="Overview of your API gateway"
+        icon={<LayoutDashboard className="h-5 w-5 text-text-muted" />}
+        title="Overview"
       />
 
       {/* Metrics */}
@@ -62,7 +61,7 @@ export function Overview({ overview, chartData, chartRange, setChartRange }: Ove
       <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <CardTitle>Total Request & Tokens</CardTitle>
+            <CardTitle>Requests & tokens</CardTitle>
             <select
               value={chartRange}
               onChange={(e) => setChartRange(e.target.value)}

@@ -8,7 +8,7 @@ interface TableProps {
 
 export function Table({ className, children }: TableProps) {
   return (
-    <div className="w-full overflow-x-auto rounded-xl border border-border bg-surface shadow-sm">
+    <div className="w-full overflow-x-auto rounded-lg border border-border bg-surface">
       <table className={cn("w-full text-sm border-collapse table-fixed", className)}>
         {children}
       </table>
@@ -18,14 +18,14 @@ export function Table({ className, children }: TableProps) {
 
 export function TableHeader({ children }: { children: ReactNode }) {
   return (
-    <thead className="bg-surface-secondary/95 border-b border-border sticky top-0 z-10 backdrop-blur-sm">
+    <thead className="bg-surface-secondary border-b border-border sticky top-0 z-10">
       {children}
     </thead>
   );
 }
 
 export function TableBody({ children }: { children: ReactNode }) {
-  return <tbody className="divide-y divide-border [&>tr:nth-child(even)]:bg-surface-secondary/40">{children}</tbody>;
+  return <tbody className="divide-y divide-border">{children}</tbody>;
 }
 
 export function TableRow({ children, className }: { children: ReactNode; className?: string }) {

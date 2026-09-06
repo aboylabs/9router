@@ -1,19 +1,9 @@
-import { useState } from "react";
-import {
-  LayoutDashboard,
-  Key,
-  Box,
-  Activity,
-  Radio,
-  LogOut,
-  Menu,
-  X,
-  Settings
-} from "lucide-react";
+import { useEffect, useState } from "react";
+import { LogOut, Menu, X } from "lucide-react";
 import { cn } from "../lib/utils";
 import { ThemeToggle } from "./ThemeToggle";
 
-export type Page = "overview" | "keys" | "models" | "usage" | "live" | "settings";
+export type Page = "overview" | "keys" | "models" | "usage" | "requests" | "live" | "settings";
 
 interface SidebarProps {
   currentPage: Page;
@@ -22,132 +12,158 @@ interface SidebarProps {
   onLogout: () => void;
 }
 
-const navGroups: { label: string; items: { id: Page; label: string; icon: typeof LayoutDashboard }[] }[] = [
-  {
-    label: "Main",
-    items: [
-      { id: "overview", label: "Overview", icon: LayoutDashboard },
-      { id: "keys", label: "API Keys", icon: Key },
-      { id: "models", label: "Models", icon: Box },
-    ],
-  },
-  {
-    label: "Monitoring",
-    items: [
-      { id: "usage", label: "Usage", icon: Activity },
-      { id: "live", label: "Live", icon: Radio },
-    ],
-  },
-  {
-    label: "System",
-    items: [
-      { id: "settings", label: "Settings", icon: Settings },
-    ],
-  },
+const primary: { id: Page; label: string }[] = [
+  { id: "overview", label: "Overview" },
+  { id: "keys", label: "Keys" },
+  { id: "models", label: "Models" },
+];
+
+const monitor: { id: Page; label: string }[] = [
+  { id: "usage", label: "Usage" },
+  { id: "requests", label: "Requests" },
+  { id: "live", label: "Live" },
 ];
 
 export function Sidebar({ currentPage, onNavigate, adminEmail, onLogout }: SidebarProps) {
+  const [monitorOpen, setMonitorOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const monitorActive = monitor.some((item) => item.id === currentPage);
+
+  useEffect(() => {
+    if (!monitorActive) setMonitorOpen(false);
+  }, [monitorActive]);
+
+  useEffect(() => {
+    if (!monitorOpen) return;
+    function onDoc(ev: MouseEvent) {
+      const t = ev.target as HTMLElement | null;
+      if (t && t.closest("[data-monitor-menu]")) return;
+      setMonitorOpen(false);
+    }
+    document.addEventListener("click", onDoc);
+    return () => document.removeEventListener("click", onDoc);
+  }, [monitorOpen]);
+
+  function go(page: Page) {
+    onNavigate(page);
+    setMobileOpen(false);
+    if (!monitor.some((item) => item.id === page)) setMonitorOpen(false);
+  }
+
+  const tabClass = (active: boolean) =>
+    cn(
+      "inline-flex items-center px-2.5 py-1.5 text-[13px] font-medium rounded-md transition-colors cursor-pointer",
+      active
+        ? "text-text-primary shadow-[inset_0_-2px_0_#7170ff] rounded-none"
+        : "text-text-secondary hover:text-text-primary hover:bg-surface-tertiary"
+    );
 
   return (
-    <>
-      {/* Mobile hamburger */}
-      <button
-        onClick={() => setMobileOpen(true)}
-        className="fixed top-4 left-4 z-50 lg:hidden flex items-center justify-center h-10 w-10 rounded-xl bg-surface/90 backdrop-blur border border-border shadow-sm text-text-primary cursor-pointer"
-        aria-label="Open menu"
-      >
-        <Menu className="h-5 w-5" />
-      </button>
-
-      {/* Mobile overlay */}
-      {mobileOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[1px] lg:hidden"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
-
-      {/* Sidebar */}
-      <aside
-        className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 bg-sidebar flex flex-col transition-transform duration-200 border-r border-white/5",
-          "lg:translate-x-0 lg:static lg:z-auto",
-          mobileOpen ? "translate-x-0" : "-translate-x-full"
-        )}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 h-16 border-b border-white/10">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary-400 to-primary-700 flex items-center justify-center shadow-lg shadow-primary-900/30 shrink-0">
-              <span className="text-white text-[11px] font-extrabold tracking-tight">R9</span>
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-sm font-bold text-white tracking-tight leading-tight">Routers9</h1>
-              <p className="text-[10px] text-sidebar-muted uppercase tracking-wider">Admin</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1">
-            <ThemeToggle />
-            <button
-              onClick={() => setMobileOpen(false)}
-              className="lg:hidden flex items-center justify-center h-8 w-8 rounded-md text-sidebar-muted hover:text-sidebar-text cursor-pointer"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
+    <header className="sticky top-0 z-50 bg-surface-secondary/92 backdrop-blur border-b border-border">
+      <div className="flex items-center gap-2 px-3 sm:px-5 h-14">
+        <div className="flex items-center gap-2 shrink-0 mr-1">
+          <img
+            src="/admin/assets/brand/mark.webp"
+            alt=""
+            width={22}
+            height={22}
+            className="h-[22px] w-[22px] rounded-md object-contain"
+          />
+          <img
+            src="/admin/assets/brand/wordmark.webp"
+            alt="routers9"
+            className="hidden sm:block h-3.5 w-auto"
+          />
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 space-y-4 overflow-y-auto">
-          {navGroups.map((group) => (
-            <div key={group.label}>
-              <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-sidebar-muted/70">
-                {group.label}
-              </p>
-              <div className="space-y-0.5">
-                {group.items.map((item) => {
-                  const Icon = item.icon;
-                  const active = currentPage === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => {
-                        onNavigate(item.id);
-                        setMobileOpen(false);
-                      }}
-                      className={cn(
-                        "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer",
-                        active
-                          ? "bg-primary-600 text-white shadow-md shadow-primary-900/30"
-                          : "text-sidebar-muted hover:text-sidebar-text hover:bg-sidebar-hover"
-                      )}
-                    >
-                      <Icon className={cn("h-4 w-4", active ? "text-white" : "text-sidebar-muted")} />
-                      {item.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+        <nav className="hidden md:flex items-center gap-0.5 min-w-0">
+          {primary.map((item) => (
+            <button key={item.id} type="button" onClick={() => go(item.id)} className={tabClass(currentPage === item.id)}>
+              {item.label}
+            </button>
           ))}
+          <div className="relative" data-monitor-menu>
+            <button
+              type="button"
+              onClick={() => setMonitorOpen((v) => !v)}
+              className={tabClass(monitorActive)}
+            >
+              Monitor <span className="ml-1 text-[10px] opacity-70">▾</span>
+            </button>
+            {monitorOpen && (
+              <div className="absolute left-0 top-[calc(100%+6px)] min-w-[160px] rounded-lg border border-border bg-surface p-1 shadow-lg">
+                {monitor.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => go(item.id)}
+                    className={cn(
+                      "block w-full text-left px-3 py-2 rounded-md text-[13px] cursor-pointer",
+                      currentPage === item.id
+                        ? "bg-surface-tertiary text-text-primary"
+                        : "text-text-secondary hover:bg-surface-tertiary hover:text-text-primary"
+                    )}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <button type="button" onClick={() => go("settings")} className={tabClass(currentPage === "settings")}>
+            Settings
+          </button>
         </nav>
 
-        {/* Footer */}
-        <div className="px-4 py-4 border-t border-white/10 space-y-3">
-          <div className="rounded-lg bg-white/5 px-3 py-2">
-            <p className="text-[10px] uppercase tracking-wider text-sidebar-muted mb-0.5">Signed in</p>
-            <p className="text-xs text-sidebar-text truncate font-medium">{adminEmail}</p>
-          </div>
+        <div className="ml-auto flex items-center gap-1.5 shrink-0">
+          <span className="hidden lg:inline text-[12px] text-text-muted max-w-[180px] truncate">{adminEmail}</span>
+          <ThemeToggle />
           <button
+            type="button"
             onClick={onLogout}
-            className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm text-sidebar-muted hover:text-white hover:bg-red-500/15 transition-colors cursor-pointer"
+            className="hidden sm:inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md text-[12px] text-text-secondary hover:text-text-primary hover:bg-surface-tertiary cursor-pointer"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            Sign out
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileOpen((v) => !v)}
+            className="md:hidden inline-flex items-center justify-center h-9 w-9 rounded-md text-text-primary hover:bg-surface-tertiary cursor-pointer"
+            aria-label={mobileOpen ? "Close menu" : "Open menu"}
+          >
+            {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+          </button>
+        </div>
+      </div>
+
+      {mobileOpen && (
+        <nav className="md:hidden border-t border-border px-3 py-2 space-y-0.5">
+          {[...primary, ...monitor, { id: "settings" as Page, label: "Settings" }].map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => go(item.id)}
+              className={cn(
+                "block w-full text-left px-3 py-2 rounded-md text-sm cursor-pointer",
+                currentPage === item.id
+                  ? "bg-surface-tertiary text-text-primary"
+                  : "text-text-secondary hover:bg-surface-tertiary hover:text-text-primary"
+              )}
+            >
+              {item.label}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={onLogout}
+            className="flex w-full items-center gap-2 px-3 py-2 rounded-md text-sm text-text-secondary hover:bg-surface-tertiary hover:text-text-primary cursor-pointer"
           >
             <LogOut className="h-4 w-4" />
             Sign out
           </button>
-        </div>
-      </aside>
-    </>
+        </nav>
+      )}
+    </header>
   );
 }

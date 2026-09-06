@@ -8,7 +8,7 @@ import { SuperAdminBadge } from "../components/SuperAdminBadge";
 import { SupporterBadge } from "../components/SupporterBadge";
 import { HelperBadge } from "../components/HelperBadge";
 import { UltraBadge } from "../components/UltraBadge";
-import { formatDateShort, formatTokens, buyerNameClassName, isSuperAdminName, isSupporterName, isHelperName, isUltraKey, roleRowClassName } from "../lib/utils";
+import { formatDateShort, formatTokens, isSuperAdminName, isSupporterName, isHelperName, isUltraKey } from "../lib/utils";
 
 type LeaderboardEntry = {
   buyer_id: string;
@@ -26,6 +26,7 @@ type LeaderboardEntry = {
   last_request_at: string;
   quota_tokens?: string | null;
   is_ultra?: boolean;
+  access_roles?: string[] | null;
 };
 
 function formatRemainingDays(expiresAt: string | null): string {
@@ -113,7 +114,6 @@ export function Leaderboard() {
             <Trophy className="h-5 w-5 text-yellow-500" />
             Leaderboard
           </h3>
-          <p className="text-sm text-text-muted mt-0.5">Top API keys by request count and token usage</p>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-xs text-text-muted hidden sm:block">
@@ -170,7 +170,7 @@ export function Leaderboard() {
               </thead>
               <tbody>
                 {sortedEntries.map((entry, index) => (
-                  <tr key={entry.key_id} className={`border-b border-border hover:bg-surface-tertiary/50 transition-colors${roleRowClassName(entry.buyer_name, entry.quota_tokens, entry.is_ultra) ? " " + roleRowClassName(entry.buyer_name, entry.quota_tokens, entry.is_ultra) : ""}`}>
+                  <tr key={entry.key_id} className="border-b border-border hover:bg-surface-tertiary/50">
                     <td className="p-2">
                       {index === 0 && <Trophy className="h-4 w-4 text-yellow-500 inline mr-1" />}
                       {index === 1 && <Trophy className="h-4 w-4 text-gray-400 inline mr-1" />}
@@ -184,11 +184,11 @@ export function Leaderboard() {
                           <CopyButton text={entry.key_prefix} />
                         </div>
                         <div className="flex items-center flex-wrap gap-1.5">
-                          <span className={`font-medium ${buyerNameClassName(entry.buyer_name, entry.quota_tokens, entry.is_ultra)}`}>{entry.buyer_name}</span>
-                          {isSuperAdminName(entry.buyer_name) ? <SuperAdminBadge /> : null}
-                          {isSupporterName(entry.buyer_name) ? <SupporterBadge /> : null}
-                          {isHelperName(entry.buyer_name) ? <HelperBadge /> : null}
-                          {!isSuperAdminName(entry.buyer_name) && !isSupporterName(entry.buyer_name) && !isHelperName(entry.buyer_name) && isUltraKey(entry.is_ultra, entry.quota_tokens) ? <UltraBadge /> : null}
+                          <span className="font-medium text-text-primary">{entry.buyer_name}</span>
+                          {isSuperAdminName(entry.buyer_name, entry.access_roles) ? <SuperAdminBadge /> : null}
+                          {isSupporterName(entry.buyer_name, entry.access_roles) ? <SupporterBadge /> : null}
+                          {isHelperName(entry.buyer_name, entry.access_roles) ? <HelperBadge /> : null}
+                          {!isSuperAdminName(entry.buyer_name, entry.access_roles) && !isSupporterName(entry.buyer_name, entry.access_roles) && !isHelperName(entry.buyer_name, entry.access_roles) && isUltraKey(entry.is_ultra, entry.quota_tokens, entry.access_roles) ? <UltraBadge /> : null}
                         </div>
                         <span className="text-xs text-text-muted">{entry.buyer_email}</span>
                         <span className={`text-xs font-medium ${getExpiryColor(entry.expires_at)}`}>

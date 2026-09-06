@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Eye, EyeOff, RefreshCw, User, Lock, Monitor, Smartphone, LogOut, Plus, Trash2, Edit2, Power, Settings as SettingsIcon } from "lucide-react";
+import { RefreshCw, Monitor, Smartphone, LogOut, Plus, Trash2, Edit2, Power, ListPlus, Settings as SettingsIcon } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "../components/ui/Card";
 import { PageHeader } from "../components/PageHeader";
 import { Input } from "../components/ui/Input";
@@ -50,17 +50,10 @@ export function Settings() {
   const [newKeyValue, setNewKeyValue] = useState("");
   const [newKeyLabel, setNewKeyLabel] = useState("");
   const [keySaving, setKeySaving] = useState(false);
-
-  const [adminEmail, setAdminEmail] = useState("");
-  const [newEmail, setNewEmail] = useState("");
-  const [emailSaving, setEmailSaving] = useState(false);
-
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [showCurrentPw, setShowCurrentPw] = useState(false);
-  const [showNewPw, setShowNewPw] = useState(false);
-  const [pwSaving, setPwSaving] = useState(false);
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkKeyValues, setBulkKeyValues] = useState("");
+  const [bulkLabelPrefix, setBulkLabelPrefix] = useState("");
+  const [bulkSaving, setBulkSaving] = useState(false);
 
   const [sessions, setSessions] = useState<Array<{
     id: string;
@@ -76,12 +69,6 @@ export function Settings() {
   useEffect(() => {
     Promise.all([
       loadUpstreams(),
-      api<{ admin: { id: string; email: string } | null }>("/admin/profile").then((data) => {
-        if (data.admin) {
-          setAdminEmail(data.admin.email);
-          setNewEmail(data.admin.email);
-        }
-      }),
       api<{ sessions: typeof sessions }>("/admin/sessions").then((data) => {
         setSessions(data.sessions);
       }).catch(() => {
@@ -170,20 +157,14 @@ export function Settings() {
     }
   }
 
-  async function syncUpstream(id: string) {
-    try {
-      const res = await api<{ synced: number; message: string }>(`/admin/upstreams/${id}/sync`, { method: "POST" });
-      toast(res.message ?? "Models synced", "success");
-    } catch {
-      toast("Failed to sync models", "error");
-    }
-  }
-
   async function openKeysManager(upstreamId: string) {
     setKeysUpstreamId(upstreamId);
     setKeysLoading(true);
     setNewKeyValue("");
     setNewKeyLabel("");
+    setBulkMode(false);
+    setBulkKeyValues("");
+    setBulkLabelPrefix("");
     try {
       const data = await api<{ keys: ManagedKey[] }>(`/admin/upstreams/${upstreamId}/keys`);
       setManagedKeys(data.keys || []);
@@ -216,6 +197,30 @@ export function Settings() {
     }
   }
 
+  async function addBulkManagedKeys() {
+    if (!keysUpstreamId) return;
+    const keys = Array.from(new Set(bulkKeyValues.split(/\r?\n/).map((key) => key.trim()).filter(Boolean)));
+    if (!keys.length) { toast("Paste at least one API key, one per line", "error"); return; }
+    setBulkSaving(true);
+    try {
+      const result = await api<{ added: number; skipped: number; duplicateInput: number; message: string }>(`/admin/upstreams/${keysUpstreamId}/keys/bulk`, {
+        method: "POST",
+        body: JSON.stringify({ keys, label_prefix: bulkLabelPrefix.trim() || undefined, is_active: true }),
+      });
+      const duplicateNote = result.duplicateInput > 0 ? ` · ${result.duplicateInput} duplicate input` : "";
+      const skippedNote = result.skipped > result.duplicateInput ? ` · ${result.skipped - result.duplicateInput} already existed` : "";
+      toast(`${result.added} key added${result.added === 1 ? "" : "s"}${duplicateNote}${skippedNote}`, "success");
+      setBulkKeyValues("");
+      setBulkLabelPrefix("");
+      await openKeysManager(keysUpstreamId);
+      await loadUpstreams();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to add API keys", "error");
+    } finally {
+      setBulkSaving(false);
+    }
+  }
+
   async function toggleManagedKey(keyId: string) {
     if (!keysUpstreamId) return;
     try {
@@ -237,49 +242,6 @@ export function Settings() {
       await loadUpstreams();
     } catch (err) {
       toast(err instanceof Error ? err.message : "Failed to delete key", "error");
-    }
-  }
-
-  async function saveEmail() {
-    const email = newEmail.trim().toLowerCase();
-    if (!email) { toast("Email is required", "error"); return; }
-    try { new URL(`https://${email}`); } catch {
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast("Invalid email format", "error"); return; }
-    }
-    if (email === adminEmail) { toast("Email unchanged", "info"); return; }
-    setEmailSaving(true);
-    try {
-      await api<{ ok: boolean; email: string }>("/admin/profile", {
-        method: "PUT",
-        body: JSON.stringify({ email })
-      });
-      setAdminEmail(email);
-      toast("Email updated", "success");
-    } catch (err) {
-      toast(err instanceof Error ? err.message : "Failed to update email", "error");
-    } finally {
-      setEmailSaving(false);
-    }
-  }
-
-  async function savePassword() {
-    if (!currentPassword) { toast("Current password is required", "error"); return; }
-    if (newPassword.length < 6) { toast("New password must be at least 6 characters", "error"); return; }
-    if (newPassword !== confirmPassword) { toast("Passwords do not match", "error"); return; }
-    setPwSaving(true);
-    try {
-      await api<{ ok: boolean }>("/admin/profile", {
-        method: "PUT",
-        body: JSON.stringify({ current_password: currentPassword, new_password: newPassword })
-      });
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      toast("Password changed", "success");
-    } catch (err) {
-      toast(err instanceof Error ? err.message : "Failed to change password", "error");
-    } finally {
-      setPwSaving(false);
     }
   }
 
@@ -346,67 +308,9 @@ export function Settings() {
   return (
     <div className="space-y-6">
       <PageHeader
-        icon={<SettingsIcon className="h-5 w-5 text-primary-500" />}
+        icon={<SettingsIcon className="h-5 w-5 text-text-muted" />}
         title="Settings"
-        subtitle="Manage your account and upstream configuration"
       />
-
-      <Card className="w-full max-w-4xl">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><User className="h-4 w-4" /> Admin Account</CardTitle>
-        </CardHeader>
-        <div className="space-y-4">
-          <Input
-            label="Email / Username"
-            type="email"
-            value={newEmail}
-            onChange={(e) => setNewEmail(e.target.value)}
-            placeholder="admin@example.com"
-          />
-          <div className="pt-1">
-            <Button onClick={saveEmail} loading={emailSaving} disabled={newEmail.trim().toLowerCase() === adminEmail}>
-              Update Email
-            </Button>
-          </div>
-        </div>
-      </Card>
-
-      <Card className="w-full max-w-4xl">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Lock className="h-4 w-4" /> Change Password</CardTitle>
-        </CardHeader>
-        <div className="space-y-4">
-          <PasswordInput
-            label="Current Password"
-            value={currentPassword}
-            onChange={setCurrentPassword}
-            show={showCurrentPw}
-            onToggleShow={() => setShowCurrentPw((v) => !v)}
-            placeholder="Enter current password"
-          />
-          <PasswordInput
-            label="New Password"
-            value={newPassword}
-            onChange={setNewPassword}
-            show={showNewPw}
-            onToggleShow={() => setShowNewPw((v) => !v)}
-            placeholder="Min 6 characters"
-          />
-          <PasswordInput
-            label="Confirm New Password"
-            value={confirmPassword}
-            onChange={setConfirmPassword}
-            show={showNewPw}
-            onToggleShow={() => setShowNewPw((v) => !v)}
-            placeholder="Re-enter new password"
-          />
-          <div className="pt-1">
-            <Button onClick={savePassword} loading={pwSaving} disabled={!currentPassword || !newPassword || !confirmPassword}>
-              Change Password
-            </Button>
-          </div>
-        </div>
-      </Card>
 
       <Card className="w-full max-w-4xl">
         <CardHeader>
@@ -489,9 +393,6 @@ export function Settings() {
                     </td>
                     <td className="py-3 text-center">
                       <div className="flex items-center justify-center gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => syncUpstream(up.id)} title="Sync Models">
-                          <RefreshCw className="h-3.5 w-3.5" />
-                        </Button>
                         <Button variant="ghost" size="sm" onClick={() => startEdit(up)} title="Edit">
                           <Edit2 className="h-3.5 w-3.5" />
                         </Button>
@@ -522,27 +423,79 @@ export function Settings() {
             Requests to this upstream rotate across active keys (round-robin). On 429/5xx the next key is tried, then other upstreams.
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4 p-3 rounded-lg border border-border bg-surface-secondary">
-            <Input
-              label="Label (optional)"
-              value={newKeyLabel}
-              onChange={(e) => setNewKeyLabel(e.target.value)}
-              placeholder="e.g. key-2"
-            />
-            <div className="grid gap-1.5 md:col-span-2">
-              <label className="text-sm font-medium text-text-secondary">New API Key</label>
-              <input
-                type="password"
-                value={newKeyValue}
-                onChange={(e) => setNewKeyValue(e.target.value)}
-                placeholder="sk-..."
-                className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors"
-              />
+          <div className="mb-4 rounded-lg border border-border bg-surface-secondary p-3">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                variant={bulkMode ? "secondary" : "default"}
+                onClick={() => setBulkMode(false)}
+              >
+                <Plus className="h-3.5 w-3.5" /> Single key
+              </Button>
+              <Button
+                size="sm"
+                variant={bulkMode ? "default" : "secondary"}
+                onClick={() => setBulkMode(true)}
+              >
+                <ListPlus className="h-3.5 w-3.5" /> Bulk paste
+              </Button>
+              <span className="text-xs text-text-muted">Maksimal 1.000 key · satu key per baris</span>
             </div>
-            <div className="md:col-span-3 flex gap-2">
-              <Button onClick={addManagedKey} loading={keySaving}>Add Key</Button>
-              <Button variant="secondary" onClick={() => { setKeysUpstreamId(null); setManagedKeys([]); }}>Close</Button>
-            </div>
+
+            {bulkMode ? (
+              <div className="grid gap-3">
+                <div className="grid gap-1.5">
+                  <label className="text-sm font-medium text-text-secondary">API Keys</label>
+                  <textarea
+                    value={bulkKeyValues}
+                    onChange={(e) => setBulkKeyValues(e.target.value)}
+                    placeholder={'Paste banyak key di sini, satu per baris\\nsk-...\\nsk-...\\nsk-...'}
+                    rows={6}
+                    className="w-full resize-y rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors"
+                  />
+                  <p className="text-xs text-text-muted">Baris kosong dan key duplikat di input akan dilewati. Key yang sudah ada juga tidak menggagalkan batch.</p>
+                </div>
+                <Input
+                  label="Label prefix (optional)"
+                  value={bulkLabelPrefix}
+                  onChange={(e) => setBulkLabelPrefix(e.target.value)}
+                  placeholder="e.g. qwen → qwen-1, qwen-2"
+                />
+                <div className="flex gap-2">
+                  <Button onClick={addBulkManagedKeys} loading={bulkSaving}>
+                    <ListPlus className="h-3.5 w-3.5" /> Add All Keys
+                  </Button>
+                  <Button variant="secondary" onClick={() => { setBulkMode(false); setBulkKeyValues(""); setBulkLabelPrefix(""); }}>
+                    Clear
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <Input
+                  label="Label (optional)"
+                  value={newKeyLabel}
+                  onChange={(e) => setNewKeyLabel(e.target.value)}
+                  placeholder="e.g. key-2"
+                />
+                <div className="grid gap-1.5 md:col-span-2">
+                  <label className="text-sm font-medium text-text-secondary">New API Key</label>
+                  <input
+                    type="password"
+                    value={newKeyValue}
+                    onChange={(e) => setNewKeyValue(e.target.value)}
+                    placeholder="sk-..."
+                    className="h-9 w-full rounded-md border border-border bg-surface px-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors"
+                  />
+                </div>
+                <div className="md:col-span-3">
+                  <Button onClick={addManagedKey} loading={keySaving}>Add Key</Button>
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="mb-4">
+            <Button variant="secondary" onClick={() => { setKeysUpstreamId(null); setManagedKeys([]); }}>Close key manager</Button>
           </div>
 
           {keysLoading ? (
@@ -660,38 +613,6 @@ export function Settings() {
           </div>
         )}
       </Card>
-    </div>
-  );
-}
-
-function PasswordInput({ label, value, onChange, show, onToggleShow, placeholder }: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  show: boolean;
-  onToggleShow: () => void;
-  placeholder?: string;
-}) {
-  return (
-    <div className="grid gap-1.5">
-      <label className="text-sm font-medium text-text-secondary">{label}</label>
-      <div className="relative">
-        <input
-          type={show ? "text" : "password"}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          className="h-9 w-full rounded-md border border-border bg-surface px-3 pr-10 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors"
-        />
-        <button
-          type="button"
-          onClick={onToggleShow}
-          className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary cursor-pointer"
-          tabIndex={-1}
-        >
-          {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-        </button>
-      </div>
     </div>
   );
 }

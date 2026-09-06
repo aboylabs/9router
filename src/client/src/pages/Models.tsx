@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Infinity as InfinityIcon, Power, RefreshCw, Search, ShieldCheck, Trash2, Box } from "lucide-react";
+import { Infinity as InfinityIcon, Power, Search, ShieldCheck, Trash2, Box } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { PageHeader } from "../components/PageHeader";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from "../components/ui/Table";
@@ -18,9 +18,10 @@ const ROLE_META: Record<ModelAccessRole, { label: string }> = {
   dev: { label: "Dev" },
   supporter: { label: "Supporter" },
   ultra: { label: "Ultra" },
+  pro: { label: "Pro" },
 };
 
-const ALL_ROLES: ModelAccessRole[] = ["dev", "supporter", "ultra"];
+const ALL_ROLES: ModelAccessRole[] = ["dev", "supporter", "ultra", "pro"];
 
 function modelPath(id: string) {
   // Keep slashes so Fastify wildcard `/admin/models/*` captures full branded id.
@@ -36,20 +37,21 @@ function rolesOf(model: Model): ModelAccessRole[] {
 
 function roleBadges(roles: ModelAccessRole[]) {
   if (!roles.length) return <span className="text-xs text-text-muted">All keys</span>;
+  const order: ModelAccessRole[] = ["pro", "ultra", "supporter", "dev"];
+  const picked = order.find((r) => roles.includes(r)) ?? roles[0];
+  const extra = roles.length > 1 ? "+" : "";
+  const variant = picked === "ultra" ? "success" : picked === "supporter" ? "warning" : "info";
   return (
-    <div className="flex flex-wrap gap-1">
-      {roles.map((r) => (
-        <Badge key={r} variant={r === "dev" ? "info" : r === "ultra" ? "success" : "warning"}>
-          {ROLE_META[r].label}
-        </Badge>
-      ))}
-    </div>
+    <span title={roles.map((r) => ROLE_META[r].label).join(", ")}>
+      <Badge variant={variant}>
+        {ROLE_META[picked].label}{extra}
+      </Badge>
+    </span>
   );
 }
 
 export function Models({ models, onRefresh }: ModelsPageProps) {
   const { toast } = useToast();
-  const [syncing, setSyncing] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [accessModel, setAccessModel] = useState<Model | null>(null);
@@ -65,19 +67,6 @@ export function Models({ models, onRefresh }: ModelsPageProps) {
         (m.upstream_model || "").toLowerCase().includes(needle)
     );
   }, [models, q]);
-
-  async function syncModels() {
-    setSyncing(true);
-    try {
-      const result = await api<{ synced: number }>("/admin/models/sync", { method: "POST" });
-      toast(`Synced ${result.synced} models`);
-      onRefresh();
-    } catch {
-      toast("Model sync failed. Check provider config.", "error");
-    } finally {
-      setSyncing(false);
-    }
-  }
 
   async function patchModel(
     model: Model,
@@ -144,15 +133,9 @@ export function Models({ models, onRefresh }: ModelsPageProps) {
   return (
     <div className="space-y-6">
       <PageHeader
-        icon={<Box className="h-5 w-5 text-primary-500" />}
-        title="Model Catalog"
-        subtitle="Free/Unlimited = usage logged, token quota key tidak terpotong. Role Dev / Supporter / Ultra bisa diaktifkan satu-satu. Kosong = semua key."
-        actions={
-          <Button variant="outline" size="sm" onClick={syncModels} loading={syncing}>
-            <RefreshCw className="h-4 w-4" />
-            <span className="hidden sm:inline">Sync Models</span>
-          </Button>
-        }
+        icon={<Box className="h-5 w-5 text-text-muted" />}
+        title="Models"
+        subtitle={`${filtered.length} models · Access sets who can call each one`}
       />
 
       <div className="relative max-w-md">
@@ -185,6 +168,11 @@ export function Models({ models, onRefresh }: ModelsPageProps) {
                   </div>
                 </div>
                 <div className="text-sm font-medium text-text-primary">{model.display_name}</div>
+                {model.upstream_name && (
+                  <div className="text-xs text-text-muted">
+                    via <span className="font-medium text-text-secondary">{model.upstream_name}</span>
+                  </div>
+                )}
                 <div>{roleBadges(roles)}</div>
                 <div className="flex items-center gap-2 pt-1 flex-wrap">
                   <Button
@@ -235,9 +223,7 @@ export function Models({ models, onRefresh }: ModelsPageProps) {
               <TableRow>
                 <TableHead className="whitespace-nowrap">Model ID</TableHead>
                 <TableHead className="whitespace-nowrap">Display Name</TableHead>
-                <TableHead className="whitespace-nowrap">Input Cost</TableHead>
-                <TableHead className="whitespace-nowrap">Output Cost</TableHead>
-                <TableHead className="whitespace-nowrap">Quota</TableHead>
+                <TableHead className="whitespace-nowrap">Upstream</TableHead>
                 <TableHead className="whitespace-nowrap">Access Roles</TableHead>
                 <TableHead className="whitespace-nowrap">Status</TableHead>
                 <TableHead className="whitespace-nowrap text-right">Actions</TableHead>
@@ -246,7 +232,7 @@ export function Models({ models, onRefresh }: ModelsPageProps) {
             <TableBody>
               {filtered.length === 0 ? (
                 <TableEmpty
-                  colSpan={8}
+                  colSpan={6}
                   message={models.length === 0 ? "No models configured. Sync models." : "No models match search."}
                 />
               ) : (
@@ -259,13 +245,13 @@ export function Models({ models, onRefresh }: ModelsPageProps) {
                         <code className="text-xs bg-surface-tertiary px-1.5 py-0.5 rounded font-mono">{model.id}</code>
                       </TableCell>
                       <TableCell className="font-medium text-text-primary">{model.display_name}</TableCell>
-                      <TableCell>{model.input_cost_per_million ? `$${model.input_cost_per_million}` : "-"}</TableCell>
-                      <TableCell>{model.output_cost_per_million ? `$${model.output_cost_per_million}` : "-"}</TableCell>
                       <TableCell>
-                        {model.quota_exempt ? (
-                          <Badge variant="info">Free / Unlimited</Badge>
+                        {model.upstream_name ? (
+                          <span title={model.upstream_id || undefined}>
+                            <Badge variant="default">{model.upstream_name}</Badge>
+                          </span>
                         ) : (
-                          <span className="text-xs text-text-muted">Metered</span>
+                          <span className="text-xs text-text-muted">—</span>
                         )}
                       </TableCell>
                       <TableCell>{roleBadges(roles)}</TableCell>

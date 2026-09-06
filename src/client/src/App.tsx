@@ -3,11 +3,13 @@ import { ToastProvider } from "./components/ui/Toast";
 import { Sidebar, type Page } from "./components/Sidebar";
 import { useAuth } from "./hooks/useAuth";
 import { useDashboard } from "./hooks/useDashboard";
+import { useTheme } from "./hooks/useTheme";
 import { Login } from "./pages/Login";
 import { Overview } from "./pages/Overview";
 import { Keys } from "./pages/Keys";
 import { Models } from "./pages/Models";
 import { Usage } from "./pages/Usage";
+import { Requests } from "./pages/Requests";
 import { Live } from "./pages/Live";
 import { Settings } from "./pages/Settings";
 
@@ -20,6 +22,7 @@ function App() {
 }
 
 function AppContent() {
+  useTheme();
   const { admin, login, logout, error, isLoading } = useAuth();
   const [page, setPage] = useState<Page>("overview");
 
@@ -53,7 +56,7 @@ function Dashboard({ adminEmail, page, onNavigate, onLogout }: {
   const { models, keys, usage, overview, chartData, chartRange, setChartRange, refreshChart, loading, refresh } = useDashboard();
 
   return (
-    <div className="min-h-screen bg-surface-secondary flex">
+    <div className="min-h-screen bg-surface-secondary flex flex-col">
       <Sidebar
         currentPage={page}
         onNavigate={onNavigate}
@@ -61,7 +64,7 @@ function Dashboard({ adminEmail, page, onNavigate, onLogout }: {
         onLogout={onLogout}
       />
 
-      <main className="flex-1 lg:ml-0 p-3 sm:p-4 lg:p-8 pt-16 lg:pt-8 overflow-auto min-h-screen">
+      <main className="flex-1 p-3 sm:p-5 lg:p-8 overflow-auto min-h-0">
         <div className="max-w-[1600px] mx-auto page-enter">
           {loading ? (
             <div className="flex items-center justify-center py-20">
@@ -76,6 +79,7 @@ function Dashboard({ adminEmail, page, onNavigate, onLogout }: {
               {page === "keys" && <Keys keys={keys} onRefresh={refresh} />}
               {page === "models" && <Models models={models} onRefresh={refresh} />}
               {page === "usage" && <Usage usage={usage} />}
+              {page === "requests" && <Requests />}
               {page === "live" && <Live />}
               {page === "settings" && <Settings />}
             </>

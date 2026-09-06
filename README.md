@@ -156,7 +156,7 @@ Breaking change in v1.3.0: old `9router/...` IDs no longer match the brand allow
 | GET | `/` | Public dashboard HTML |
 | GET | `/health` | Health check |
 | GET | `/public/overview` | Global stats |
-| GET | `/public/leaderboard?q=` | Top keys; optional name/key search; used/quota |
+| GET | `/public/leaderboard?q=` | All active keys; optional name search; used/quota |
 | GET | `/public/live` | Active buyers (last 5 min) |
 | GET | `/public/usage` | Recent events, **success-only** (`success=true`, `status_code=200`) |
 | GET | `/public/usage/chart?range=` | `15m` `1h` `6h` `12h` `1d` `3d` `7d` `1M` |

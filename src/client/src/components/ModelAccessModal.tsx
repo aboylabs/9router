@@ -12,7 +12,7 @@ interface ModelAccessModalProps {
   onSave: (model: Model, roles: ModelAccessRole[]) => Promise<void> | void;
 }
 
-const ALL_ROLES: ModelAccessRole[] = ["dev", "supporter", "ultra"];
+const ALL_ROLES: ModelAccessRole[] = ["dev", "supporter", "ultra", "pro"];
 
 const ROLE_INFO: Record<ModelAccessRole, { label: string; desc: string; accent: string }> = {
   dev: {
@@ -29,6 +29,11 @@ const ROLE_INFO: Record<ModelAccessRole, { label: string; desc: string; accent: 
     label: "Ultra (500M)",
     desc: "Key paket Ultra — quota 500M",
     accent: "text-cyan-500",
+  },
+  pro: {
+    label: "Pro",
+    desc: "Key dengan role Pro (assign via API Keys)",
+    accent: "text-blue-500",
   },
 };
 

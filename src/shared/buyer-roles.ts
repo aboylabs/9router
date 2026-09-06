@@ -7,13 +7,13 @@
 export const SUPER_ADMIN_NAME = "super admin";
 
 /** Supporter / donatur roster (lowercase). Extend when promoting someone. */
-export const SUPPORTER_NAMES = ["gilbert arias", "yuop", "attta rebelution", "aditya sandy", "dono"] as const;
+export const SUPPORTER_NAMES = ["gilbert arias", "yuop", "attta rebelution", "aditya sandy", "dono", "dna", "brother rogers", "ichigo kurosaki", "#indopride", "blue", "mrians21", "khd", "snapt", "bebascetak", "ramses", "binkhozin", "el", "tars", "en en", "company belanda", "petapagenit", "cucakrowo", "octav", "0xfz", "nyguist"] as const;
 
 /** Helper / builder roster (lowercase). Not auto-granted restricted models. */
 export const HELPER_NAMES = [] as const;
 
 /** Per-model access roles that can be toggled independently in Models menu. */
-export const MODEL_ACCESS_ROLES = ["dev", "supporter", "ultra"] as const;
+export const MODEL_ACCESS_ROLES = ["dev", "supporter", "ultra", "pro"] as const;
 export type ModelAccessRole = (typeof MODEL_ACCESS_ROLES)[number];
 
 /** Exact 500M lifetime quota → Ultra tier (create-key Ultra package). */

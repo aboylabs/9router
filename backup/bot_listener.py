@@ -35,16 +35,7 @@ def get_db_status(config):
     return "Failed to fetch DB status."
 
 def get_last_backup():
-    backup_dir = SCRIPT_DIR
-    files = [f for f in os.listdir(backup_dir) if f.startswith("9router_backup_") and f.endswith(".json.gz")]
-    if not files:
-        return "No backups found."
-    files.sort(reverse=True)
-    latest = files[0]
-    stat = os.stat(os.path.join(backup_dir, latest))
-    mtime = datetime.fromtimestamp(stat.st_mtime, tz=timezone(timedelta(hours=7)))
-    size_kb = stat.st_size / 1024
-    return f"• File: {latest}\n• Size: {size_kb:.1f} KB\n• Time: {mtime.strftime('%Y-%m-%d %H:%M')} WIB"
+    return "• Disabled. Daily/Telegram DB dump is off (no key_plain export)."
 
 def get_system_info():
     """Get system resource information: RAM, swap, disk, uptime, load."""
@@ -128,11 +119,10 @@ def get_main_menu_keyboard():
     return {
         "inline_keyboard": [
             [
-                {"text": "💾 Backup Manual", "callback_data": "backup"},
-                {"text": "📊 Status DB", "callback_data": "status"}
+                {"text": "📊 Status DB", "callback_data": "status"},
+                {"text": "🖥️ Server Info", "callback_data": "system"}
             ],
             [
-                {"text": "🖥️ Server Info", "callback_data": "system"},
                 {"text": "❓ Help", "callback_data": "help"}
             ]
         ]
@@ -230,27 +220,21 @@ def handle_updates(config):
                         send_message(token, chat_id, reply, msg_id, get_main_menu_keyboard() if is_callback else None)
                         
                     elif text in ["/backup", "backup"]:
-                        if is_callback:
-                            send_message(token, chat_id, "⏳ Starting manual backup, please wait...", msg_id)
-                        else:
-                            send_message(token, chat_id, "⏳ Starting manual backup, please wait...", msg_id, get_main_menu_keyboard())
-                        
-                        result = subprocess.run(
-                            ["python3", os.path.join(SCRIPT_DIR, "backup.py")], 
-                            capture_output=True, text=True, timeout=120
+                        send_message(
+                            token,
+                            chat_id,
+                            "Backup dimatikan. Dump DB + key_plain ke Telegram sudah tidak ada.",
+                            msg_id,
+                            get_main_menu_keyboard(),
                         )
-                        if result.returncode == 0:
-                            send_message(token, chat_id, "✅ Manual backup completed successfully! The file has been sent to this chat.", msg_id, get_main_menu_keyboard())
-                        else:
-                            send_message(token, chat_id, f"❌ Backup failed.\nError: {result.stderr}", msg_id, get_main_menu_keyboard())
-                        
+
                     elif text in ["/start", "/help", "start", "help"]:
                         reply = (
-                            f"<b>🤖 9router Backup Bot</b>\n\n"
+                            f"<b>🤖 9router Bot</b>\n\n"
                             f"Gunakan tombol di bawah atau ketik perintah:\n"
-                            f"• <b>/status</b> - Cek statistik database & backup terakhir\n"
+                            f"• <b>/status</b> - Cek statistik database\n"
                             f"• <b>/system</b> - Cek RAM, Swap, Disk SSD, Uptime\n"
-                            f"• <b>/backup</b> - Trigger backup manual & kirim file\n"
+                            f"Backup harian / dump key_plain sudah dimatikan.\n"
                         )
                         send_message(token, chat_id, reply, msg_id, get_main_menu_keyboard())
                         

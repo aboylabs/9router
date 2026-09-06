@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api";
 
-export type ModelAccessRole = "dev" | "supporter" | "ultra";
+export type ModelAccessRole = "dev" | "supporter" | "ultra" | "pro";
 
 export type Model = {
   id: string;
@@ -16,6 +16,10 @@ export type Model = {
   privileged_only?: boolean;
   /** Independent role allowlist. Empty = all keys. */
   access_roles?: ModelAccessRole[] | string[];
+  /** Upstream UUID this model is pinned to. */
+  upstream_id?: string | null;
+  /** Upstream display name (joined from upstreams). */
+  upstream_name?: string | null;
 };
 
 export type Key = {
@@ -25,7 +29,6 @@ export type Key = {
   buyer_email?: string;
   label: string;
   key_prefix: string;
-  key_plain?: string;
   expires_at: string | null;
   revoked_at: string | null;
   quota_tokens: string | null;
@@ -47,6 +50,7 @@ export type UsageEvent = {
   key_prefix: string | null;
   quota_tokens?: string | null;
   is_ultra?: boolean;
+  access_roles?: string[] | null;
   agent_id: string;
   model_id: string | null;
   status_code: number;

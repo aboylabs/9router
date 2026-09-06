@@ -13,12 +13,10 @@ import { UltraBadge } from "../components/UltraBadge";
 import {
   formatDateShort,
   formatTokens,
-  buyerNameClassName,
   isSuperAdminName,
   isSupporterName,
   isHelperName,
-  isUltraKey,
-  roleRowClassName
+  isUltraKey
 } from "../lib/utils";
 
 type LiveEntry = {
@@ -28,11 +26,27 @@ type LiveEntry = {
   buyer_email: string;
   quota_tokens?: string | null;
   is_ultra?: boolean;
+  access_roles?: string[] | null;
   request_count: number;
   last_request_at: string;
   total_tokens: string;
+  ip_count?: number;
+  ips?: string[] | null;
   models_used: string[] | null;
 };
+
+function ipCountLabel(count?: number) {
+  const n = Number(count) || 0;
+  return n === 1 ? "1 IP" : `${n} IPs`;
+}
+
+function ipBadgeVariant(count?: number): "success" | "warning" | "danger" | "info" {
+  const n = Number(count) || 0;
+  if (n >= 5) return "danger";
+  if (n >= 3) return "warning";
+  if (n >= 1) return "success";
+  return "info";
+}
 
 export function Live() {
   const [active, setActive] = useState<LiveEntry[]>([]);
@@ -60,9 +74,9 @@ export function Live() {
   return (
     <div className="space-y-6">
       <PageHeader
-        icon={<Radio className="h-5 w-5 text-green-500 animate-pulse" />}
-        title="Live Usage"
-        subtitle="Active API keys in the last 5 minutes"
+        icon={<Radio className="h-5 w-5 text-text-muted" />}
+        title="Live"
+        subtitle="Active keys · last 5 minutes"
         actions={
           <>
             <span className="text-xs text-text-muted">
@@ -113,18 +127,18 @@ export function Live() {
       ) : (
         <div className="space-y-3">
           {active.map((entry) => (
-            <Card key={entry.key_id} className={roleRowClassName(entry.buyer_name, entry.quota_tokens, entry.is_ultra) || undefined}>
+            <Card key={entry.key_id}>
               <div className="p-4 space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse shrink-0" />
-                    <span className={`font-medium text-sm truncate ${buyerNameClassName(entry.buyer_name, entry.quota_tokens, entry.is_ultra)}`}>
+                    <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
+                    <span className="font-medium text-sm truncate text-text-primary">
                       {entry.buyer_name}
                     </span>
-                    {isSuperAdminName(entry.buyer_name) ? <SuperAdminBadge /> : null}
-                    {isSupporterName(entry.buyer_name) ? <SupporterBadge /> : null}
-                    {isHelperName(entry.buyer_name) ? <HelperBadge /> : null}
-                    {!isSuperAdminName(entry.buyer_name) && !isSupporterName(entry.buyer_name) && !isHelperName(entry.buyer_name) && isUltraKey(entry.is_ultra, entry.quota_tokens) ? <UltraBadge /> : null}
+                    {isSuperAdminName(entry.buyer_name, entry.access_roles) ? <SuperAdminBadge /> : null}
+                    {isSupporterName(entry.buyer_name, entry.access_roles) ? <SupporterBadge /> : null}
+                    {isHelperName(entry.buyer_name, entry.access_roles) ? <HelperBadge /> : null}
+                    {!isSuperAdminName(entry.buyer_name, entry.access_roles) && !isSupporterName(entry.buyer_name, entry.access_roles) && !isHelperName(entry.buyer_name, entry.access_roles) && isUltraKey(entry.is_ultra, entry.quota_tokens, entry.access_roles) ? <UltraBadge /> : null}
                   </div>
                   <Badge variant="info">{entry.request_count} req</Badge>
                 </div>
@@ -138,6 +152,23 @@ export function Live() {
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-text-muted">Tokens: <span className="text-text-primary font-medium">{formatTokens(entry.total_tokens)}</span></span>
                   <span className="text-text-muted">Last: {formatDateShort(entry.last_request_at)}</span>
+                </div>
+                <div className="flex items-start justify-between gap-3 text-xs pt-0.5">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-text-muted shrink-0">IPs (5m)</span>
+                    <Badge variant={ipBadgeVariant(entry.ip_count)}>{ipCountLabel(entry.ip_count)}</Badge>
+                  </div>
+                  {entry.ips && entry.ips.length > 0 ? (
+                    <div className="flex flex-wrap justify-end gap-1 min-w-0">
+                      {entry.ips.map((ip) => (
+                        <code key={ip} className="bg-surface-tertiary px-1.5 py-0.5 rounded font-mono text-text-muted" title={ip}>
+                          {ip}
+                        </code>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-text-muted">no IP yet</span>
+                  )}
                 </div>
                 {entry.models_used && entry.models_used.length > 0 && (
                   <div className="flex flex-wrap gap-1 pt-1">

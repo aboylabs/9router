@@ -11,8 +11,10 @@ interface SuccessModalProps {
   data: {
     apiKey: string;
     name?: string;
-    email: string;
-    password: string;
+    email?: string;
+    password?: string;
+    title?: string;
+    warning?: string;
     package: {
       id: string | null;
       label: string;
@@ -20,9 +22,9 @@ interface SuccessModalProps {
       daily_quota_tokens: number | null;
       daily_reset: boolean;
       rate_limit_rpm?: number | null;
-      expires_at: string;
+      expires_at: string | Date | null;
     };
-    created_at?: string;
+    created_at?: string | Date;
   };
 }
 
@@ -50,11 +52,16 @@ export function SuccessModal({ open, onOpenChange, data }: SuccessModalProps) {
             <div className="flex items-center justify-center h-10 w-10 rounded-full bg-emerald-50 dark:bg-emerald-950">
               <CheckCircle2 className="h-5 w-5 text-success" />
             </div>
-            <DialogTitle>API Key Created</DialogTitle>
+            <DialogTitle>{data.title ?? "API Key Created"}</DialogTitle>
           </div>
         </DialogHeader>
 
         <div className="mt-4 space-y-3">
+          {data.warning ? (
+            <p className="text-xs text-amber-600 dark:text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-md px-3 py-2">
+              {data.warning}
+            </p>
+          ) : null}
           <div className="space-y-1">
             <p className="text-xs font-medium text-text-muted uppercase">API Key</p>
             <code className="block w-full px-3 py-2 rounded-md bg-sidebar text-emerald-300 text-xs font-mono break-all">

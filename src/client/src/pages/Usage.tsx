@@ -49,9 +49,9 @@ export function Usage({ usage }: UsagePageProps) {
   return (
     <div className="space-y-6">
       <PageHeader
-        icon={<Activity className="h-5 w-5 text-primary-500" />}
-        title="Usage History"
-        subtitle="Last 250 API requests"
+        icon={<Activity className="h-5 w-5 text-text-muted" />}
+        title="Usage"
+        subtitle="Last 250 requests"
       />
 
       {/* Charts */}
@@ -165,10 +165,10 @@ export function Usage({ usage }: UsagePageProps) {
                   <span className={`truncate font-medium ${buyerNameClassName(event.buyer_name, event.quota_tokens, event.is_ultra)}`}>
                     {event.buyer_name || "-"}
                   </span>
-                  {isSuperAdminName(event.buyer_name) ? <SuperAdminBadge /> : null}
-                  {isSupporterName(event.buyer_name) ? <SupporterBadge /> : null}
-                  {isHelperName(event.buyer_name) ? <HelperBadge /> : null}
-                  {!isSuperAdminName(event.buyer_name) && !isSupporterName(event.buyer_name) && !isHelperName(event.buyer_name) && isUltraKey(event.is_ultra, event.quota_tokens) ? <UltraBadge /> : null}
+                  {isSuperAdminName(event.buyer_name, event.access_roles) ? <SuperAdminBadge /> : null}
+                  {isSupporterName(event.buyer_name, event.access_roles) ? <SupporterBadge /> : null}
+                  {isHelperName(event.buyer_name, event.access_roles) ? <HelperBadge /> : null}
+                  {!isSuperAdminName(event.buyer_name, event.access_roles) && !isSupporterName(event.buyer_name, event.access_roles) && !isHelperName(event.buyer_name, event.access_roles) && isUltraKey(event.is_ultra, event.quota_tokens, event.access_roles) ? <UltraBadge /> : null}
                 </div>
                 <span className="shrink-0">{event.latency_ms}ms</span>
               </div>
@@ -204,10 +204,10 @@ export function Usage({ usage }: UsagePageProps) {
                     <span className={buyerNameClassName(event.buyer_name, event.quota_tokens, event.is_ultra)}>
                       {event.buyer_name || "-"}
                     </span>
-                    {isSuperAdminName(event.buyer_name) ? <SuperAdminBadge /> : null}
-                    {isSupporterName(event.buyer_name) ? <SupporterBadge /> : null}
-                    {isHelperName(event.buyer_name) ? <HelperBadge /> : null}
-                    {!isSuperAdminName(event.buyer_name) && !isSupporterName(event.buyer_name) && !isHelperName(event.buyer_name) && isUltraKey(event.is_ultra, event.quota_tokens) ? <UltraBadge /> : null}
+                    {isSuperAdminName(event.buyer_name, event.access_roles) ? <SuperAdminBadge /> : null}
+                    {isSupporterName(event.buyer_name, event.access_roles) ? <SupporterBadge /> : null}
+                    {isHelperName(event.buyer_name, event.access_roles) ? <HelperBadge /> : null}
+                    {!isSuperAdminName(event.buyer_name, event.access_roles) && !isSupporterName(event.buyer_name, event.access_roles) && !isHelperName(event.buyer_name, event.access_roles) && isUltraKey(event.is_ultra, event.quota_tokens, event.access_roles) ? <UltraBadge /> : null}
                   </div>
                 </TableCell>
                 <TableCell>

@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Plus, Search, ClockArrowUp, Coins, Gauge, X, Settings2, Edit, Eye, EyeOff, RefreshCw, Infinity as InfinityIcon, KeyRound, CalendarPlus, UserCog } from "lucide-react";
+import { Plus, Search, ClockArrowUp, Coins, Gauge, X, Settings2, Edit, RefreshCw, Infinity as InfinityIcon, KeyRound, CalendarPlus, UserCog, Pause, Play, MoreHorizontal, RotateCw } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { PageHeader } from "../components/PageHeader";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from "../components/ui/Table";
 import { Badge } from "../components/ui/Badge";
 import { CopyButton } from "../components/CopyButton";
 import { CreateKeyModal } from "../components/CreateKeyModal";
+import { SuccessModal } from "../components/SuccessModal";
 import { AddTokensModal } from "../components/AddTokensModal";
 import { ExtendKeysModal } from "../components/ExtendKeysModal";
 import { EditRpmModal } from "../components/EditRpmModal";
@@ -14,10 +15,10 @@ import { SuperAdminBadge } from "../components/SuperAdminBadge";
 import { SupporterBadge } from "../components/SupporterBadge";
 import { HelperBadge } from "../components/HelperBadge";
 import { UltraBadge } from "../components/UltraBadge";
+import { ProBadge } from "../components/ProBadge";
 import { useToast } from "../components/ui/Toast";
 import { api } from "../lib/api";
-import { buildCopyText } from "../lib/copy";
-import { formatRemaining, formatTokens, buyerNameClassName, isSuperAdminName, isSupporterName, isHelperName, isUltraKey, roleRowClassName } from "../lib/utils";
+import { formatRemaining, formatTokens, buyerNameClassName, isSuperAdminName, isSupporterName, SUPPORTER_NAMES, isHelperName, isUltraKey, isProKey, roleRowClassName } from "../lib/utils";
 import { createKeyPackageForId } from "@shared/package-catalog";
 import type { Key } from "../hooks/useDashboard";
 
@@ -33,10 +34,6 @@ const QUOTA_PRESETS = [
   { value: 500_000_000, label: "500M" }
 ] as const;
 
-function fullKey(key: Key): string {
-  return (key as any)["key_plain"] || key.key_prefix;
-}
-
 function isUnlimitedKey(key: Key): boolean {
   return key.quota_tokens == null || key.quota_tokens === "";
 }
@@ -48,15 +45,42 @@ const PACKAGE_BADGE_STYLES: Record<string, string> = {
   ultra: "border-cyan-400/30 bg-cyan-500/10 text-cyan-600 dark:text-cyan-300",
 };
 
-function PackagePill({ packageId }: { packageId: string | null }) {
-  if (!packageId) return null;
-  const pkg = createKeyPackageForId(packageId);
-  const label = pkg?.label ?? packageId;
-  const style = PACKAGE_BADGE_STYLES[packageId] ?? "border-border bg-surface-tertiary text-text-muted";
+function RolePills({ keyRow }: { keyRow: Key }) {
+  const roles = Array.isArray(keyRow.access_roles) ? keyRow.access_roles : [];
+  if (roles.length === 0) {
+    if (keyRow.package_id) {
+      const pkg = createKeyPackageForId(keyRow.package_id);
+      const label = pkg?.label ?? keyRow.package_id;
+      const style = PACKAGE_BADGE_STYLES[keyRow.package_id] ?? "border-border bg-surface-tertiary text-text-muted";
+      return (
+        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${style}`}>
+          {label}
+        </span>
+      );
+    }
+    return null;
+  }
+
+  const roleStyles: Record<string, string> = {
+    supporter: "border-yellow-400/35 bg-yellow-500/15 text-yellow-700 dark:text-yellow-300",
+    ultra: "border-cyan-400/35 bg-cyan-500/15 text-cyan-700 dark:text-cyan-300",
+    pro: "border-blue-400/35 bg-blue-500/15 text-blue-700 dark:text-blue-300",
+    dev: "border-fuchsia-400/35 bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-300",
+  };
+
   return (
-    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${style}`}>
-      {label}
-    </span>
+    <div className="flex flex-wrap gap-1">
+      {roles.map((r) => (
+        <span
+          key={r}
+          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize whitespace-nowrap ${
+            roleStyles[r] ?? "border-border bg-surface-tertiary text-text-muted"
+          }`}
+        >
+          {r}
+        </span>
+      ))}
+    </div>
   );
 }
 
@@ -73,23 +97,38 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
   const [editingNameId, setEditingNameId] = useState<string | null>(null);
   const [editNameValue, setEditNameValue] = useState("");
   const [editNameLoading, setEditNameLoading] = useState(false);
-  const [showFullKey, setShowFullKey] = useState<string | null>(null);
-  const [dailyResetLoading, setDailyResetLoading] = useState<string | null>(null);
   const [setQuotaId, setSetQuotaId] = useState<string | null>(null);
+  const [regenerating, setRegenerating] = useState<string | null>(null);
+  const [regenResult, setRegenResult] = useState<{
+    apiKey: string;
+    name?: string;
+    email?: string;
+    warning?: string;
+    created_at?: string | Date;
+    package: {
+      id: string | null;
+      label: string;
+      quota_tokens: number | null;
+      daily_quota_tokens: number | null;
+      daily_reset: boolean;
+      rate_limit_rpm?: number | null;
+      expires_at: string | Date | null;
+    };
+  } | null>(null);
   const [quotaLoading, setQuotaLoading] = useState<string | null>(null);
   const [addDaysId, setAddDaysId] = useState<string | null>(null);
   const [addDaysLoading, setAddDaysLoading] = useState<string | null>(null);
   const [editRolesId, setEditRolesId] = useState<string | null>(null);
   const [editRolesLoading, setEditRolesLoading] = useState<string | null>(null);
+  const [pausing, setPausing] = useState<string | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   const filtered = keys.filter((key) => {
     const q = search.toLowerCase();
-    const plain = ((key as any)["key_plain"] as string | undefined)?.toLowerCase() ?? "";
     return (
       key.buyer_name.toLowerCase().includes(q) ||
       key.key_prefix.toLowerCase().includes(q) ||
-      (key.buyer_email?.toLowerCase().includes(q) ?? false) ||
-      plain.includes(q)
+      (key.buyer_email?.toLowerCase().includes(q) ?? false)
     );
   });
 
@@ -97,6 +136,24 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
     setEditRpmId(null);
     setSetQuotaId(null);
     setAddDaysId(null);
+  }
+
+  async function togglePause(key: Key) {
+    const next = !key.revoked_at;
+    if (next && !confirm(`Pause API key ${key.buyer_name}? Chat will be blocked until you resume. The key stays in the list.`)) return;
+    setPausing(key.id);
+    try {
+      await api(`/admin/keys/${key.id}/pause`, {
+        method: "PATCH",
+        body: JSON.stringify({ paused: next })
+      });
+      toast(next ? `Paused · ${key.buyer_name}` : `Resumed · ${key.buyer_name}`);
+      onRefresh();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to update pause", "error");
+    } finally {
+      setPausing(null);
+    }
   }
 
   async function revokeKey(keyId: string) {
@@ -111,18 +168,6 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
     } finally {
       setRevoking(null);
     }
-  }
-
-  function getCopyText(key: Key): string {
-    return buildCopyText({
-      email: key.buyer_email || "-",
-      password: "-",
-      apiKey: fullKey(key),
-      quotaTokens: key.quota_tokens || "unlimited",
-      expiresAt: key.expires_at,
-      dailyReset: key.daily_reset,
-      dailyQuotaTokens: key.daily_quota_tokens
-    });
   }
 
   function getEffectiveQuota(key: Key): string | null {
@@ -146,23 +191,40 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
     }
   }
 
-  async function toggleDailyReset(key: Key) {
-    if (!key.daily_reset && isUnlimitedKey(key)) {
-      toast("Key unlimited — set max token dulu sebelum enable daily reset", "error");
-      return;
-    }
-    setDailyResetLoading(key.id);
+  async function regenerateKey(key: Key) {
+    if (!confirm(`Regenerate API key ${key.buyer_name}?\n\nKey lama langsung mati. Quota, role, expiry, dan usage tidak berubah.`)) return;
+    setRegenerating(key.id);
     try {
-      await api(`/admin/keys/${key.id}/daily-reset`, {
-        method: "PATCH",
-        body: JSON.stringify({ daily_reset: !key.daily_reset })
+      const data = await api<{
+        apiKey: string;
+        name?: string;
+        email?: string;
+        warning?: string;
+        created_at?: string | Date;
+        package: {
+          id: string | null;
+          label: string;
+          quota_tokens: number | null;
+          daily_quota_tokens: number | null;
+          daily_reset: boolean;
+          rate_limit_rpm?: number | null;
+          expires_at: string | Date | null;
+        };
+      }>(`/admin/keys/${key.id}/regenerate`, { method: "POST" });
+      setRegenResult({
+        apiKey: data.apiKey,
+        name: data.name ?? key.buyer_name,
+        email: data.email ?? key.buyer_email,
+        warning: data.warning ?? "This API key is shown once. The previous key is now invalid.",
+        created_at: data.created_at,
+        package: data.package
       });
-      toast(key.daily_reset ? "Daily reset OFF" : "Daily reset ON (00:00 WIB)");
+      toast(`Regenerated · ${key.buyer_name}`);
       onRefresh();
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Failed to toggle daily reset", "error");
+      toast(err instanceof Error ? err.message : "Failed to regenerate key", "error");
     } finally {
-      setDailyResetLoading(null);
+      setRegenerating(null);
     }
   }
 
@@ -229,14 +291,13 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
     }
   }
 
-  /** Get effective roles for a key: DB access_roles + name-match + is_ultra. */
+  /** Get effective roles for a key: DB access_roles + name-match. */
   function getKeyRoles(key: Key): string[] {
     const roles = new Set<string>();
     const dbRoles = Array.isArray(key.access_roles) ? key.access_roles : [];
     for (const r of dbRoles) roles.add(String(r));
     if (isSuperAdminName(key.buyer_name, key.access_roles)) roles.add("dev");
     if (isSupporterName(key.buyer_name, key.access_roles)) roles.add("supporter");
-    if (isUltraKey(key.is_ultra, key.quota_tokens)) roles.add("ultra");
     return Array.from(roles);
   }
 
@@ -259,29 +320,44 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
   }
 
   const iconBtn =
-    "h-8 w-8 p-0 shrink-0 inline-flex items-center justify-center rounded-lg border border-border bg-surface text-text-secondary hover:text-text-primary hover:bg-surface-tertiary hover:border-border-hover transition-colors disabled:opacity-50 shadow-sm";
-  const iconBtnActiveDaily =
-    "h-8 w-8 p-0 shrink-0 inline-flex items-center justify-center rounded-lg border border-sky-500/40 bg-sky-500/15 text-sky-600 dark:text-sky-400 hover:bg-sky-500/25 transition-colors disabled:opacity-50 shadow-sm";
+    "h-8 w-8 p-0 shrink-0 inline-flex items-center justify-center rounded-md border border-border bg-surface text-text-secondary hover:text-text-primary hover:bg-surface-tertiary hover:border-border-hover transition-colors disabled:opacity-50";
   const iconBtnActiveUnlimited =
-    "h-8 w-8 p-0 shrink-0 inline-flex items-center justify-center rounded-lg border border-violet-500/45 bg-violet-500/15 text-violet-600 dark:text-violet-300 hover:bg-violet-500/25 transition-colors disabled:opacity-50 shadow-sm shadow-[0_0_12px_rgba(167,139,250,0.25)]";
+    "h-8 w-8 p-0 shrink-0 inline-flex items-center justify-center rounded-md border border-violet-500/40 bg-violet-500/15 text-violet-300 hover:bg-violet-500/25 transition-colors disabled:opacity-50";
   const iconBtnDanger =
-    "h-8 w-8 p-0 shrink-0 inline-flex items-center justify-center rounded-lg border border-red-500/30 bg-danger text-white hover:bg-red-600 transition-colors disabled:opacity-50 shadow-sm";
+    "h-8 w-8 p-0 shrink-0 inline-flex items-center justify-center rounded-md border border-red-500/30 bg-danger text-white hover:bg-red-600 transition-colors disabled:opacity-50";
+  const iconBtnPaused =
+    "h-8 w-8 p-0 shrink-0 inline-flex items-center justify-center rounded-md border border-amber-500/40 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 transition-colors disabled:opacity-50";
 
-  // Per-row actions: Copy · ∞ · RPM · Daily · AddDays · Role · Delete
+  // Per-row actions: Regen · Pause · ∞ · RPM · AddDays · Role · Delete
   // Extend + Add Tokens live in the top toolbar (near Create) — no row duplicates.
   function ActionButtons({ keyRow, compact = false }: { keyRow: Key; compact?: boolean }) {
-    if (keyRow.revoked_at) {
-      return <CopyButton text={getCopyText(keyRow)} />;
-    }
+    const paused = Boolean(keyRow.revoked_at);
     const unlimited = isUnlimitedKey(keyRow);
     return (
       <div className={`flex items-center ${compact ? "gap-1.5" : "gap-2"} flex-wrap`}>
-        <CopyButton text={getCopyText(keyRow)} />
+        <button
+          type="button"
+          className={iconBtn}
+          title="Regenerate API key (old key dies immediately)"
+          disabled={regenerating === keyRow.id || paused}
+          onClick={() => void regenerateKey(keyRow)}
+        >
+          <RotateCw className={`h-3.5 w-3.5 ${regenerating === keyRow.id ? "animate-spin" : ""}`} />
+        </button>
+        <button
+          type="button"
+          className={paused ? iconBtnPaused : iconBtn}
+          title={paused ? "Resume API key" : "Pause API key (block chat, keep in list)"}
+          disabled={pausing === keyRow.id}
+          onClick={() => void togglePause(keyRow)}
+        >
+          {paused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
+        </button>
         <button
           type="button"
           className={unlimited ? iconBtnActiveUnlimited : iconBtn}
           title={unlimited ? "Remove unlimited — set finite quota" : "Make unlimited token"}
-          disabled={quotaLoading === keyRow.id}
+          disabled={quotaLoading === keyRow.id || paused}
           onClick={() => {
             if (unlimited) {
               setSetQuotaId(keyRow.id);
@@ -297,6 +373,7 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
           type="button"
           className={iconBtn}
           title="Edit rate limit"
+          disabled={paused}
           onClick={() => {
             setEditRpmId(keyRow.id);
             setEditRpmCurrent(keyRow.rate_limit_rpm);
@@ -307,24 +384,9 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
         </button>
         <button
           type="button"
-          className={keyRow.daily_reset ? iconBtnActiveDaily : iconBtn}
-          title={
-            unlimited
-              ? "Unlimited key — set max token first"
-              : keyRow.daily_reset
-                ? "Disable daily quota reset"
-                : "Enable daily quota reset at 00:00 WIB"
-          }
-          disabled={dailyResetLoading === keyRow.id || unlimited}
-          onClick={() => toggleDailyReset(keyRow)}
-        >
-          <RefreshCw className="h-3.5 w-3.5" />
-        </button>
-        <button
-          type="button"
           className={iconBtn}
           title="Add days to expiry"
-          disabled={addDaysLoading === keyRow.id || !keyRow.expires_at}
+          disabled={addDaysLoading === keyRow.id || !keyRow.expires_at || paused}
           onClick={() => {
             setAddDaysId(addDaysId === keyRow.id ? null : keyRow.id);
             setEditRpmId(null);
@@ -337,7 +399,7 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
           type="button"
           className={iconBtn}
           title="Manage roles"
-          disabled={editRolesLoading === keyRow.id}
+          disabled={editRolesLoading === keyRow.id || paused}
           onClick={() => {
             setEditRolesId(editRolesId === keyRow.id ? null : keyRow.id);
             setSetQuotaId(null);
@@ -418,15 +480,16 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
   function RoleEditor({ keyRow }: { keyRow: Key }) {
     const currentRoles = getKeyRoles(keyRow);
     const isInherited = (role: string) => {
-      // Only name-match / package roles are inherited (cannot be removed).
-      // DB access_roles are always removable via Save.
+      // Only name-match roles are inherited (cannot be removed).
+      // DB access_roles are always toggleable and removable via Save.
       if (role === "dev") return isSuperAdminName(keyRow.buyer_name);
-      if (role === "supporter") return isSupporterName(keyRow.buyer_name);
-      if (role === "ultra") return isUltraKey(keyRow.is_ultra, keyRow.quota_tokens) && !(Array.isArray(keyRow.access_roles) && keyRow.access_roles.includes("ultra"));
+      if (role === "supporter") return SUPPORTER_NAMES.has((keyRow.buyer_name || "").trim().toLowerCase()) && !(Array.isArray(keyRow.access_roles) && keyRow.access_roles.includes("supporter"));
       return false;
     };
     const allRoles: { id: string; label: string; color: string }[] = [
+      { id: "supporter", label: "Supporter", color: "amber" },
       { id: "ultra", label: "Ultra", color: "cyan" },
+      { id: "pro", label: "Pro", color: "blue" },
     ];
     const [selected, setSelected] = useState<Set<string>>(new Set(currentRoles));
     const toggle = (role: string) => {
@@ -440,11 +503,13 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
       fuchsia: "border-fuchsia-400/50 bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-300",
       amber: "border-amber-400/50 bg-amber-500/15 text-amber-700 dark:text-amber-300",
       cyan: "border-cyan-400/50 bg-cyan-500/15 text-cyan-700 dark:text-cyan-300",
+      blue: "border-blue-400/50 bg-blue-500/15 text-blue-700 dark:text-blue-300",
     };
     const colorClassesOff: Record<string, string> = {
       fuchsia: "border-border bg-surface text-text-muted hover:border-fuchsia-400/40",
       amber: "border-border bg-surface text-text-muted hover:border-amber-400/40",
       cyan: "border-border bg-surface text-text-muted hover:border-cyan-400/40",
+      blue: "border-border bg-surface text-text-muted hover:border-blue-400/40",
     };
 
     if (editRolesId !== keyRow.id) return null;
@@ -494,13 +559,13 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
     return (
       <div className="flex flex-col items-start gap-1.5">
         {keyRow.revoked_at ? (
-          <Badge variant="danger">Revoked</Badge>
+          <Badge variant="warning">Paused</Badge>
         ) : keyRow.expires_at && new Date(keyRow.expires_at) < new Date() ? (
           <Badge variant="warning">Expired</Badge>
         ) : (
           <Badge variant="success">Active</Badge>
         )}
-        <PackagePill packageId={keyRow.package_id} />
+        <RolePills keyRow={keyRow} />
         {isUnlimitedKey(keyRow) && (
           <span className="inline-flex items-center gap-1 rounded-full border border-violet-400/30 bg-violet-500/10 px-2 py-0.5 text-[10px] font-semibold text-violet-600 dark:text-violet-300 whitespace-nowrap">
             <InfinityIcon className="h-2.5 w-2.5" strokeWidth={2.6} />
@@ -520,23 +585,30 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={<KeyRound className="h-5 w-5 text-primary-500" />}
+        icon={<KeyRound className="h-5 w-5 text-text-muted" />}
         title="API Keys"
-        subtitle={`Manage buyer API keys · ${filtered.length} shown`}
+        subtitle={`${filtered.length} keys`}
         actions={
           <>
-          <Button variant="secondary" size="sm" onClick={() => setBulkUpdateOpen(true)}>
-            <Settings2 className="h-4 w-4" />
-            <span className="hidden sm:inline">Bulk</span>
-          </Button>
-          <Button variant="secondary" size="sm" onClick={() => setExtendKeysOpen(true)}>
-            <ClockArrowUp className="h-4 w-4" />
-            <span className="hidden sm:inline">Extend</span>
-          </Button>
-          <Button variant="secondary" size="sm" onClick={() => setAddTokensOpen(true)}>
-            <Coins className="h-4 w-4" />
-            <span className="hidden sm:inline">Tokens</span>
-          </Button>
+          <div className="relative">
+            <Button variant="secondary" size="sm" onClick={() => setMoreOpen((v) => !v)}>
+              <MoreHorizontal className="h-4 w-4" />
+              <span className="hidden sm:inline">More</span>
+            </Button>
+            {moreOpen && (
+              <div className="absolute right-0 top-[calc(100%+6px)] z-20 min-w-[160px] rounded-lg border border-border bg-surface p-1">
+                <button type="button" className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-text-secondary hover:bg-surface-tertiary hover:text-text-primary cursor-pointer" onClick={() => { setMoreOpen(false); setBulkUpdateOpen(true); }}>
+                  <Settings2 className="h-4 w-4" /> Bulk
+                </button>
+                <button type="button" className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-text-secondary hover:bg-surface-tertiary hover:text-text-primary cursor-pointer" onClick={() => { setMoreOpen(false); setExtendKeysOpen(true); }}>
+                  <ClockArrowUp className="h-4 w-4" /> Extend
+                </button>
+                <button type="button" className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-text-secondary hover:bg-surface-tertiary hover:text-text-primary cursor-pointer" onClick={() => { setMoreOpen(false); setAddTokensOpen(true); }}>
+                  <Coins className="h-4 w-4" /> Tokens
+                </button>
+              </div>
+            )}
+          </div>
           <Button size="sm" onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4" />
             <span className="hidden sm:inline">Create</span>
@@ -552,7 +624,7 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
           placeholder="Search by buyer, email, or prefix..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="h-10 w-full rounded-xl border border-border bg-surface pl-9 pr-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors shadow-sm"
+          className="h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-transparent"
         />
       </div>
 
@@ -565,9 +637,9 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
             const effectiveQuota = getEffectiveQuota(key);
             const pct = effectiveQuota ? Math.min(100, (Number(key.used_tokens) / Number(effectiveQuota)) * 100) : 0;
             const color = pct > 90 ? "bg-red-500" : pct > 70 ? "bg-yellow-500" : "bg-primary-500";
-            const displayed = showFullKey === key.id ? fullKey(key) : key.key_prefix;
+            const displayed = key.key_prefix;
             return (
-              <div key={key.id} className={`border border-border rounded-xl p-4 space-y-3 bg-surface shadow-sm${roleRowClassName(key.buyer_name, key.quota_tokens, key.is_ultra) ? " " + roleRowClassName(key.buyer_name, key.quota_tokens, key.is_ultra) : ""}`}>
+              <div key={key.id} className="border border-border rounded-lg p-4 space-y-3 bg-surface">
                 <div className="flex items-start justify-between gap-3">
                   {editingNameId === key.buyer_id ? (
                     <div className="flex items-center gap-2 flex-1">
@@ -587,7 +659,8 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
                       {isSuperAdminName(key.buyer_name, key.access_roles) ? <SuperAdminBadge /> : null}
                       {isSupporterName(key.buyer_name, key.access_roles) ? <SupporterBadge /> : null}
                       {isHelperName(key.buyer_name, key.access_roles) ? <HelperBadge /> : null}
-                      {!isSuperAdminName(key.buyer_name, key.access_roles) && !isSupporterName(key.buyer_name, key.access_roles) && !isHelperName(key.buyer_name, key.access_roles) && isUltraKey(key.is_ultra, key.quota_tokens) ? <UltraBadge /> : null}
+                      {!isSuperAdminName(key.buyer_name, key.access_roles) && !isSupporterName(key.buyer_name, key.access_roles) && !isHelperName(key.buyer_name, key.access_roles) && isUltraKey(key.is_ultra, key.quota_tokens, key.access_roles) ? <UltraBadge /> : null}
+                      {isProKey(key.access_roles) ? <ProBadge /> : null}
                       <button
                         onClick={() => { setEditingNameId(key.buyer_id); setEditNameValue(key.buyer_name); }}
                         className="text-text-muted hover:text-text-primary transition-colors shrink-0"
@@ -606,14 +679,7 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
                   <code className="text-xs bg-surface-tertiary px-2 py-1 rounded-md font-mono flex-1 min-w-0 truncate" title={displayed}>
                     {displayed}
                   </code>
-                  <button
-                    onClick={() => setShowFullKey(showFullKey === key.id ? null : key.id)}
-                    className="text-text-muted hover:text-text-primary transition-colors shrink-0"
-                    title={showFullKey === key.id ? "Hide full key" : "Show full key"}
-                  >
-                    {showFullKey === key.id ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                  <CopyButton text={fullKey(key)} />
+                  <CopyButton text={key.key_prefix} />
                 </div>
 
                 <div className="space-y-1.5">
@@ -672,7 +738,7 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
           ) : (
             filtered.map((key) => {
               const effectiveQuota = getEffectiveQuota(key);
-              const displayed = showFullKey === key.id ? fullKey(key) : key.key_prefix;
+              const displayed = key.key_prefix;
               return (
               <TableRow key={key.id} className={roleRowClassName(key.buyer_name, key.quota_tokens, key.is_ultra, key.access_roles) || undefined}>
                 <TableCell className="font-medium text-text-primary align-top py-2.5">
@@ -694,7 +760,8 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
                       {isSuperAdminName(key.buyer_name, key.access_roles) ? <SuperAdminBadge /> : null}
                       {isSupporterName(key.buyer_name, key.access_roles) ? <SupporterBadge /> : null}
                       {isHelperName(key.buyer_name, key.access_roles) ? <HelperBadge /> : null}
-                      {!isSuperAdminName(key.buyer_name, key.access_roles) && !isSupporterName(key.buyer_name, key.access_roles) && !isHelperName(key.buyer_name, key.access_roles) && isUltraKey(key.is_ultra, key.quota_tokens) ? <UltraBadge /> : null}
+                      {!isSuperAdminName(key.buyer_name, key.access_roles) && !isSupporterName(key.buyer_name, key.access_roles) && !isHelperName(key.buyer_name, key.access_roles) && isUltraKey(key.is_ultra, key.quota_tokens, key.access_roles) ? <UltraBadge /> : null}
+                      {isProKey(key.access_roles) ? <ProBadge /> : null}
                       <button
                         onClick={() => { setEditingNameId(key.buyer_id); setEditNameValue(key.buyer_name); }}
                         className="text-text-muted hover:text-text-primary transition-colors shrink-0"
@@ -710,14 +777,7 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
                     <code className="text-xs bg-surface-tertiary px-1.5 py-0.5 rounded-md font-mono max-w-[100px] truncate" title={displayed}>
                       {displayed}
                     </code>
-                    <button
-                      onClick={() => setShowFullKey(showFullKey === key.id ? null : key.id)}
-                      className="text-text-muted hover:text-text-primary transition-colors shrink-0"
-                      title={showFullKey === key.id ? "Hide full key" : "Show full key"}
-                    >
-                      {showFullKey === key.id ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                    </button>
-                    <CopyButton text={fullKey(key)} />
+                    <CopyButton text={key.key_prefix} />
                   </div>
                 </TableCell>
                 <TableCell className="align-top py-2.5">
@@ -783,6 +843,16 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
       </div>
 
       <CreateKeyModal open={createOpen} onOpenChange={setCreateOpen} onSuccess={onRefresh} />
+      {regenResult ? (
+        <SuccessModal
+          open={true}
+          onOpenChange={(open) => { if (!open) setRegenResult(null); }}
+          data={{
+            ...regenResult,
+            title: "API Key Regenerated"
+          }}
+        />
+      ) : null}
       <AddTokensModal open={addTokensOpen} onOpenChange={setAddTokensOpen} onSuccess={onRefresh} keys={keys} />
       <ExtendKeysModal open={extendKeysOpen} onOpenChange={setExtendKeysOpen} onSuccess={onRefresh} keys={keys} />
       <EditRpmModal

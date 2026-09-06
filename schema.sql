@@ -103,12 +103,37 @@ CREATE TABLE IF NOT EXISTS usage_events (
   cost_estimate NUMERIC DEFAULT 0,
   latency_ms INTEGER DEFAULT 0,
   error_code VARCHAR(64),
+  ip_address VARCHAR(45),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_usage_events_created ON usage_events(created_at);
 CREATE INDEX IF NOT EXISTS idx_usage_events_api_key ON usage_events(api_key_id);
 CREATE INDEX IF NOT EXISTS idx_usage_events_buyer ON usage_events(buyer_id);
+
+-- Admin request inspector: last user prompt only (max 1KB), pruned after 7 days.
+CREATE TABLE IF NOT EXISTS request_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  buyer_id UUID REFERENCES buyers(id) ON DELETE SET NULL,
+  api_key_id UUID REFERENCES api_keys(id) ON DELETE SET NULL,
+  model_id VARCHAR(128),
+  status_code INTEGER NOT NULL,
+  success BOOLEAN NOT NULL,
+  prompt_tokens BIGINT DEFAULT 0,
+  completion_tokens BIGINT DEFAULT 0,
+  total_tokens BIGINT DEFAULT 0,
+  latency_ms INTEGER DEFAULT 0,
+  error_code VARCHAR(64),
+  ip_address VARCHAR(45),
+  user_prompt TEXT,
+  prompt_truncated BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_request_logs_created ON request_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_request_logs_buyer ON request_logs(buyer_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_request_logs_api_key ON request_logs(api_key_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_request_logs_ip ON request_logs(ip_address, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_request_logs_model ON request_logs(model_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS upstreams (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

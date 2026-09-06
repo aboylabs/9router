@@ -84,9 +84,9 @@ export function isSuperAdminName(name: string | null | undefined, accessRoles?: 
 
 /**
  * Supporter / donatur buyers — bright yellow name + badge.
- * Name-match list (extend as needed). Currently: GILBERT ARIAS, yuop.
+ * Name-match list (extend as needed).
  */
-const SUPPORTER_NAMES = new Set(["gilbert arias", "yuop", "attta rebelution", "aditya sandy", "dono"]);
+export const SUPPORTER_NAMES = new Set(["gilbert arias", "yuop", "attta rebelution", "aditya sandy", "dono", "dna", "brother rogers", "ichigo kurosaki", "#indopride", "blue", "mrians21", "khd", "snapt", "bebascetak", "ramses", "binkhozin", "el", "tars", "en en", "company belanda", "petapagenit", "cucakrowo", "octav", "0xfz", "nyguist"]);
 
 export function isSupporterName(name: string | null | undefined, accessRoles?: string[] | null): boolean {
   if (SUPPORTER_NAMES.has((name || "").trim().toLowerCase())) return true;
@@ -116,9 +116,17 @@ export function isUltraQuota(quotaTokens?: number | string | null): boolean {
 }
 
 /** Ultra tier from dedicated is_ultra flag, falling back to legacy 500M quota. */
-export function isUltraKey(isUltra?: boolean | null, quotaTokens?: number | string | null): boolean {
+export function isUltraKey(isUltra?: boolean | null, quotaTokens?: number | string | null, accessRoles?: string[] | null): boolean {
+  if (Array.isArray(accessRoles)) {
+    return accessRoles.includes("ultra");
+  }
   if (isUltra === true) return true;
   return isUltraQuota(quotaTokens);
+}
+
+/** Pro role — per-key access_roles column only (no name-match roster). */
+export function isProKey(accessRoles?: string[] | null): boolean {
+  return Array.isArray(accessRoles) && accessRoles.includes("pro");
 }
 
 /**
@@ -129,59 +137,19 @@ export function isUltraKey(isUltra?: boolean | null, quotaTokens?: number | stri
  * ULTRA 500M cyan glow > 250M light green > default
  */
 export function buyerNameClassName(
-  name: string | null | undefined,
-  quotaTokens?: number | string | null,
-  isUltra?: boolean | null,
-  accessRoles?: string[] | null
+  _name?: string | null,
+  _quotaTokens?: number | string | null,
+  _isUltra?: boolean | null,
+  _accessRoles?: string[] | null
 ): string {
-  if (isSuperAdminName(name, accessRoles)) {
-    return [
-      "font-semibold",
-      "sa-name-anim",
-    ].join(" ");
-  }
-  if (isSupporterName(name, accessRoles)) {
-    return [
-      "font-semibold",
-      "sp-name-anim",
-    ].join(" ");
-  }
-  if (isHelperName(name, accessRoles)) {
-    return [
-      "font-semibold",
-      "bg-gradient-to-r from-emerald-600 via-teal-500 to-green-600",
-      "dark:from-emerald-200 dark:via-teal-200 dark:to-green-300",
-      "bg-clip-text text-transparent",
-      "drop-shadow-[0_0_10px_rgba(52,211,153,0.45)]",
-    ].join(" ");
-  }
-  if (isUltraKey(isUltra, quotaTokens)) {
-    return [
-      "font-semibold",
-      "ul-name-anim",
-    ].join(" ");
-  }
-  if (quotaTokens == null || quotaTokens === "") return "text-text-primary";
-  const q = Number(quotaTokens);
-  if (!Number.isFinite(q)) return "text-text-primary";
-  if (q === QUOTA_250M) return "text-emerald-600 dark:text-emerald-300 font-semibold";
   return "text-text-primary";
 }
 
-/**
- * Row-level highlight class for special roles.
- * Returns the appropriate CSS class for Super Admin / Supporter / Ultra rows,
- * or empty string for normal rows.
- */
 export function roleRowClassName(
-  name: string | null | undefined,
-  quotaTokens?: number | string | null,
-  isUltra?: boolean | null,
-  accessRoles?: string[] | null
+  _name?: string | null,
+  _quotaTokens?: number | string | null,
+  _isUltra?: boolean | null,
+  _accessRoles?: string[] | null
 ): string {
-  if (isSuperAdminName(name, accessRoles)) return "sa-row-highlight";
-  if (isSupporterName(name, accessRoles)) return "sp-row-highlight";
-  if (isHelperName(name, accessRoles)) return ""; // helper — no row highlight for now
-  if (isUltraKey(isUltra, quotaTokens)) return "ul-row-highlight";
   return "";
 }

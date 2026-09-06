@@ -1,6 +1,10 @@
 # Dependencies
 node_modules/
 
+# Python cache
+__pycache__/
+*.pyc
+
 # Build output
 dist/
 
@@ -20,17 +24,18 @@ Thumbs.db
 # Logs
 *.log
 
-# Database
+# Database & local ops dumps
 *.sql.backup
-
-# Local ops dumps / secrets snapshots (never commit production data)
-backup/*.json.gz
+backup/*.sql
 backup/*.csv
 backup/*.dump
-backup/*_backup_*.sql
-backup/*_pre_*.sql
-backup/*_before_*.sql
+backup/*.json.gz
 backup/cron.log
+
+# Local test & migration scratch files
+probe_*.mts
+*.pre-*
 
 # Cache
 .cache/
+

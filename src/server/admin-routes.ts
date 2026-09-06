@@ -9,19 +9,23 @@ import {
   isAllowedPublicModelId,
   isAllowedUpstreamModelId
 } from "./model-alias.js";
-import { createSession, clearSession, readSession, requireAdmin, getActiveSessions, revokeSession, revokeAllOtherSessions } from "./session.js";
+import { createSession, clearSession, readSession, requireAdmin, maybeRefreshSession, getActiveSessions, revokeSession, revokeAllOtherSessions } from "./session.js";
 import { createApiKeyRecord, invalidateApiKeyCache } from "./repositories.js";
 import { generateApiKey, apiKeyPrefix, hashApiKey, hashPassword, verifyPassword } from "./security.js";
 import { FixedWindowRateLimiter, chatRateLimiter } from "./rate-limiter.js";
 
-// Login rate limiter: max 5 attempts per IP per 15 minutes
-const MAX_LOGIN_ATTEMPTS = 5;
+// Login rate limiter: tiap salah password → tunggu 1 menit (user request: bukan 5x baru block, tapi tiap 1 salah langsung 60s)
+const MAX_LOGIN_ATTEMPTS = 1;
+const LOGIN_WINDOW_MS = 60 * 1000;
 const loginRateLimiter = {
   windows: new Map<string, { count: number; resetAt: number }>(),
+  reset(ip: string) {
+    this.windows.delete(ip);
+  },
   check(ip: string, limit: number) {
     const now = Date.now();
     const existing = this.windows.get(ip);
-    const resetAt = now + 15 * 60 * 1000;
+    const resetAt = now + LOGIN_WINDOW_MS;
     
     if (!existing || existing.resetAt <= now) {
       this.windows.set(ip, { count: 1, resetAt });
@@ -46,6 +50,7 @@ import {
   MODEL_ACCESS_ROLES,
   normalizeAccessRoles,
   type ModelAccessRole,
+  SUPPORTER_NAMES,
   ULTRA_QUOTA_TOKENS,
 } from "../shared/buyer-roles.js";
 import {
@@ -116,8 +121,12 @@ const ALWAYS_AVAILABLE_MODELS: AlwaysAvailableModel[] = [];
 const createKeySchema = z.object({
   name: z.string().min(1),
   days: z.number().int().positive().optional(),
-  packageId: z.enum(CREATE_KEY_PACKAGE_IDS).default(DEFAULT_CREATE_KEY_PACKAGE_ID),
+  noExpiry: z.boolean().optional().default(false),
+  packageId: z.enum(CREATE_KEY_PACKAGE_IDS).optional(),
+  rateLimitRpm: z.number().int().min(1).max(500).optional().default(20),
+  quotaTokens: z.number().int().positive().nullable().optional(),
   unlimitedQuota: z.boolean().optional().default(false),
+  roles: z.array(z.enum(MODEL_ACCESS_ROLES)).optional().default([]),
 });
 
 const upstreamModelSchema = z.object({
@@ -165,15 +174,19 @@ async function keyIdsForAccessRoles(roles: ModelAccessRole[]): Promise<string[]>
   }
   if (normalized.includes("supporter")) {
     conditions.push(`lower(trim(b.name)) = any($${i++}::text[])`);
-    params.push(["gilbert arias", "yuop", "attta rebelution", "aditya sandy", "dono"]);
+    params.push([...SUPPORTER_NAMES]);
     conditions.push(`$${i++} = any(coalesce(k.access_roles, '{}'::text[]))`);
     params.push("supporter");
   }
   if (normalized.includes("ultra")) {
-    // Ultra role: is_ultra flag OR access_roles column OR legacy 500M quota
-    conditions.push(`(k.is_ultra = true or k.quota_tokens = $${i++} or $${i++} = any(coalesce(k.access_roles, '{}'::text[])))`);
-    params.push(ULTRA_QUOTA_TOKENS);
+    // Ultra role: per-key access_roles column (or is_ultra flag for fallback)
+    conditions.push(`($${i++} = any(coalesce(k.access_roles, '{}'::text[])) or k.is_ultra = true)`);
     params.push("ultra");
+  }
+  if (normalized.includes("pro")) {
+    // Pro role: per-key access_roles column only (no name-match roster)
+    conditions.push(`$${i++} = any(coalesce(k.access_roles, '{}'::text[]))`);
+    params.push("pro");
   }
 
   const result = await query<{ id: string }>(
@@ -296,7 +309,7 @@ async function syncKeyRestrictedModelAccess(apiKeyId: string) {
 
 export async function registerAdminRoutes(app: FastifyInstance) {
   app.post("/admin/auth/login", async (request, reply) => {
-    // Rate limit: max 5 attempts per IP per 15 minutes
+    // Rate limit: tiap salah password = block 1 menit (MAX 1/IP/menit, sukses reset window)
     const rateResult = loginRateLimiter.check(request.ip, MAX_LOGIN_ATTEMPTS);
     if (!rateResult.allowed) {
       return reply.code(429).send({ 
@@ -317,6 +330,8 @@ export async function registerAdminRoutes(app: FastifyInstance) {
       return reply.code(401).send({ error: "Invalid email or password" });
     }
 
+    // Sukses login — hapus rate-limit window IP ini supaya tidak kebawa hitungan salah sebelumnya
+    loginRateLimiter.reset(request.ip);
     await createSession(reply, { adminId: admin.id, email: admin.email }, request.ip, request.headers["user-agent"]);
     return { admin: { id: admin.id, email: admin.email } };
   });
@@ -326,8 +341,9 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
-  app.get("/admin/me", async (request) => {
+  app.get("/admin/me", async (request, reply) => {
     const session = await readSession(request);
+    if (session) await maybeRefreshSession(request, reply, session);
     return { admin: session };
   });
 
@@ -357,19 +373,19 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     const parsed = createKeySchema.safeParse(request.body);
     if (!parsed.success) {
       return reply.code(400).send({
-        error: "Invalid payload. Requires name (string) and packageId (starter|pro|business|ultra); days optional positive int"
+        error: "Invalid payload. Requires name (string), optional days/noExpiry/rateLimitRpm/roles"
       });
     }
 
-    const pkg = CREATE_KEY_PACKAGES_BY_ID[parsed.data.packageId];
-    if (!pkg) {
-      return reply.code(400).send({ error: "Unknown packageId" });
+    const pkg = parsed.data.packageId ? CREATE_KEY_PACKAGES_BY_ID[parsed.data.packageId] : undefined;
+    const defaultDays = pkg?.defaultDays ?? 28;
+    const noExpiry = Boolean(parsed.data.noExpiry);
+    const days = parsed.data.days ?? defaultDays;
+    if (!noExpiry && (!Number.isInteger(days) || days <= 0)) {
+      return reply.code(400).send({ error: "days must be a positive integer when expiry is set" });
     }
 
-    const days = parsed.data.days ?? pkg.defaultDays;
-    if (!Number.isInteger(days) || days <= 0) {
-      return reply.code(400).send({ error: "days must be a positive integer" });
-    }
+    const rateLimitRpm = parsed.data.rateLimitRpm ?? pkg?.rateLimitRpm ?? 20;
 
     const keyTag = crypto.randomBytes(4).toString("hex");
     const email = `key-${keyTag}@9router.local`;
@@ -382,15 +398,23 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     const buyerId = buyerResult.rows[0].id;
 
     const apiKey = generateApiKey();
-    const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
-    const label = `${pkg.label} · ${days} hari`;
+    const expiresAt = noExpiry ? null : new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+
+    // Determine initial roles: package defaults + explicit roles passed in
+    const initialRoles = new Set<ModelAccessRole>(normalizeAccessRoles(parsed.data.roles));
+    if (pkg?.id === "ultra") initialRoles.add("ultra");
+    if (pkg?.id === "pro") initialRoles.add("pro");
+    const finalRoles = Array.from(initialRoles);
+
+    const isUltra = finalRoles.includes("ultra");
+
+    const roleTag = finalRoles.length ? finalRoles.map((r) => r.toUpperCase()).join("/") : (pkg?.label ?? "Key");
+    const label = noExpiry ? `${roleTag} · no expired` : `${roleTag} · ${days} hari`;
 
     const modelIds = await activeAllowedModelIds();
-    // Ultra role is a dedicated flag on the package; grant ultra-restricted models.
-    const isUltraPackage = pkg.id === "ultra";
-    if (isUltraPackage) {
-      const ultraModels = await modelIdsWithAccessRole("ultra");
-      for (const id of ultraModels) {
+    for (const r of finalRoles) {
+      const restrictedModels = await modelIdsWithAccessRole(r);
+      for (const id of restrictedModels) {
         if (!modelIds.includes(id)) modelIds.push(id);
       }
     }
@@ -398,19 +422,30 @@ export async function registerAdminRoutes(app: FastifyInstance) {
       return reply.code(500).send({ error: "No active white-label models are configured" });
     }
 
+    // Quota tokens: unlimited if checked, or explicit quotaTokens, or package default, or null (unlimited by default)
+    let quotaTokens: number | null = null;
+    if (!parsed.data.unlimitedQuota) {
+      if (parsed.data.quotaTokens !== undefined) {
+        quotaTokens = parsed.data.quotaTokens;
+      } else if (pkg) {
+        quotaTokens = pkg.quotaTokens;
+      }
+    }
+
     const keyRecord = await createApiKeyRecord({
       buyerId,
       label,
       apiKey,
       expiresAt,
-      quotaTokens: parsed.data.unlimitedQuota ? null : pkg.quotaTokens,
+      quotaTokens,
       quotaRequests: null,
       modelIds,
       dailyReset: false,
       dailyQuotaTokens: null,
-      packageId: pkg.id,
-      rateLimitRpm: pkg.rateLimitRpm,
-      isUltra: isUltraPackage
+      packageId: pkg?.id ?? null,
+      rateLimitRpm,
+      isUltra,
+      accessRoles: finalRoles
     });
     invalidateApiKeyCache();
 
@@ -426,14 +461,14 @@ export async function registerAdminRoutes(app: FastifyInstance) {
       keyId: keyRecord.id,
       keyPrefix: keyRecord.key_prefix,
       created_at: createdAt,
-      days,
+      days: noExpiry ? null : days,
       package: {
-        id: pkg.id,
-        label: pkg.label,
-        quota_tokens: parsed.data.unlimitedQuota ? null : pkg.quotaTokens,
+        id: pkg?.id ?? null,
+        label: roleTag,
+        quota_tokens: quotaTokens,
         daily_quota_tokens: null,
         daily_reset: false,
-        rate_limit_rpm: pkg.rateLimitRpm,
+        rate_limit_rpm: rateLimitRpm,
         expires_at: expiresAt
       }
     });
@@ -536,6 +571,91 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     if (!result.rowCount) return reply.code(404).send({ error: "Key not found or has no expiry" });
 
     return { key: result.rows[0], days_added: body.data.days };
+  });
+
+  // --- Regenerate credential in place (quota / roles / expiry / usage untouched) ---
+  app.post("/admin/keys/:keyId/regenerate", async (request, reply) => {
+    const params = z.object({ keyId: z.string().uuid() }).safeParse(request.params);
+    if (!params.success) return reply.code(400).send({ error: "Invalid key id" });
+
+    const existing = await query<{
+      id: string;
+      buyer_id: string;
+      label: string;
+      package_id: string | null;
+      quota_tokens: string | null;
+      daily_quota_tokens: string | null;
+      daily_reset: boolean;
+      rate_limit_rpm: number | null;
+      expires_at: Date | null;
+      created_at: Date;
+    }>(
+      `SELECT id, buyer_id, label, package_id, quota_tokens, daily_quota_tokens,
+              daily_reset, rate_limit_rpm, expires_at, created_at
+       FROM api_keys
+       WHERE id = $1 AND deleted_at IS NULL AND is_hidden = false
+       LIMIT 1`,
+      [params.data.keyId]
+    );
+    if (!existing.rowCount) return reply.code(404).send({ error: "API key not found" });
+
+    let plaintext = "";
+    let keyPrefix = "";
+    let rotated = false;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const nextKey = generateApiKey();
+      const nextHash = hashApiKey(nextKey);
+      const nextPrefix = apiKeyPrefix(nextKey);
+      try {
+        const result = await query<{ id: string; key_prefix: string }>(
+          `UPDATE api_keys
+           SET key_plain = $2, key_hash = $3, key_prefix = $4
+           WHERE id = $1 AND deleted_at IS NULL AND is_hidden = false
+           RETURNING id, key_prefix`,
+          [params.data.keyId, nextKey, nextHash, nextPrefix]
+        );
+        if (!result.rowCount) return reply.code(404).send({ error: "API key not found" });
+        plaintext = nextKey;
+        keyPrefix = result.rows[0].key_prefix;
+        rotated = true;
+        break;
+      } catch (err) {
+        const code = typeof err === "object" && err && "code" in err ? String((err as { code?: string }).code) : "";
+        if (code === "23505") continue;
+        throw err;
+      }
+    }
+    if (!rotated) {
+      return reply.code(500).send({ error: "Failed to generate a unique API key" });
+    }
+
+    invalidateApiKeyCache();
+
+    const row = existing.rows[0];
+    const pkg = row.package_id ? CREATE_KEY_PACKAGES_BY_ID[row.package_id as keyof typeof CREATE_KEY_PACKAGES_BY_ID] : undefined;
+    const buyer = await query<{ name: string; email: string }>(
+      `SELECT name, email FROM buyers WHERE id = $1 LIMIT 1`,
+      [row.buyer_id]
+    );
+
+    return {
+      apiKey: plaintext,
+      keyId: row.id,
+      keyPrefix,
+      name: buyer.rows[0]?.name ?? "",
+      email: buyer.rows[0]?.email ?? "",
+      warning: "This API key is shown once. The previous key is now invalid.",
+      created_at: row.created_at,
+      package: {
+        id: row.package_id,
+        label: pkg?.label ?? row.label,
+        quota_tokens: row.quota_tokens === null ? null : Number(row.quota_tokens),
+        daily_quota_tokens: row.daily_quota_tokens === null ? null : Number(row.daily_quota_tokens),
+        daily_reset: row.daily_reset,
+        rate_limit_rpm: row.rate_limit_rpm,
+        expires_at: row.expires_at
+      }
+    };
   });
 
   // --- Add days to key expiry (bulk) ---
@@ -649,7 +769,13 @@ export async function registerAdminRoutes(app: FastifyInstance) {
   });
 
   app.get("/admin/models", async () => {
-    const result = await query(`select * from models where id not like 'kr/%' order by display_name asc`);
+    const result = await query(
+      `select m.*, u.name as upstream_name
+       from models m
+       left join upstreams u on u.id::text = m.upstream_id
+       where m.id not like 'kr/%'
+       order by m.display_name asc`
+    );
     return { models: result.rows };
   });
 
@@ -866,13 +992,13 @@ export async function registerAdminRoutes(app: FastifyInstance) {
   app.get("/admin/keys", async () => {
     const result = await query(
       `select k.id, k.buyer_id, b.name as buyer_name, b.email as buyer_email,
-        k.label, k.key_prefix, k.key_plain, k.expires_at,
+        k.label, k.key_prefix, k.expires_at,
         k.revoked_at, k.deleted_at, k.quota_tokens, k.quota_requests, k.used_tokens, k.used_requests, k.created_at,
         k.daily_reset, k.daily_quota_tokens, k.package_id, k.rate_limit_rpm, k.is_ultra,
         k.access_roles
        from api_keys k
        join buyers b on b.id = k.buyer_id
-       where k.deleted_at is null and k.revoked_at is null and k.is_hidden = false
+       where k.deleted_at is null and k.is_hidden = false
        order by k.created_at desc`
     );
     return { keys: result.rows };
@@ -914,6 +1040,37 @@ export async function registerAdminRoutes(app: FastifyInstance) {
 
     invalidateApiKeyCache();
     return { ok: true };
+  });
+
+  app.patch("/admin/keys/:keyId/pause", async (request, reply) => {
+    const params = z.object({ keyId: z.string().uuid() }).safeParse(request.params);
+    if (!params.success) return reply.code(400).send({ error: "Invalid key id" });
+
+    const body = z.object({
+      paused: z.boolean()
+    }).safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ error: "Invalid payload" });
+
+    const result = await query<{ id: string; revoked_at: Date | null }>(
+      body.data.paused
+        ? `UPDATE api_keys
+           SET revoked_at = COALESCE(revoked_at, now())
+           WHERE id = $1 AND deleted_at IS NULL AND is_hidden = false
+           RETURNING id, revoked_at`
+        : `UPDATE api_keys
+           SET revoked_at = NULL
+           WHERE id = $1 AND deleted_at IS NULL AND is_hidden = false
+           RETURNING id, revoked_at`,
+      [params.data.keyId]
+    );
+    if (!result.rowCount) return reply.code(404).send({ error: "API key not found" });
+
+    invalidateApiKeyCache();
+    return {
+      ok: true,
+      paused: result.rows[0].revoked_at != null,
+      revoked_at: result.rows[0].revoked_at
+    };
   });
 
   app.patch("/admin/keys/:keyId/rate-limit", async (request, reply) => {
@@ -1046,7 +1203,7 @@ export async function registerAdminRoutes(app: FastifyInstance) {
       roles: z.array(z.enum(MODEL_ACCESS_ROLES))
     }).safeParse(request.body);
     if (!body.success) {
-      return reply.code(400).send({ error: "Invalid payload. Requires { roles: string[] } where each role is one of: dev, supporter, ultra" });
+      return reply.code(400).send({ error: "Invalid payload. Requires { roles: string[] } where each role is one of: dev, supporter, ultra, pro" });
     }
 
     const roles = normalizeAccessRoles(body.data.roles);
@@ -1057,20 +1214,11 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     );
     if (!result.rowCount) return reply.code(404).send({ error: "Key not found" });
 
-    // Sync is_ultra flag: if 'ultra' in roles, set is_ultra = true for backward compat
+    // Sync is_ultra flag: exactly follows whether 'ultra' is in roles
     if (roles.includes("ultra")) {
       await query(`UPDATE api_keys SET is_ultra = true WHERE id = $1`, [params.data.keyId]);
     } else {
-      // If 'ultra' was removed and it was only set via access_roles, clear the flag
-      // But keep is_ultra=true if key was created as Ultra package (has ultra quota)
-      const ultraCheck = await query<{ quota_tokens: string | null; package_id: string | null }>(
-        `SELECT quota_tokens, package_id FROM api_keys WHERE id = $1`,
-        [params.data.keyId]
-      );
-      const k = ultraCheck.rows[0];
-      if (k && k.package_id !== "ultra" && k.quota_tokens !== String(ULTRA_QUOTA_TOKENS)) {
-        await query(`UPDATE api_keys SET is_ultra = false WHERE id = $1`, [params.data.keyId]);
-      }
+      await query(`UPDATE api_keys SET is_ultra = false WHERE id = $1`, [params.data.keyId]);
     }
 
     invalidateApiKeyCache();
@@ -1219,7 +1367,7 @@ export async function registerAdminRoutes(app: FastifyInstance) {
     const result = await query(
       `select ue.created_at, ue.agent_id, ue.endpoint, ue.model_id, ue.status_code, ue.success,
         ue.prompt_tokens, ue.completion_tokens, ue.total_tokens, ue.estimated, ue.cost_estimate, ue.latency_ms,
-        b.name as buyer_name, k.key_prefix, k.quota_tokens, k.is_ultra
+        b.name as buyer_name, k.key_prefix, k.quota_tokens, k.is_ultra, k.access_roles
        from usage_events ue
        left join buyers b on b.id = ue.buyer_id
        left join api_keys k on k.id = ue.api_key_id
@@ -1227,6 +1375,80 @@ export async function registerAdminRoutes(app: FastifyInstance) {
        limit 250`
     );
     return { events: result.rows };
+  });
+
+  app.get("/admin/requests", async (request) => {
+    const parsed = z.object({
+      q: z.string().trim().max(200).optional(),
+      status: z.enum(["all", "ok", "fail"]).optional().default("all"),
+      hours: z.coerce.number().int().min(1).max(168).optional().default(24),
+      limit: z.coerce.number().int().min(1).max(200).optional().default(80),
+      offset: z.coerce.number().int().min(0).max(5000).optional().default(0)
+    }).safeParse(request.query);
+
+    const filters = parsed.success
+      ? parsed.data
+      : { q: undefined, status: "all" as const, hours: 24, limit: 80, offset: 0 };
+
+    const where: string[] = ["rl.created_at >= NOW() - ($1::int * INTERVAL '1 hour')"];
+    const params: unknown[] = [filters.hours];
+    let idx = 2;
+
+    if (filters.status === "ok") {
+      where.push("rl.success = true");
+    } else if (filters.status === "fail") {
+      where.push("rl.success = false");
+    }
+
+    if (filters.q) {
+      const needle = `%${filters.q}%`;
+      where.push(`(
+        b.name ILIKE $${idx}
+        OR k.key_prefix ILIKE $${idx}
+        OR COALESCE(rl.model_id, '') ILIKE $${idx}
+        OR COALESCE(rl.ip_address, '') ILIKE $${idx}
+        OR COALESCE(rl.user_prompt, '') ILIKE $${idx}
+      )`);
+      params.push(needle);
+      idx += 1;
+    }
+
+    const whereSql = where.join(" AND ");
+    const limitParam = idx;
+    const offsetParam = idx + 1;
+    params.push(filters.limit, filters.offset);
+
+    const list = await query(
+      `SELECT rl.id, rl.created_at, rl.model_id, rl.status_code, rl.success,
+              rl.prompt_tokens, rl.completion_tokens, rl.total_tokens, rl.latency_ms,
+              rl.error_code, rl.ip_address, rl.user_prompt, rl.prompt_truncated,
+              b.name AS buyer_name, k.key_prefix, k.quota_tokens, k.is_ultra, k.access_roles
+         FROM request_logs rl
+         LEFT JOIN buyers b ON b.id = rl.buyer_id
+         LEFT JOIN api_keys k ON k.id = rl.api_key_id
+        WHERE ${whereSql}
+        ORDER BY rl.created_at DESC
+        LIMIT $${limitParam} OFFSET $${offsetParam}`,
+      params
+    );
+
+    const countParams = params.slice(0, params.length - 2);
+    const count = await query<{ count: string }>(
+      `SELECT COUNT(*)::bigint AS count
+         FROM request_logs rl
+         LEFT JOIN buyers b ON b.id = rl.buyer_id
+         LEFT JOIN api_keys k ON k.id = rl.api_key_id
+        WHERE ${whereSql}`,
+      countParams
+    );
+
+    return {
+      events: list.rows,
+      total: Number(count.rows[0]?.count ?? 0),
+      hours: filters.hours,
+      limit: filters.limit,
+      offset: filters.offset
+    };
   });
 
   app.get("/admin/buyers/:buyerId/usage", async (request, reply) => {
@@ -1253,18 +1475,21 @@ export async function registerAdminRoutes(app: FastifyInstance) {
         k.id as key_id,
         k.quota_tokens,
         k.is_ultra,
+        k.access_roles,
         b.name as buyer_name,
         b.email as buyer_email,
         count(ue.id)::int as request_count,
         max(ue.created_at) as last_request_at,
         sum(ue.total_tokens)::bigint as total_tokens,
+        count(distinct ue.ip_address)::int as ip_count,
+        array_agg(distinct ue.ip_address) filter (where ue.ip_address is not null) as ips,
         array_agg(distinct ue.model_id) filter (where ue.model_id is not null) as models_used
        from usage_events ue
        join api_keys k on k.id = ue.api_key_id
        join buyers b on b.id = k.buyer_id
        where ue.created_at > now() - interval '5 minutes'
          and k.is_hidden = false
-       group by k.id, k.key_prefix, k.quota_tokens, k.is_ultra, b.name, b.email
+       group by k.id, k.key_prefix, k.quota_tokens, k.is_ultra, k.access_roles, b.name, b.email
        order by max(ue.created_at) desc`
     );
     return { active: result.rows };
@@ -1284,6 +1509,7 @@ export async function registerAdminRoutes(app: FastifyInstance) {
         k.created_at as key_created_at,
         k.quota_tokens,
         k.is_ultra,
+        k.access_roles,
         COUNT(ue.id)::int as total_requests,
         COALESCE(SUM(ue.total_tokens), 0)::bigint as total_tokens,
         COALESCE(SUM(ue.prompt_tokens), 0)::bigint as prompt_tokens,
@@ -1293,7 +1519,7 @@ export async function registerAdminRoutes(app: FastifyInstance) {
       JOIN api_keys k ON k.id = ue.api_key_id
       JOIN buyers b ON b.id = k.buyer_id
       WHERE k.is_hidden = false
-      GROUP BY b.id, b.name, b.email, k.id, k.label, k.key_prefix, k.expires_at, k.created_at, k.quota_tokens, k.is_ultra
+      GROUP BY b.id, b.name, b.email, k.id, k.label, k.key_prefix, k.expires_at, k.created_at, k.quota_tokens, k.is_ultra, k.access_roles
       HAVING COUNT(ue.id) > 0
       ORDER BY total_requests DESC
       LIMIT 100`
@@ -1669,6 +1895,50 @@ export async function registerAdminRoutes(app: FastifyInstance) {
       }
       throw err;
     }
+  });
+
+  app.post("/admin/upstreams/:id/keys/bulk", async (request, reply) => {
+    const params = z.object({ id: z.string().uuid() }).safeParse(request.params);
+    if (!params.success) return reply.code(400).send({ error: "Invalid upstream ID" });
+
+    const parsed = z.object({
+      keys: z.array(z.string().min(1)).min(1).max(1000),
+      label_prefix: z.string().max(240).optional().default(""),
+      is_active: z.boolean().optional().default(true),
+    }).safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "Invalid payload. Requires keys (maximum 1000)" });
+    }
+
+    const exists = await query<{ id: string }>(`SELECT id FROM upstreams WHERE id = $1`, [params.data.id]);
+    if (!exists.rows[0]) return reply.code(404).send({ error: "Upstream not found" });
+
+    const keys = Array.from(new Set(parsed.data.keys.map((key) => key.trim()).filter(Boolean)));
+    if (!keys.length) return reply.code(400).send({ error: "At least one non-empty API key is required" });
+
+    const prefix = parsed.data.label_prefix.trim();
+    const labels = keys.map((_key, index) => `${prefix || "bulk"}-${index + 1}`);
+    const activeFlags = keys.map(() => parsed.data.is_active);
+    const result = await query<{ id: string }>(
+      `INSERT INTO upstream_api_keys (upstream_id, label, api_key, is_active)
+       SELECT $1, input.label, input.api_key, input.is_active
+       FROM unnest($2::text[], $3::text[], $4::boolean[]) AS input(api_key, label, is_active)
+       ON CONFLICT (upstream_id, api_key) DO NOTHING
+       RETURNING id`,
+      [params.data.id, keys, labels, activeFlags]
+    );
+
+    await syncUpstreamPrimaryKey(params.data.id);
+    clearUpstreamCache();
+
+    const added = result.rows.length;
+    return {
+      added,
+      skipped: parsed.data.keys.length - added,
+      duplicateInput: parsed.data.keys.length - keys.length,
+      received: parsed.data.keys.length,
+      message: `${added} API key${added === 1 ? "" : "s"} added`,
+    };
   });
 
   app.put("/admin/upstreams/:id/keys/:keyId", async (request, reply) => {
