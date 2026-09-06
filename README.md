@@ -4,7 +4,7 @@
 
 It fronts one or more upstream providers, issues buyer API keys with quotas + rate limits, meters usage 1:1 with upstream token counts, and exposes both an admin dashboard and a public read-only panel.
 
-Current release: **v1.3.1**
+Current release: **v1.6.0**
 
 ---
 
@@ -126,7 +126,7 @@ Backend code changes need a process restart (do not restart production without e
 │   │   └── daily-reset.ts      # 00:00 WIB token reset
 │   └── shared/
 ├── schema.sql
-├── package.json                # version 1.3.0
+├── package.json                # version 1.6.0
 ├── tsconfig.json
 └── vite.config.ts
 ```
@@ -241,6 +241,16 @@ Response header `x-9router-upstream` shows which upstream handled the request.
 ---
 
 ## Changelog
+
+### v1.6.0 (2026-09-06)
+- **feat**: Zero-downtime static public panel (`public/panel/index.html`) decoupled from server rebuilds
+- **feat**: Viewer unlock gate (`/public/unlock` 7-day cookie session, gated leaderboard/live/usage)
+- **feat**: Admin Request Inspector (`request_logs` table, last user prompt logging capped at 1KB, 7-day auto-pruning, `/admin/requests` UI with search/filter)
+- **feat**: Pro role tier (`ProBadge`, `CREATE_KEY_PACKAGES` pro option, per-key `access_roles` with `pro`)
+- **feat**: Public brand assets hosting (`/brand/` static route, favicon, webp mark/logo)
+- **feat**: Extended supporter roster with badge hierarchy
+- **security**: Hardened Telegram backup scripts (disabled plain key exports), admin 30-day session with rolling refresh, strict login rate limiting
+- **perf**: Fixed desktop GPU high usage on public dashboard
 
 ### v1.5.0 (2026-08-01)
 - **feat**: Per-key access roles (`api_keys.access_roles`) — RoleEditor (Dev/Supporter/Ultra) per key, `PATCH /admin/keys/:keyId/roles`, role detection merges DB roles + name-match rosters + package flags
