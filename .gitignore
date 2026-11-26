@@ -43,3 +43,4 @@ probe_*.mts
 # Local backups
 *.bak
 *.bak_*
+backup/config.json

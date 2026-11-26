@@ -1,0 +1,14 @@
+{
+  "bot_token": "<telegram-bot-token>",
+  "chat_id": "<telegram-chat-id>",
+  "db_name": "9router",
+  "db_user": "postgres",
+  "backup_dir": "/home/ubuntu/9router/backup",
+  "tables": [
+    "buyers",
+    "api_keys",
+    "buyer_model_access",
+    "upstreams",
+    "usage_rollups"
+  ]
+}

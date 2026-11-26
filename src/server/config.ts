@@ -22,7 +22,7 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(24).default("9router-change-this-long-random-secret"),
   COOKIE_SECURE: boolFromEnv.default(false),
   // Legacy fallback only (used when upstreams table empty). Keep in sync with live primary.
-  UPSTREAM_BASE_URL: z.string().url().default("http://43.156.17.235:8000/v1"),
+  UPSTREAM_BASE_URL: z.string().url().default("http://localhost:8000/v1"),
   UPSTREAM_API_KEY: z.string().min(1).default("sk-replace-with-upstream-key"),
   UPSTREAM_TIMEOUT_MS: z.coerce.number().int().positive().default(300_000),
   UPSTREAM_STREAM_CONNECT_TIMEOUT_MS: z.coerce.number().int().positive().default(180_000),
