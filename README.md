@@ -4,7 +4,7 @@
 
 It fronts one or more upstream providers, issues buyer API keys with quotas + rate limits, meters usage 1:1 with upstream token counts, and exposes both an admin dashboard and a public read-only panel.
 
-Current release: **v1.6.0**
+Current release: **v1.7.0**
 
 ---
 
@@ -126,7 +126,7 @@ Backend code changes need a process restart (do not restart production without e
 │   │   └── daily-reset.ts      # 00:00 WIB token reset
 │   └── shared/
 ├── schema.sql
-├── package.json                # version 1.6.0
+├── package.json                # version 1.7.0
 ├── tsconfig.json
 └── vite.config.ts
 ```
@@ -241,6 +241,17 @@ Response header `x-9router-upstream` shows which upstream handled the request.
 ---
 
 ## Changelog
+
+### v1.7.0 (2026-11-26)
+- **feat**: Admin Leaderboard — role filter tabs + role summaries, per-user detail modal backed by `GET /admin/keys/:keyId/telemetry` (quota, usage, keys, last active)
+- **feat**: Admin Models — upstream liveness probe with per-model Live/Mati badge (latency + reply snippet) and "Test all" progress via `POST /admin/models/probe`
+- **feat**: Request Inspector now captures the assistant reply as well (`request_logs.ai_response`, 1KB cap, streaming + non-stream, `response_truncated` flag)
+- **feat**: Public panel — Members menu (Account / Leaderboard / Live), session expiry card, brand chips + STARTER/PREMIUM tiering, Telegram community CTA
+- **feat**: Viewer session extended to 30 days (was 7) with salted viewer secret; `/public/unlock/status` exposes expiry; Usage, Stats24h and Overview are public, Leaderboard/Live/Account stay gated
+- **feat**: Nous Portal tag injection (`user=9router`) for `inference-api.nousresearch.com` — fixes HTTP 400 "missing user tag" surfaced as 502
+- **feat**: DB-enforced role token caps — Supporter 5B, KING 15B triggers on `api_keys` (panel quota edits clamp; dev/ultra/pro exempt)
+- **perf**: 30s in-memory cache for admin overview/leaderboard aggregates, role cohort SQL, keyset pagination in request logs
+- **fix**: Last-active labels in English (Today/Yesterday/D Mon), admin session rolling refresh, non-JSON upstream tail fallback (`{ raw }`)
 
 ### v1.6.0 (2026-09-06)
 - **feat**: Zero-downtime static public panel (`public/panel/index.html`) decoupled from server rebuilds
