@@ -249,6 +249,24 @@ function failureResponse(failure: UpstreamFailure) {
   });
 }
 
+// Nous Portal rejects some routes (upstage/solar-mini4:free) with HTTP 400
+// "missing tags" / "missing user tag" unless the JSON body carries a tags
+// entry that starts with "user=". Hermes Agent sends product=/client= only,
+// and a bare OpenAI client sends nothing — both 400, which we surface as 502.
+// Inject a stable user= tag for that host only. Other upstreams are untouched.
+const NOUS_USER_TAG = "user=9router";
+
+export function withNousUserTag(baseUrl: string, body: unknown): unknown {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return body;
+  let host = "";
+  try { host = new URL(baseUrl).hostname; } catch { return body; }
+  if (host !== "inference-api.nousresearch.com") return body;
+  const record = body as Record<string, unknown>;
+  const tags = Array.isArray(record.tags) ? record.tags.filter((t): t is string => typeof t === "string") : [];
+  if (tags.some((t) => t.startsWith("user="))) return body;
+  return { ...record, tags: [...tags, NOUS_USER_TAG] };
+}
+
 async function callSingleUpstream(
   upstream: Upstream,
   path: string,
@@ -257,13 +275,14 @@ async function callSingleUpstream(
 ): Promise<UpstreamResult & { retriable: boolean }> {
   const key = apiKeyOverride ?? pickUpstreamApiKey(upstream);
   const base = upstream.baseUrl.replace(/\/$/, "");
+  const wireBody = withNousUserTag(base, body);
   const opts: RequestInit = {
     method: body === undefined ? "GET" : "POST",
     headers: {
       authorization: authHeader(key.apiKey),
       "content-type": "application/json",
     },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined ? undefined : JSON.stringify(wireBody),
   };
 
   let delay = INITIAL_DELAY_MS;
@@ -381,7 +400,7 @@ async function streamSingleUpstream(
       authorization: authHeader(key.apiKey),
       "content-type": "application/json",
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify(withNousUserTag(base, body)),
   };
 
   let delay = INITIAL_DELAY_MS;
@@ -453,6 +472,82 @@ export async function streamUpstream(path: string, body: unknown, preferredUpstr
   }
 
   return failureResponse(lastFailure ?? upstreamFailure(502, "upstream_connection_error", "All upstreams failed"));
+}
+
+const PROBE_TIMEOUT_MS = 25_000;
+
+function probeContent(body: unknown): string {
+  let d = body as any;
+  if (d && typeof d === "object" && d.data && typeof d.data === "object" && !Array.isArray(d.data) && !d.choices) {
+    d = d.data;
+  }
+  const msg = d?.choices?.[0]?.message;
+  const text = typeof msg?.content === "string" ? msg.content.trim() : "";
+  const reasoning =
+    typeof msg?.reasoning_content === "string"
+      ? msg.reasoning_content.trim()
+      : typeof msg?.reasoning === "string"
+        ? msg.reasoning.trim()
+        : "";
+  return (text || reasoning || "").slice(0, 80);
+}
+
+// Liveness check for the admin Models page. One pinned upstream, one key, no
+// failover and no retry — a dead route must come back fast, not burn the
+// 5-minute buyer-chat timeout across every upstream.
+export async function probeModel(
+  upstreamId: string | null,
+  upstreamModel: string
+): Promise<{ ok: boolean; status: number; ms: number; detail: string }> {
+  const started = Date.now();
+  const all = await getUpstreams();
+  const target = upstreamId ? all.find((u) => u.id === upstreamId) : all.find((u) => u.isActive);
+  if (!target || !target.isActive) {
+    return { ok: false, status: 0, ms: Date.now() - started, detail: "upstream inactive" };
+  }
+  let key: UpstreamApiKey;
+  try {
+    key = pickUpstreamApiKey(target);
+  } catch {
+    return { ok: false, status: 0, ms: Date.now() - started, detail: "no active key" };
+  }
+  const base = target.baseUrl.replace(/\/$/, "");
+  const payload = JSON.stringify({
+    model: upstreamModel,
+    messages: [{ role: "user", content: "Reply with exactly OK" }],
+    max_tokens: 512,
+    temperature: 0,
+  });
+  try {
+    const response = await fetchWithTimeout(
+      `${base}/chat/completions`,
+      {
+        method: "POST",
+        headers: { authorization: authHeader(key.apiKey), "content-type": "application/json" },
+        body: payload,
+      },
+      PROBE_TIMEOUT_MS
+    );
+    const text = await response.text();
+    const ms = Date.now() - started;
+    let json: unknown = null;
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}");
+    if (start >= 0 && end > start) {
+      try { json = JSON.parse(text.slice(start, end + 1)); } catch { json = null; }
+    }
+    if (response.status < 200 || response.status >= 300) {
+      const err = (json as any)?.error?.message || (json as any)?.message || text.slice(0, 140);
+      return { ok: false, status: response.status, ms, detail: String(err).slice(0, 160) };
+    }
+    const content = probeContent(json);
+    if (!content) return { ok: false, status: response.status, ms, detail: "empty reply" };
+    return { ok: true, status: response.status, ms, detail: content };
+  } catch (error) {
+    const failure = failureForFetchError(error);
+    const detail = failure.errorCode === "upstream_timeout" ? "timeout" : failure.errorCode.replace("upstream_", "");
+    return { ok: false, status: failure.statusCode, ms: Date.now() - started, detail };
+  }
 }
 
 export async function fetchUpstreamModels(upstreamId?: string) {

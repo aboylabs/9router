@@ -65,7 +65,7 @@ function RolePills({ keyRow }: { keyRow: Key }) {
     supporter: "border-yellow-400/35 bg-yellow-500/15 text-yellow-700 dark:text-yellow-300",
     ultra: "border-cyan-400/35 bg-cyan-500/15 text-cyan-700 dark:text-cyan-300",
     pro: "border-blue-400/35 bg-blue-500/15 text-blue-700 dark:text-blue-300",
-    dev: "border-fuchsia-400/35 bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-300",
+    dev: "border-red-400/35 bg-red-500/15 text-red-700 dark:text-red-300",
   };
 
   return (
@@ -77,7 +77,7 @@ function RolePills({ keyRow }: { keyRow: Key }) {
             roleStyles[r] ?? "border-border bg-surface-tertiary text-text-muted"
           }`}
         >
-          {r}
+          {r === "dev" ? "KING" : r}
         </span>
       ))}
     </div>
@@ -487,6 +487,7 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
       return false;
     };
     const allRoles: { id: string; label: string; color: string }[] = [
+      { id: "dev", label: "KING", color: "red" },
       { id: "supporter", label: "Supporter", color: "amber" },
       { id: "ultra", label: "Ultra", color: "cyan" },
       { id: "pro", label: "Pro", color: "blue" },
@@ -500,12 +501,14 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
     };
 
     const colorClasses: Record<string, string> = {
+      red: "border-red-400/50 bg-red-500/15 text-red-700 dark:text-red-300",
       fuchsia: "border-fuchsia-400/50 bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-300",
       amber: "border-amber-400/50 bg-amber-500/15 text-amber-700 dark:text-amber-300",
       cyan: "border-cyan-400/50 bg-cyan-500/15 text-cyan-700 dark:text-cyan-300",
       blue: "border-blue-400/50 bg-blue-500/15 text-blue-700 dark:text-blue-300",
     };
     const colorClassesOff: Record<string, string> = {
+      red: "border-border bg-surface text-text-muted hover:border-red-400/40",
       fuchsia: "border-border bg-surface text-text-muted hover:border-fuchsia-400/40",
       amber: "border-border bg-surface text-text-muted hover:border-amber-400/40",
       cyan: "border-border bg-surface text-text-muted hover:border-cyan-400/40",
@@ -657,7 +660,7 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
                     <div className="flex items-center gap-1.5 min-w-0">
                       <span className={`font-medium text-sm truncate min-w-0 ${buyerNameClassName(key.buyer_name, key.quota_tokens, key.is_ultra, key.access_roles)}`}>{key.buyer_name}</span>
                       {isSuperAdminName(key.buyer_name, key.access_roles) ? <SuperAdminBadge /> : null}
-                      {isSupporterName(key.buyer_name, key.access_roles) ? <SupporterBadge /> : null}
+                      {!isSuperAdminName(key.buyer_name, key.access_roles) && isSupporterName(key.buyer_name, key.access_roles) ? <SupporterBadge /> : null}
                       {isHelperName(key.buyer_name, key.access_roles) ? <HelperBadge /> : null}
                       {!isSuperAdminName(key.buyer_name, key.access_roles) && !isSupporterName(key.buyer_name, key.access_roles) && !isHelperName(key.buyer_name, key.access_roles) && isUltraKey(key.is_ultra, key.quota_tokens, key.access_roles) ? <UltraBadge /> : null}
                       {isProKey(key.access_roles) ? <ProBadge /> : null}
@@ -758,7 +761,7 @@ export function Keys({ keys, onRefresh }: KeysPageProps) {
                     <div className="flex items-center gap-1.5 min-w-0">
                       <span className={`font-medium text-sm truncate min-w-0 ${buyerNameClassName(key.buyer_name, key.quota_tokens, key.is_ultra, key.access_roles)}`}>{key.buyer_name}</span>
                       {isSuperAdminName(key.buyer_name, key.access_roles) ? <SuperAdminBadge /> : null}
-                      {isSupporterName(key.buyer_name, key.access_roles) ? <SupporterBadge /> : null}
+                      {!isSuperAdminName(key.buyer_name, key.access_roles) && isSupporterName(key.buyer_name, key.access_roles) ? <SupporterBadge /> : null}
                       {isHelperName(key.buyer_name, key.access_roles) ? <HelperBadge /> : null}
                       {!isSuperAdminName(key.buyer_name, key.access_roles) && !isSupporterName(key.buyer_name, key.access_roles) && !isHelperName(key.buyer_name, key.access_roles) && isUltraKey(key.is_ultra, key.quota_tokens, key.access_roles) ? <UltraBadge /> : null}
                       {isProKey(key.access_roles) ? <ProBadge /> : null}

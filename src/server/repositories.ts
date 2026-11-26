@@ -263,6 +263,9 @@ export async function recordUsage(params: {
   /** Last user message only (already truncated). Logged outside the billing transaction. */
   userPrompt?: string | null;
   promptTruncated?: boolean;
+  /** AI response message snippet (already truncated). Logged outside the billing transaction. */
+  aiResponse?: string | null;
+  responseTruncated?: boolean;
   /** When false, usage_events/rollups still log tokens but api_keys.used_tokens is not increased (quota-exempt models). Default true. */
   countTowardTokenQuota?: boolean;
 }) {
@@ -342,8 +345,8 @@ export async function recordUsage(params: {
       `INSERT INTO request_logs
        (buyer_id, api_key_id, model_id, status_code, success,
         prompt_tokens, completion_tokens, total_tokens, latency_ms, error_code,
-        ip_address, user_prompt, prompt_truncated)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+        ip_address, user_prompt, prompt_truncated, ai_response, response_truncated)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
       [
         params.buyerId ?? null,
         params.apiKeyId ?? null,
@@ -357,7 +360,9 @@ export async function recordUsage(params: {
         params.errorCode ?? null,
         params.ipAddress ?? null,
         params.userPrompt ?? null,
-        params.promptTruncated === true
+        params.promptTruncated === true,
+        params.aiResponse ?? null,
+        params.responseTruncated === true
       ]
     );
   } catch (error) {

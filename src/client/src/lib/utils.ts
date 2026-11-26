@@ -33,6 +33,49 @@ export function formatDateShort(date: string | Date | null): string {
   });
 }
 
+export function formatLastActive(date: string | Date | null): string {
+  if (!date) return "-";
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return "-";
+
+  const dateFmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  });
+  const timeFmt = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Jakarta",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  });
+
+  const targetDateStr = dateFmt.format(d);
+  const todayDateStr = dateFmt.format(new Date());
+  const timeStr = timeFmt.format(d);
+
+  const [tY, tM, tD] = targetDateStr.split("-").map(Number);
+  const [nowY, nowM, nowD] = todayDateStr.split("-").map(Number);
+
+  const targetUtc = Date.UTC(tY, tM - 1, tD);
+  const todayUtc = Date.UTC(nowY, nowM - 1, nowD);
+  const diffDays = Math.round((todayUtc - targetUtc) / 86400000);
+
+  if (diffDays <= 0) {
+    return timeStr;
+  }
+  if (diffDays === 1) {
+    return `Yesterday, ${timeStr}`;
+  }
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const monthName = monthNames[tM - 1] || String(tM);
+  if (tY !== nowY) {
+    return `${tD} ${monthName} ${tY}, ${timeStr}`;
+  }
+  return `${tD} ${monthName}, ${timeStr}`;
+}
+
 /** Remaining lifetime of a key from expires_at (WIB-facing display). */
 export function formatRemaining(expiresAt: string | Date | null | undefined): {
   label: string;
@@ -86,9 +129,10 @@ export function isSuperAdminName(name: string | null | undefined, accessRoles?: 
  * Supporter / donatur buyers — bright yellow name + badge.
  * Name-match list (extend as needed).
  */
-export const SUPPORTER_NAMES = new Set(["gilbert arias", "yuop", "attta rebelution", "aditya sandy", "dono", "dna", "brother rogers", "ichigo kurosaki", "#indopride", "blue", "mrians21", "khd", "snapt", "bebascetak", "ramses", "binkhozin", "el", "tars", "en en", "company belanda", "petapagenit", "cucakrowo", "octav", "0xfz", "nyguist"]);
+export const SUPPORTER_NAMES = new Set(["attta rebelution", "aditya sandy", "dono", "dna", "brother rogers", "ichigo kurosaki", "#indopride", "blue", "mrians21", "khd", "snapt", "ramses", "binkhozin", "el", "company belanda", "petapagenit", "cucakrowo", "octav", "0xfz", "nyguist"]);
 
 export function isSupporterName(name: string | null | undefined, accessRoles?: string[] | null): boolean {
+  if (isSuperAdminName(name, accessRoles)) return false;
   if (SUPPORTER_NAMES.has((name || "").trim().toLowerCase())) return true;
   return Array.isArray(accessRoles) && accessRoles.includes("supporter");
 }
@@ -137,11 +181,14 @@ export function isProKey(accessRoles?: string[] | null): boolean {
  * ULTRA 500M cyan glow > 250M light green > default
  */
 export function buyerNameClassName(
-  _name?: string | null,
+  name?: string | null,
   _quotaTokens?: number | string | null,
   _isUltra?: boolean | null,
-  _accessRoles?: string[] | null
+  accessRoles?: string[] | null
 ): string {
+  if (isSuperAdminName(name, accessRoles)) {
+    return "text-red-500 font-bold dark:text-red-400";
+  }
   return "text-text-primary";
 }
 

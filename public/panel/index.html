@@ -76,6 +76,17 @@
     }
     .pub-footer a { color: #94a3b8; text-decoration: none; font-weight: 600; }
     .pub-footer a:hover { color: #c4b5fd; }
+    .pub-footer-links {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55rem;
+      flex-wrap: wrap;
+    }
+    .pub-footer-dot {
+      color: #475569;
+      font-weight: 400;
+      user-select: none;
+    }
     .status-pill {
       display: inline-flex; align-items: center; gap: 0.4rem;
       font-weight: 700; color: #86efac;
@@ -181,16 +192,26 @@
       line-height: 1.1;
     }
     .sidebar-header p { font-size: 0.72rem; color: #64748b; margin-top: 0.18rem; width: 100%; padding-left: 0.15rem; }
-    .tg-link {
-      color: #94a3b8; transition: all 0.2s; text-decoration: none;
+    .header-socials {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .social-btn, .tg-link {
+      color: #94a3b8; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); text-decoration: none;
       display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem;
       min-width: 34px; height: 34px; padding: 0 0.55rem; border-radius: 10px;
       border: 1px solid rgba(148,163,184,0.14);
       background: rgba(15,23,42,0.55);
       font-size: 0.72rem; font-weight: 700;
+      flex-shrink: 0;
     }
-    .tg-link .tg-text { color: #cbd5e1; }
-    .tg-link:hover { color: #60a5fa; border-color: rgba(96,165,250,0.45); background: rgba(37,99,235,0.12); transform: translateY(-1px); }
+    .social-btn.tg-link .tg-text, .tg-link .tg-text { color: #cbd5e1; }
+    .social-btn.tg-link:hover, .tg-link:hover { color: #38bdf8; border-color: rgba(56,189,248,0.45); background: rgba(14,165,233,0.12); transform: translateY(-1px); }
+    .social-btn.x-link { padding: 0; width: 34px; }
+    .social-btn.x-link:hover { color: #f8fafc; border-color: rgba(248,250,252,0.35); background: rgba(255,255,255,0.08); transform: translateY(-1px); }
+    .social-btn.th-link { padding: 0; width: 34px; }
+    .social-btn.th-link:hover { color: #e2e8f0; border-color: rgba(226,232,240,0.35); background: rgba(255,255,255,0.08); transform: translateY(-1px); }
     .nav-item {
       display: flex;
       align-items: center;
@@ -576,6 +597,28 @@
       border-radius: 50%;
       background: currentColor;
     }
+    .account-session-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.3rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      background: rgba(56,189,248,0.1);
+      border: 1px solid rgba(56,189,248,0.28);
+      color: #7dd3fc;
+      letter-spacing: 0.01em;
+    }
+    .account-session-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #38bdf8;
+    }
+    .bento-sub-stat.cols-3 {
+      grid-template-columns: 1fr 1fr 1fr;
+    }
     .account-lock-btn {
       display: inline-flex;
       align-items: center;
@@ -755,28 +798,11 @@
     .badge-yellow { background: rgba(202,138,4,0.15); color: #fbbf24; border-color: rgba(251,191,36,0.2); }
     .badge-red { background: rgba(220,38,38,0.15); color: #f87171; border-color: rgba(248,113,113,0.2); }
 
-    /* Super Admin developer badge — animated purple/fuchsia */
-    .sa-name {
-      position: relative;
-      display: inline-block;
-      font-weight: 800;
-      background: linear-gradient(90deg, #c4b5fd 0%, #e879f9 28%, #f0abfc 52%, #f9a8d4 76%, #c4b5fd 100%);
-      background-size: 220% 100%;
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-      filter: drop-shadow(0 0 10px rgba(192,132,252,0.55));
-      animation: saNameShine 3.2s ease-in-out;
-    }
-    @keyframes saNameShine {
-      0%, 100% {
-        background-position: 0% 50%;
-        filter: drop-shadow(0 0 8px rgba(192,132,252,0.4));
-      }
-      50% {
-        background-position: 100% 50%;
-        filter: drop-shadow(0 0 16px rgba(232,121,249,0.75));
-      }
+    /* King (Super Admin) name styling — bold vibrant red */
+    .king-name {
+      color: #ef4444 !important;
+      font-weight: 700 !important;
+      text-shadow: 0 0 10px rgba(239, 68, 68, 0.45);
     }
     .sa-badge {
       position: relative;
@@ -792,12 +818,12 @@
       font-weight: 800;
       letter-spacing: 0.08em;
       line-height: 1;
-      color: #f5d0fe;
-      border: 1px solid rgba(232, 121, 249, 0.55);
+      color: #fee2e2;
+      border: 1px solid rgba(239, 68, 68, 0.55);
       background:
-        radial-gradient(120% 160% at 20% 0%, rgba(244,114,182,0.28), transparent 55%),
-        linear-gradient(90deg, rgba(168,85,247,0.38), rgba(217,70,239,0.24), rgba(236,72,153,0.3));
-      box-shadow: 0 0 14px rgba(192,132,252,0.45), 0 0 28px rgba(217,70,239,0.18);
+        radial-gradient(120% 160% at 20% 0%, rgba(239, 68, 68, 0.28), transparent 55%),
+        linear-gradient(90deg, rgba(185, 28, 28, 0.45), rgba(220, 38, 38, 0.28), rgba(239, 68, 68, 0.35));
+      box-shadow: 0 0 14px rgba(239, 68, 68, 0.5), 0 0 28px rgba(220, 38, 38, 0.22);
       white-space: nowrap;
       animation: saBadgePulse 2.4s ease-in-out;
     }
@@ -813,13 +839,13 @@
     }
     @keyframes saBadgePulse {
       0%, 100% {
-        box-shadow: 0 0 12px rgba(192,132,252,0.4), 0 0 22px rgba(217,70,239,0.14);
-        border-color: rgba(232, 121, 249, 0.45);
+        box-shadow: 0 0 12px rgba(239, 68, 68, 0.4), 0 0 22px rgba(220, 38, 38, 0.16);
+        border-color: rgba(239, 68, 68, 0.5);
         transform: translateY(0) scale(1);
       }
       50% {
-        box-shadow: 0 0 20px rgba(232,121,249,0.7), 0 0 36px rgba(236,72,153,0.3);
-        border-color: rgba(244, 114, 182, 0.75);
+        box-shadow: 0 0 20px rgba(239, 68, 68, 0.75), 0 0 36px rgba(220, 38, 38, 0.35);
+        border-color: rgba(248, 113, 113, 0.8);
         transform: translateY(-0.5px) scale(1.03);
       }
     }
@@ -827,17 +853,17 @@
       width: 11px;
       height: 11px;
       flex-shrink: 0;
-      color: #e9d5ff;
+      color: #fca5a5;
       stroke: currentColor;
       animation: saIconFlicker 2.6s ease-in-out;
-      filter: drop-shadow(0 0 4px rgba(232,121,249,0.55));
+      filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.6));
     }
     @keyframes saIconFlicker {
       0%, 100% { opacity: 0.85; transform: scale(1); }
       50% { opacity: 1; transform: scale(1.12); }
     }
     .sa-badge .sa-dev {
-      background: linear-gradient(90deg, #e9d5ff, #f0abfc, #f9a8d4, #e9d5ff);
+      background: linear-gradient(90deg, #fee2e2, #fca5a5, #f87171, #fee2e2);
       background-size: 200% 100%;
       -webkit-background-clip: text;
       background-clip: text;
@@ -848,7 +874,7 @@
       position: absolute;
       width: 3px; height: 3px;
       border-radius: 50%;
-      background: #f0abfc;
+      background: #f87171;
       pointer-events: none;
       z-index: 1;
     }
@@ -1679,7 +1705,9 @@
 
     .model-tag.tencent { color: #38bdf8; border-color: rgba(14,165,233,0.45); background: rgba(14,165,233,0.12); }
     .model-tag.ox { color: #bef264; border-color: rgba(163,230,53,0.35); background: rgba(132,204,22,0.12); }
-    .tencent-badge, .ox-badge, .minimax-badge, .nvidia-badge {
+    .tencent-badge, .ox-badge, .minimax-badge, .nvidia-badge, .atria-badge,
+    .mimo-badge, .longcat-badge, .ling-badge, .laguna-badge, .solar-badge, .apodex-badge, .stepfun-badge,
+    .inception-badge {
       font-size: 0.62rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
       border-radius: 999px; padding: 0.18rem 0.45rem;
     }
@@ -1687,8 +1715,26 @@
     .ox-badge { color: #d9f99d; background: rgba(132,204,22,0.22); }
     .minimax-badge { color: #fed7aa; background: rgba(249,115,22,0.22); }
     .nvidia-badge { color: #bbf7d0; background: rgba(34,197,94,0.22); }
+    .atria-badge { color: #fbcfe8; background: rgba(244,63,94,0.22); border: 1px solid rgba(251,113,133,0.38); }
+    .mimo-badge { color: #fdba74; background: rgba(194,65,12,0.22); border: 1px solid rgba(234,88,12,0.42); }
+    .longcat-badge { color: #f0abfc; background: rgba(192,38,211,0.22); border: 1px solid rgba(217,70,239,0.40); }
+    .ling-badge { color: #99f6e4; background: rgba(13,148,136,0.22); border: 1px solid rgba(45,212,191,0.40); }
+    .laguna-badge { color: #bfdbfe; background: rgba(37,99,235,0.22); border: 1px solid rgba(96,165,250,0.40); }
+    .solar-badge { color: #bfdbfe; background: rgba(29,78,216,0.24); border: 1px solid rgba(59,130,246,0.45); }
+    .apodex-badge { color: #fde68a; background: rgba(180,83,9,0.22); border: 1px solid rgba(245,158,11,0.42); }
+    .stepfun-badge { color: #ddd6fe; background: rgba(109,40,217,0.24); border: 1px solid rgba(167,139,250,0.48); }
+    .inception-badge { color: #e0e7ff; background: linear-gradient(135deg, rgba(199,210,254,0.22), rgba(100,116,139,0.28)); border: 1px solid rgba(165,180,252,0.48); }
     .model-tag.minimax { color: #fb923c; border-color: rgba(249,115,22,0.4); background: rgba(249,115,22,0.12); }
     .model-tag.nvidia { color: #4ade80; border-color: rgba(34,197,94,0.4); background: rgba(34,197,94,0.12); }
+    .model-tag.atria { color: #fb7185; border-color: rgba(244,63,94,0.4); background: rgba(244,63,94,0.12); }
+    .model-tag.mimo { color: #fb923c; border-color: rgba(194,65,12,0.5); background: rgba(194,65,12,0.14); }
+    .model-tag.longcat { color: #e879f9; border-color: rgba(192,38,211,0.45); background: rgba(192,38,211,0.12); }
+    .model-tag.ling { color: #2dd4bf; border-color: rgba(13,148,136,0.45); background: rgba(13,148,136,0.12); }
+    .model-tag.laguna { color: #60a5fa; border-color: rgba(37,99,235,0.45); background: rgba(37,99,235,0.12); }
+    .model-tag.solar { color: #93c5fd; border-color: rgba(29,78,216,0.5); background: rgba(29,78,216,0.14); }
+    .model-tag.apodex { color: #fbbf24; border-color: rgba(180,83,9,0.5); background: rgba(180,83,9,0.14); }
+    .model-tag.stepfun { color: #c4b5fd; border-color: rgba(109,40,217,0.5); background: rgba(109,40,217,0.14); }
+    .model-tag.inception { color: #c7d2fe; border-color: rgba(129,140,248,0.5); background: rgba(99,102,241,0.14); }
 
     /* === STATS 24H TABLE === */
     .stats-table-wrap { overflow-x: auto; border-radius: 14px; border: 1px solid rgba(148,163,184,0.12); background: rgba(15,23,42,0.35); }
@@ -1753,12 +1799,7 @@
       transition: all 0.2s;
       box-shadow: 0 4px 12px rgba(0,0,0,0.12);
     }
-    .model-tag:hover {
-      border-color: rgba(167,139,250,0.45);
-      background: rgba(124,58,237,0.12);
-      color: #c4b5fd;
-      transform: translateY(-1px);
-    }
+    .model-tag:hover { transform: translateY(-1px); }
 
     /* === CLAUDE MODEL TAG (glow pulse + shimmer sweep) === */
     .model-tag.claude {
@@ -2135,6 +2176,25 @@
       .model-tag.gemini { animation: none; }
     }
 
+    .model-tag.tier-starter { color: #6ee7b7 !important; border-color: rgba(110,231,183,0.55) !important; background: rgba(6,78,59,0.4) !important; }
+    .model-tag.tier-pro { color: #93c5fd !important; border-color: rgba(147,197,253,0.55) !important; background: rgba(30,58,138,0.38) !important; }
+    .model-tag.tier-ultra { color: #67e8f9 !important; border-color: rgba(103,232,249,0.55) !important; background: rgba(8,51,68,0.4) !important; }
+    .model-tag.tier-supporter { color: #fde68a !important; border-color: rgba(253,230,138,0.55) !important; background: rgba(66,32,6,0.4) !important; }
+    .model-tag.tier-king { color: #fca5a5 !important; border-color: rgba(239,68,68,0.6) !important; background: rgba(127,29,29,0.4) !important; }
+    .model-tag.tier-premium {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      color: #fbbf24 !important;
+      border-color: rgba(251,191,36,0.65) !important;
+      background: rgba(245,158,11,0.07) !important;
+      font-weight: 600;
+      box-shadow: none;
+      animation: none !important;
+    }
+    .model-tag.tier-premium::after { display: none !important; }
+    .model-tag .premium-crown { width: 12px; height: 12px; display: block; flex: 0 0 auto; }
+
     /* === ZEBRA + ROW HOVER === */
     tbody tr:nth-child(even):not(.top-row) td { background: rgba(148,163,184,0.035); }
     tbody tr:not(.top-row):hover td { background: rgba(124,58,237,0.08); transition: background 0.15s; }
@@ -2253,7 +2313,6 @@
     }
     /* Grok unlimited card: override .free sky-blue with metallic silver */
     .model-card.free.grok-card {
-      border-color: rgba(148,163,184,0.50) !important;
       background:
         radial-gradient(120% 90% at 100% 0%, rgba(203,213,225,0.18), transparent 55%),
         radial-gradient(100% 80% at 0% 100%, rgba(100,116,139,0.10), transparent 50%),
@@ -2262,7 +2321,6 @@
       animation: grokGlow 2.8s ease-in-out !important;
     }
     .model-card.free.grok-card:hover {
-      border-color: rgba(203,213,225,0.75) !important;
       box-shadow: 0 0 0 1px rgba(148,163,184,0.28), 0 16px 40px rgba(148,163,184,0.22);
     }
     /* === GLM CARD (rose/pink — unique dual-tone + card shimmer) === */
@@ -2323,7 +2381,6 @@
     }
     /* DeepSeek unlimited card: override .free with deepseek indigo */
     .model-card.free.deepseek-card {
-      border-color: rgba(79,70,229,0.50) !important;
       background:
         radial-gradient(120% 90% at 100% 0%, rgba(99,102,241,0.20), transparent 55%),
         radial-gradient(100% 80% at 0% 100%, rgba(67,56,202,0.14), transparent 50%),
@@ -2332,7 +2389,6 @@
       animation: deepseekGlow 2.8s ease-in-out !important;
     }
     .model-card.free.deepseek-card:hover {
-      border-color: rgba(79,70,229,0.8) !important;
       box-shadow: 0 0 0 1px rgba(79,70,229,0.28), 0 16px 40px rgba(79,70,229,0.22);
     }
     /* === GPT CARD (emerald) === */
@@ -2357,7 +2413,6 @@
     }
     /* GPT unlimited card: override .free with emerald */
     .model-card.free.gpt-card {
-      border-color: rgba(16,185,129,0.50) !important;
       background:
         radial-gradient(120% 90% at 100% 0%, rgba(52,211,153,0.20), transparent 55%),
         radial-gradient(100% 80% at 0% 100%, rgba(5,150,105,0.14), transparent 50%),
@@ -2366,7 +2421,6 @@
       animation: gptGlow 2.8s ease-in-out !important;
     }
     .model-card.free.gpt-card:hover {
-      border-color: rgba(16,185,129,0.8) !important;
       box-shadow: 0 0 0 1px rgba(16,185,129,0.28), 0 16px 40px rgba(16,185,129,0.22);
     }
     /* === META CARD (Meta blue) === */
@@ -2420,10 +2474,6 @@
         radial-gradient(100% 80% at 0% 100%, rgba(234,88,12,0.14), transparent 50%),
         linear-gradient(180deg, rgba(67,20,7,0.85), rgba(15,23,42,0.6));
     }
-    .model-card.gemini-card:hover {
-      border-color: rgba(251,146,60,0.85);
-      box-shadow: 0 0 0 1px rgba(251,146,60,0.28), 0 16px 40px rgba(234,88,12,0.22);
-    }
     .gemini-badge {
       display: inline-flex; align-items: center; gap: 0.3rem;
       font-size: 0.68rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase;
@@ -2431,33 +2481,240 @@
       border: 1px solid rgba(251,146,60,0.40);
       padding: 0.22rem 0.55rem; border-radius: 999px;
     }
-    .model-card.privileged.gemini-card {
-      border-color: rgba(251,146,60,0.50) !important;
-      background:
-        radial-gradient(120% 90% at 100% 0%, rgba(251,146,60,0.22), transparent 55%),
-        radial-gradient(100% 80% at 0% 100%, rgba(234,88,12,0.14), transparent 50%),
-        linear-gradient(180deg, rgba(67,20,7,0.85), rgba(15,23,42,0.6)) !important;
-      box-shadow: 0 0 0 1px rgba(251,146,60,0.14), 0 12px 32px rgba(234,88,12,0.12);
-    }
-    .model-card.privileged.gemini-card:hover {
-      border-color: rgba(251,146,60,0.85) !important;
-      box-shadow: 0 0 0 1px rgba(251,146,60,0.30), 0 16px 40px rgba(234,88,12,0.22) !important;
-    }
-    .model-card.privileged.gemini-card .model-card-id { color: #fdba74; }
-    .model-card.privileged.gemini-card::after {
-      background: linear-gradient(105deg, transparent, rgba(253,186,116,0.18), transparent) !important;
-    }
-    .model-card.free.gemini-card {
-      border-color: rgba(251,146,60,0.50) !important;
-      background:
-        radial-gradient(120% 90% at 100% 0%, rgba(251,146,60,0.22), transparent 55%),
-        radial-gradient(100% 80% at 0% 100%, rgba(234,88,12,0.14), transparent 50%),
-        linear-gradient(180deg, rgba(67,20,7,0.85), rgba(15,23,42,0.6)) !important;
-      box-shadow: 0 0 0 1px rgba(251,146,60,0.12), 0 12px 32px rgba(234,88,12,0.12);
-    }
-    .model-card.free.gemini-card:hover {
-      border-color: rgba(251,146,60,0.85) !important;
+    .model-card.gemini-card:hover {
+      border-color: rgba(251,146,60,0.85);
       box-shadow: 0 0 0 1px rgba(251,146,60,0.28), 0 16px 40px rgba(234,88,12,0.22);
+    }
+    /* === ATRIA DAWN CARD (sunrise coral/rose to violet palette) === */
+    .model-card.atria-card {
+      border-color: rgba(244,63,94,0.45);
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(251,113,133,0.20), transparent 55%),
+        radial-gradient(100% 80% at 0% 100%, rgba(168,85,247,0.14), transparent 50%),
+        linear-gradient(180deg, rgba(35,15,30,0.85), rgba(15,23,42,0.6));
+    }
+    .model-card.atria-card:hover {
+      border-color: rgba(251,113,133,0.80);
+      box-shadow: 0 0 0 1px rgba(244,63,94,0.25), 0 16px 40px rgba(225,29,72,0.18);
+      transform: translateY(-2px);
+    }
+    .model-card.atria-card .model-card-id { color: #fda4af; }
+    .model-card.privileged.atria-card {
+      border-color: rgba(244,63,94,0.50) !important;
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(251,113,133,0.22), transparent 55%),
+        radial-gradient(100% 80% at 0% 100%, rgba(168,85,247,0.16), transparent 50%),
+        linear-gradient(180deg, rgba(38,15,32,0.88), rgba(15,23,42,0.65)) !important;
+      box-shadow: 0 0 0 1px rgba(244,63,94,0.14), 0 12px 32px rgba(225,29,72,0.12);
+    }
+    .model-card.privileged.atria-card:hover {
+      border-color: rgba(251,113,133,0.85) !important;
+      box-shadow: 0 0 0 1px rgba(244,63,94,0.30), 0 16px 40px rgba(225,29,72,0.22) !important;
+    }
+    .model-card.privileged.atria-card .model-card-id { color: #fda4af; }
+    .model-card.privileged.atria-card::after {
+      background: linear-gradient(105deg, transparent, rgba(253,164,175,0.18), transparent) !important;
+    }
+    .model-card.free.atria-card {
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(251,113,133,0.22), transparent 55%),
+        radial-gradient(100% 80% at 0% 100%, rgba(168,85,247,0.16), transparent 50%),
+        linear-gradient(180deg, rgba(38,15,32,0.88), rgba(15,23,42,0.65)) !important;
+      box-shadow: 0 0 0 1px rgba(244,63,94,0.12), 0 12px 32px rgba(225,29,72,0.12);
+    }
+    .model-card.free.atria-card:hover {
+      box-shadow: 0 0 0 1px rgba(244,63,94,0.28), 0 16px 40px rgba(225,29,72,0.22);
+    }
+    /* === MIMO (copper #c2410c — not Claude amber, not Gemini tangerine) === */
+    .model-card.mimo-card {
+      border-color: rgba(194,65,12,0.55);
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(234,88,12,0.22), transparent 55%),
+        radial-gradient(100% 80% at 0% 100%, rgba(124,45,18,0.16), transparent 50%),
+        linear-gradient(180deg, rgba(48,16,6,0.88), rgba(15,23,42,0.6));
+    }
+    .model-card.mimo-card:hover {
+      border-color: rgba(234,88,12,0.9);
+      box-shadow: 0 0 0 1px rgba(194,65,12,0.30), 0 16px 40px rgba(154,52,18,0.24);
+    }
+    .model-card.free.mimo-card {
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(234,88,12,0.22), transparent 55%),
+        radial-gradient(100% 80% at 0% 100%, rgba(124,45,18,0.16), transparent 50%),
+        linear-gradient(180deg, rgba(48,16,6,0.88), rgba(15,23,42,0.6)) !important;
+      box-shadow: 0 0 0 1px rgba(194,65,12,0.14), 0 12px 32px rgba(154,52,18,0.14);
+    }
+    .model-card.free.mimo-card:hover {
+      box-shadow: 0 0 0 1px rgba(194,65,12,0.30), 0 16px 40px rgba(154,52,18,0.24);
+    }
+    .model-card.mimo-card .model-card-id { color: #fdba74; }
+    /* === LONGCAT (fuchsia #c026d3) === */
+    .model-card.longcat-card {
+      border-color: rgba(192,38,211,0.50);
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(217,70,239,0.20), transparent 55%),
+        radial-gradient(100% 80% at 0% 100%, rgba(134,25,143,0.14), transparent 50%),
+        linear-gradient(180deg, rgba(48,10,52,0.85), rgba(15,23,42,0.6));
+    }
+    .model-card.longcat-card:hover {
+      border-color: rgba(217,70,239,0.85);
+      box-shadow: 0 0 0 1px rgba(192,38,211,0.28), 0 16px 40px rgba(162,28,175,0.22);
+    }
+    .model-card.free.longcat-card {
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(217,70,239,0.20), transparent 55%),
+        radial-gradient(100% 80% at 0% 100%, rgba(134,25,143,0.14), transparent 50%),
+        linear-gradient(180deg, rgba(48,10,52,0.85), rgba(15,23,42,0.6)) !important;
+      box-shadow: 0 0 0 1px rgba(192,38,211,0.12), 0 12px 32px rgba(162,28,175,0.12);
+    }
+    .model-card.free.longcat-card:hover {
+      box-shadow: 0 0 0 1px rgba(192,38,211,0.28), 0 16px 40px rgba(162,28,175,0.22);
+    }
+    .model-card.longcat-card .model-card-id { color: #f0abfc; }
+    /* === LING (teal #0d9488) === */
+    .model-card.ling-card {
+      border-color: rgba(13,148,136,0.50);
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(45,212,191,0.18), transparent 55%),
+        radial-gradient(100% 80% at 0% 100%, rgba(15,118,110,0.14), transparent 50%),
+        linear-gradient(180deg, rgba(6,40,38,0.85), rgba(15,23,42,0.6));
+    }
+    .model-card.ling-card:hover {
+      border-color: rgba(45,212,191,0.85);
+      box-shadow: 0 0 0 1px rgba(13,148,136,0.28), 0 16px 40px rgba(15,118,110,0.22);
+    }
+    .model-card.free.ling-card {
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(45,212,191,0.18), transparent 55%),
+        radial-gradient(100% 80% at 0% 100%, rgba(15,118,110,0.14), transparent 50%),
+        linear-gradient(180deg, rgba(6,40,38,0.85), rgba(15,23,42,0.6)) !important;
+      box-shadow: 0 0 0 1px rgba(13,148,136,0.12), 0 12px 32px rgba(15,118,110,0.12);
+    }
+    .model-card.free.ling-card:hover {
+      box-shadow: 0 0 0 1px rgba(13,148,136,0.28), 0 16px 40px rgba(15,118,110,0.22);
+    }
+    .model-card.ling-card .model-card-id { color: #99f6e4; }
+    /* === LAGUNA (blue #2563eb — distinct from Meta sky and DeepSeek indigo) === */
+    .model-card.laguna-card {
+      border-color: rgba(37,99,235,0.50);
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(96,165,250,0.18), transparent 55%),
+        radial-gradient(100% 80% at 0% 100%, rgba(29,78,216,0.14), transparent 50%),
+        linear-gradient(180deg, rgba(12,24,58,0.85), rgba(15,23,42,0.6));
+    }
+    .model-card.laguna-card:hover {
+      border-color: rgba(96,165,250,0.85);
+      box-shadow: 0 0 0 1px rgba(37,99,235,0.28), 0 16px 40px rgba(29,78,216,0.22);
+    }
+    .model-card.free.laguna-card {
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(96,165,250,0.18), transparent 55%),
+        radial-gradient(100% 80% at 0% 100%, rgba(29,78,216,0.14), transparent 50%),
+        linear-gradient(180deg, rgba(12,24,58,0.85), rgba(15,23,42,0.6)) !important;
+      box-shadow: 0 0 0 1px rgba(37,99,235,0.12), 0 12px 32px rgba(29,78,216,0.12);
+    }
+    .model-card.free.laguna-card:hover {
+      box-shadow: 0 0 0 1px rgba(37,99,235,0.28), 0 16px 40px rgba(29,78,216,0.22);
+    }
+    .model-card.laguna-card .model-card-id { color: #bfdbfe; }
+    /* === SOLAR / Upstage (blue #1d4ed8 — not Laguna #2563eb, not Meta sky) === */
+    .model-card.solar-card {
+      border-color: rgba(29,78,216,0.55);
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(59,130,246,0.22), transparent 55%),
+        radial-gradient(100% 80% at 0% 100%, rgba(30,58,138,0.16), transparent 50%),
+        linear-gradient(180deg, rgba(8,18,48,0.88), rgba(15,23,42,0.6));
+    }
+    .model-card.solar-card:hover {
+      border-color: rgba(96,165,250,0.9);
+      box-shadow: 0 0 0 1px rgba(29,78,216,0.32), 0 16px 40px rgba(30,64,175,0.24);
+    }
+    .model-card.free.solar-card {
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(59,130,246,0.22), transparent 55%),
+        radial-gradient(100% 80% at 0% 100%, rgba(30,58,138,0.16), transparent 50%),
+        linear-gradient(180deg, rgba(8,18,48,0.88), rgba(15,23,42,0.6)) !important;
+      box-shadow: 0 0 0 1px rgba(29,78,216,0.14), 0 12px 32px rgba(30,64,175,0.14);
+    }
+    .model-card.free.solar-card:hover {
+      box-shadow: 0 0 0 1px rgba(29,78,216,0.32), 0 16px 40px rgba(30,64,175,0.24);
+    }
+    .model-card.solar-card .model-card-id { color: #bfdbfe; }
+    /* === APODEX (amber #b45309 — not Claude gold, not Grok slate) === */
+    .model-card.apodex-card {
+      border-color: rgba(180,83,9,0.55);
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(245,158,11,0.18), transparent 55%),
+        radial-gradient(100% 80% at 0% 100%, rgba(120,53,15,0.16), transparent 50%),
+        linear-gradient(180deg, rgba(42,24,6,0.88), rgba(15,23,42,0.6));
+    }
+    .model-card.apodex-card:hover {
+      border-color: rgba(251,191,36,0.85);
+      box-shadow: 0 0 0 1px rgba(180,83,9,0.28), 0 16px 40px rgba(146,64,14,0.22);
+    }
+    .model-card.free.apodex-card {
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(245,158,11,0.18), transparent 55%),
+        radial-gradient(100% 80% at 0% 100%, rgba(120,53,15,0.16), transparent 50%),
+        linear-gradient(180deg, rgba(42,24,6,0.88), rgba(15,23,42,0.6)) !important;
+      box-shadow: 0 0 0 1px rgba(180,83,9,0.14), 0 12px 32px rgba(146,64,14,0.14);
+    }
+    .model-card.free.apodex-card:hover {
+      box-shadow: 0 0 0 1px rgba(180,83,9,0.28), 0 16px 40px rgba(146,64,14,0.22);
+    }
+    .model-card.apodex-card .model-card-id { color: #fde68a; }
+    /* === STEPFUN (indigo #6d28d9 — not Qwen violet, not Poolside blue) === */
+    .model-card.stepfun-card {
+      border-color: rgba(109,40,217,0.55);
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(167,139,250,0.20), transparent 55%),
+        radial-gradient(100% 80% at 0% 100%, rgba(76,29,149,0.16), transparent 50%),
+        linear-gradient(180deg, rgba(28,16,52,0.88), rgba(15,23,42,0.6));
+    }
+    .model-card.stepfun-card:hover {
+      border-color: rgba(167,139,250,0.88);
+      box-shadow: 0 0 0 1px rgba(109,40,217,0.30), 0 16px 40px rgba(76,29,149,0.22);
+    }
+    .model-card.free.stepfun-card {
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(167,139,250,0.20), transparent 55%),
+        radial-gradient(100% 80% at 0% 100%, rgba(76,29,149,0.16), transparent 50%),
+        linear-gradient(180deg, rgba(28,16,52,0.88), rgba(15,23,42,0.6)) !important;
+      box-shadow: 0 0 0 1px rgba(109,40,217,0.14), 0 12px 32px rgba(76,29,149,0.14);
+    }
+    .model-card.free.stepfun-card:hover {
+      box-shadow: 0 0 0 1px rgba(109,40,217,0.30), 0 16px 40px rgba(76,29,149,0.22);
+    }
+    .model-card.stepfun-card .model-card-id { color: #ddd6fe; }
+    /* === INCEPTION / Mercury (indigo-chrome #6366f1 — not StepFun violet, not Grok slate) === */
+    .model-card.inception-card {
+      border-color: rgba(99,102,241,0.55);
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(199,210,254,0.20), transparent 55%),
+        radial-gradient(100% 80% at 0% 100%, rgba(51,65,85,0.20), transparent 50%),
+        linear-gradient(180deg, rgba(15,20,40,0.88), rgba(15,23,42,0.6));
+    }
+    .model-card.inception-card:hover {
+      border-color: rgba(165,180,252,0.88);
+      box-shadow: 0 0 0 1px rgba(99,102,241,0.30), 0 16px 40px rgba(49,46,129,0.24);
+    }
+    .model-card.free.inception-card {
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(199,210,254,0.20), transparent 55%),
+        radial-gradient(100% 80% at 0% 100%, rgba(51,65,85,0.20), transparent 50%),
+        linear-gradient(180deg, rgba(15,20,40,0.88), rgba(15,23,42,0.6)) !important;
+      box-shadow: 0 0 0 1px rgba(99,102,241,0.14), 0 12px 32px rgba(49,46,129,0.14);
+    }
+    .model-card.free.inception-card:hover {
+      box-shadow: 0 0 0 1px rgba(99,102,241,0.30), 0 16px 40px rgba(49,46,129,0.24);
+    }
+    .model-card.inception-card .model-card-id { color: #e0e7ff; }
+    /* Unified lab-chip geometry: every brand badge renders at one size/shape */
+    .model-card-top > span[class$="-badge"] {
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 0.62rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
+      line-height: 1.15; padding: 0.18rem 0.45rem; border-radius: 999px;
+      border-width: 1px; border-style: solid; white-space: nowrap; flex: 0 0 auto;
     }
     @media (prefers-reduced-motion: reduce) {
       tr.row-new td, tr.row-enter,
@@ -2507,10 +2764,20 @@
     .model-card.meta-card::before { background: linear-gradient(90deg, transparent, rgba(59,130,246,0.7), transparent); }
     .model-card.tencent-card::before { background: linear-gradient(90deg, transparent, rgba(14,165,233,0.7), transparent); }
     .model-card.ox-card::before { background: linear-gradient(90deg, transparent, rgba(163,230,53,0.7), transparent); }
-    .model-card.free::before { background: linear-gradient(90deg, transparent, rgba(56,189,248,0.8), transparent); }
+    .model-card.atria-card::before { background: linear-gradient(90deg, transparent, rgba(251,113,133,0.9), rgba(168,85,247,0.85), transparent); }
+    .model-card.mimo-card::before { background: linear-gradient(90deg, transparent, rgba(194,65,12,0.9), transparent); }
+    .model-card.longcat-card::before { background: linear-gradient(90deg, transparent, rgba(192,38,211,0.85), transparent); }
+    .model-card.ling-card::before { background: linear-gradient(90deg, transparent, rgba(13,148,136,0.85), transparent); }
+    .model-card.laguna-card::before { background: linear-gradient(90deg, transparent, rgba(37,99,235,0.85), transparent); }
+    .model-card.solar-card::before { background: linear-gradient(90deg, transparent, rgba(29,78,216,0.9), transparent); }
+    .model-card.apodex-card::before { background: linear-gradient(90deg, transparent, rgba(180,83,9,0.9), transparent); }
+    .model-card.stepfun-card::before { background: linear-gradient(90deg, transparent, rgba(109,40,217,0.9), transparent); }
+    .model-card.inception-card::before { background: linear-gradient(90deg, transparent, rgba(99,102,241,0.9), rgba(203,213,225,0.85), transparent); }
+    .model-card.free::before { background: linear-gradient(90deg, transparent, rgba(110,231,183,0.85), transparent); }
+    .model-card.role-dev::before { background: linear-gradient(90deg, transparent, rgba(239,68,68,0.85), transparent); }
     .model-card.role-supporter::before { background: linear-gradient(90deg, transparent, rgba(251,191,36,0.85), transparent); }
     .model-card.role-ultra::before { background: linear-gradient(90deg, transparent, rgba(34,211,238,0.85), transparent); }
-    .model-card.role-pro::before { background: linear-gradient(90deg, transparent, rgba(244,114,182,0.85), transparent); }
+    .model-card.role-pro::before { background: linear-gradient(90deg, transparent, rgba(147,197,253,0.85), transparent); }
 
     /* Interactive Desktop Spotlight (Passive via CSS variables) */
     @media (hover: hover) and (pointer: fine) {
@@ -2525,21 +2792,19 @@
       box-shadow: 0 10px 28px rgba(0,0,0,0.22);
     }
     .model-card.free {
-      border-color: rgba(56,189,248,0.45);
+      border-color: rgba(110,231,183,0.5);
       background:
-        radial-gradient(120% 90% at 100% 0%, rgba(56,189,248,0.18), transparent 55%),
-        radial-gradient(90% 80% at 0% 100%, rgba(167,139,250,0.14), transparent 50%),
+        radial-gradient(120% 90% at 100% 0%, rgba(110,231,183,0.16), transparent 55%),
         rgba(15,23,42,0.72);
-      box-shadow: 0 0 0 1px rgba(56,189,248,0.12), 0 12px 32px rgba(14,165,233,0.12);
-      animation: freeCardGlow 2.8s ease-in-out;
+      box-shadow: none;
+      animation: none;
     }
     .model-card.free:hover {
-      border-color: rgba(125,211,252,0.7);
-      box-shadow: 0 0 0 1px rgba(56,189,248,0.28), 0 16px 40px rgba(14,165,233,0.22);
+      border-color: rgba(110,231,183,0.8);
+      box-shadow: 0 10px 28px rgba(0,0,0,0.22);
     }
     /* GLM unlimited card: override .free sky-blue with rose/pink */
     .model-card.free.glm-card {
-      border-color: rgba(244,63,94,0.50) !important;
       background:
         radial-gradient(120% 90% at 100% 0%, rgba(251,113,133,0.20), transparent 55%),
         radial-gradient(100% 80% at 0% 100%, rgba(168,85,247,0.14), transparent 50%),
@@ -2548,7 +2813,6 @@
       animation: glmGlow 2.8s ease-in-out !important;
     }
     .model-card.free.glm-card:hover {
-      border-color: rgba(244,63,94,0.8) !important;
       box-shadow: 0 0 0 1px rgba(244,63,94,0.28), 0 16px 40px rgba(244,63,94,0.22);
     }
     .model-card.privileged {
@@ -2603,10 +2867,12 @@
       font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace;
       font-size: 0.72rem;
       color: #93c5fd;
-      word-break: break-all;
+      word-break: normal;
+      overflow-wrap: anywhere;
+      letter-spacing: -0.02em;
       line-height: 1.4;
     }
-    .model-card.free .model-card-id { color: #7dd3fc; }
+    .model-card.free .model-card-id { color: #6ee7b7; }
     .model-card.privileged .model-card-id { color: #fcd34d; }
     .model-card-meta {
       margin-top: 0.7rem;
@@ -2614,6 +2880,90 @@
       flex-wrap: wrap;
       gap: 0.35rem;
       align-items: center;
+    }
+    /* ── NEW drops: flame accent + NEW chip beside the model name ── */
+    .model-card-name {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+    }
+    .new-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.22rem;
+      font-size: 0.55rem;
+      font-weight: 900;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      line-height: 1;
+      color: #fff5eb;
+      background: linear-gradient(135deg, #f97316 0%, #ef4444 100%);
+      border-radius: 999px;
+      padding: 0.17rem 0.44rem 0.17rem 0.3rem;
+      box-shadow: 0 0 0 1px rgba(251,146,60,0.5), 0 2px 9px rgba(239,68,68,0.32);
+      white-space: nowrap;
+      flex: 0 0 auto;
+    }
+    .new-chip svg { width: 9px; height: 9px; display: block; }
+    .model-card.card-fire { border-color: rgba(249,115,22,0.42); }
+    .model-card.card-fire:hover { border-color: rgba(251,146,60,0.78); }
+    .model-card.card-fire::before {
+      background: linear-gradient(90deg, rgba(251,191,36,0), rgba(251,191,36,0.85) 30%, rgba(239,68,68,0.9) 55%, rgba(249,115,22,0.85) 78%, rgba(251,191,36,0));
+      height: 2px;
+      opacity: 1;
+    }
+    .model-card.card-fire:hover::before { height: 2.5px; }
+    /* travelling ember line: transform-based so it animates on every browser */
+    .fire-line {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 45%;
+      height: 2px;
+      border-radius: 2px;
+      background: linear-gradient(90deg, rgba(251,191,36,0), rgba(251,191,36,0.95) 30%, #ef4444 60%, rgba(249,115,22,0.9) 80%, rgba(251,191,36,0));
+      animation: fireRun 4.5s linear infinite;
+      will-change: transform;
+    }
+    .fire-fx {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      border-radius: inherit;
+      pointer-events: none;
+      z-index: 0;
+      background: radial-gradient(130% 95% at 50% 128%, rgba(249,115,22,0.22), rgba(239,68,68,0.09) 44%, transparent 72%);
+    }
+    .fire-fx::before {
+      content: '';
+      position: absolute;
+      left: -25%;
+      right: -25%;
+      bottom: -45%;
+      height: 95%;
+      background:
+        radial-gradient(55% 100% at 28% 100%, rgba(251,146,60,0.50), transparent 70%),
+        radial-gradient(45% 100% at 62% 100%, rgba(239,68,68,0.40), transparent 72%),
+        radial-gradient(40% 100% at 84% 100%, rgba(251,191,36,0.36), transparent 70%);
+      filter: blur(10px);
+      opacity: 0.8;
+      animation: fireFlicker 6s ease-in-out infinite;
+    }
+    .model-card > .model-card-top,
+    .model-card > .model-card-id,
+    .model-card > .model-card-meta { position: relative; z-index: 1; }
+    @keyframes fireRun {
+      0% { transform: translateX(-110%); }
+      100% { transform: translateX(240%); }
+    }
+    @keyframes fireFlicker {
+      0%, 100% { transform: translateY(0) scaleY(1); opacity: 0.72; }
+      35% { transform: translateY(-3px) scaleY(1.06); opacity: 0.95; }
+      70% { transform: translateY(-1px) scaleY(0.98); opacity: 0.78; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .fire-line, .fire-fx::before { animation: none !important; }
     }
     .free-badge {
       display: inline-flex;
@@ -2625,10 +2975,11 @@
       font-weight: 800;
       letter-spacing: 0.06em;
       text-transform: uppercase;
-      color: #082f49;
-      background: linear-gradient(135deg, #7dd3fc 0%, #a78bfa 55%, #f0abfc 100%);
-      box-shadow: 0 0 16px rgba(56,189,248,0.35);
-      animation: freeBadgePulse 2.2s ease-in-out;
+      color: #022c22;
+      background: #6ee7b7;
+      border: 0;
+      box-shadow: none;
+      animation: none;
       white-space: nowrap;
     }
     .free-badge svg { width: 11px; height: 11px; }
@@ -2652,13 +3003,13 @@
       box-shadow: none;
       animation: none;
     }
-    .privileged-badge.role-dev { color: #2e1064; background: #d8b4fe; }
+    .privileged-badge.role-dev { color: #ffffff; background: #dc2626; }
     .privileged-badge.role-supporter { color: #422006; background: #fde68a; }
     .privileged-badge.role-ultra { color: #083344; background: #67e8f9; }
-    .privileged-badge.role-pro { color: #1e1b4b; background: #f9a8d4; }
+    .privileged-badge.role-pro { color: #0c1a33; background: #93c5fd; }
     .model-card.role-dev {
-      border-color: rgba(168,85,247,0.5);
-      background: radial-gradient(120% 90% at 100% 0%, rgba(168,85,247,0.16), transparent 55%), rgba(15,23,42,0.75);
+      border-color: rgba(239,68,68,0.5);
+      background: radial-gradient(120% 90% at 100% 0%, rgba(239,68,68,0.16), transparent 55%), rgba(15,23,42,0.75);
     }
     .model-card.role-supporter {
       border-color: rgba(251,191,36,0.5);
@@ -2669,9 +3020,432 @@
       background: radial-gradient(120% 90% at 100% 0%, rgba(34,211,238,0.16), transparent 55%), rgba(15,23,42,0.75);
     }
     .model-card.role-pro {
-      border-color: rgba(244,114,182,0.5);
-      background: radial-gradient(120% 90% at 100% 0%, rgba(244,114,182,0.16), transparent 55%), rgba(15,23,42,0.75);
+      border-color: rgba(147,197,253,0.5);
+      background: radial-gradient(120% 90% at 100% 0%, rgba(147,197,253,0.16), transparent 55%), rgba(15,23,42,0.75);
     }
+    .model-card.role-pro,
+    .model-card.role-pro.claude-card,
+    .model-card.role-pro.kimi-card,
+    .model-card.role-pro.qwen-card,
+    .model-card.role-pro.grok-card,
+    .model-card.role-pro.glm-card,
+    .model-card.role-pro.deepseek-card,
+    .model-card.role-pro.gpt-card,
+    .model-card.role-pro.gemini-card,
+    .model-card.role-pro.meta-card,
+    .model-card.role-pro.tencent-card,
+    .model-card.role-pro.ox-card,
+    .model-card.role-pro.minimax-card,
+    .model-card.role-pro.nvidia-card,
+    .model-card.role-pro.atria-card,
+    .model-card.role-pro.mimo-card,
+    .model-card.role-pro.longcat-card,
+    .model-card.role-pro.ling-card,
+    .model-card.role-pro.laguna-card,
+    .model-card.role-pro.solar-card,
+    .model-card.role-pro.apodex-card,
+    .model-card.role-pro.stepfun-card {
+      border-color: rgba(147,197,253,0.62) !important;
+      background: radial-gradient(120% 90% at 100% 0%, rgba(147,197,253,0.16), transparent 55%), rgba(15,23,42,0.75) !important;
+    }
+    .model-card.role-ultra,
+    .model-card.role-ultra.claude-card,
+    .model-card.role-ultra.kimi-card,
+    .model-card.role-ultra.qwen-card,
+    .model-card.role-ultra.grok-card,
+    .model-card.role-ultra.glm-card,
+    .model-card.role-ultra.deepseek-card,
+    .model-card.role-ultra.gpt-card,
+    .model-card.role-ultra.gemini-card,
+    .model-card.role-ultra.meta-card,
+    .model-card.role-ultra.tencent-card,
+    .model-card.role-ultra.ox-card,
+    .model-card.role-ultra.minimax-card,
+    .model-card.role-ultra.nvidia-card,
+    .model-card.role-ultra.atria-card,
+    .model-card.role-ultra.mimo-card,
+    .model-card.role-ultra.longcat-card,
+    .model-card.role-ultra.ling-card,
+    .model-card.role-ultra.laguna-card,
+    .model-card.role-ultra.solar-card,
+    .model-card.role-ultra.apodex-card,
+    .model-card.role-ultra.stepfun-card {
+      border-color: rgba(103,232,249,0.62) !important;
+      background: radial-gradient(120% 90% at 100% 0%, rgba(103,232,249,0.16), transparent 55%), rgba(15,23,42,0.75) !important;
+    }
+    .model-card.role-supporter,
+    .model-card.role-supporter.claude-card,
+    .model-card.role-supporter.kimi-card,
+    .model-card.role-supporter.qwen-card,
+    .model-card.role-supporter.grok-card,
+    .model-card.role-supporter.glm-card,
+    .model-card.role-supporter.deepseek-card,
+    .model-card.role-supporter.gpt-card,
+    .model-card.role-supporter.gemini-card,
+    .model-card.role-supporter.meta-card,
+    .model-card.role-supporter.tencent-card,
+    .model-card.role-supporter.ox-card,
+    .model-card.role-supporter.minimax-card,
+    .model-card.role-supporter.nvidia-card,
+    .model-card.role-supporter.atria-card,
+    .model-card.role-supporter.mimo-card,
+    .model-card.role-supporter.longcat-card,
+    .model-card.role-supporter.ling-card,
+    .model-card.role-supporter.laguna-card,
+    .model-card.role-supporter.solar-card,
+    .model-card.role-supporter.apodex-card,
+    .model-card.role-supporter.stepfun-card {
+      border-color: rgba(253,230,138,0.62) !important;
+      background: radial-gradient(120% 90% at 100% 0%, rgba(253,230,138,0.16), transparent 55%), rgba(15,23,42,0.75) !important;
+    }
+    .model-card.role-dev,
+    .model-card.role-dev.claude-card,
+    .model-card.role-dev.kimi-card,
+    .model-card.role-dev.qwen-card,
+    .model-card.role-dev.grok-card,
+    .model-card.role-dev.glm-card,
+    .model-card.role-dev.deepseek-card,
+    .model-card.role-dev.gpt-card,
+    .model-card.role-dev.gemini-card,
+    .model-card.role-dev.meta-card,
+    .model-card.role-dev.tencent-card,
+    .model-card.role-dev.ox-card,
+    .model-card.role-dev.minimax-card,
+    .model-card.role-dev.nvidia-card,
+    .model-card.role-dev.atria-card,
+    .model-card.role-dev.mimo-card,
+    .model-card.role-dev.longcat-card,
+    .model-card.role-dev.ling-card,
+    .model-card.role-dev.laguna-card,
+    .model-card.role-dev.solar-card,
+    .model-card.role-dev.apodex-card,
+    .model-card.role-dev.stepfun-card {
+      border-color: rgba(239,68,68,0.62) !important;
+      background: radial-gradient(120% 90% at 100% 0%, rgba(239,68,68,0.16), transparent 55%), rgba(15,23,42,0.75) !important;
+    }
+    .model-card.free.claude-card,
+    .model-card.free.kimi-card,
+    .model-card.free.qwen-card,
+    .model-card.free.grok-card,
+    .model-card.free.glm-card,
+    .model-card.free.deepseek-card,
+    .model-card.free.gpt-card,
+    .model-card.free.gemini-card,
+    .model-card.free.meta-card,
+    .model-card.free.tencent-card,
+    .model-card.free.ox-card,
+    .model-card.free.minimax-card,
+    .model-card.free.nvidia-card,
+    .model-card.free.atria-card,
+    .model-card.free.mimo-card,
+    .model-card.free.longcat-card,
+    .model-card.free.ling-card,
+    .model-card.free.laguna-card,
+    .model-card.free.solar-card,
+    .model-card.free.apodex-card,
+    .model-card.free.stepfun-card,
+    .model-card.free.inception-card {
+      border-color: rgba(110,231,183,0.62) !important;
+      background: radial-gradient(120% 90% at 100% 0%, rgba(110,231,183,0.16), transparent 55%), rgba(15,23,42,0.75) !important;
+    }
+    .model-card.role-pro::before { background: linear-gradient(90deg, transparent, rgba(147,197,253,0.9), transparent) !important; }
+    .model-card.role-ultra { border-color: rgba(103,232,249,0.62) !important; }
+    .model-card.role-ultra::before { background: linear-gradient(90deg, transparent, rgba(103,232,249,0.9), transparent) !important; }
+    .model-card.role-supporter { border-color: rgba(253,230,138,0.62) !important; }
+    .model-card.role-supporter::before { background: linear-gradient(90deg, transparent, rgba(253,230,138,0.9), transparent) !important; }
+    .model-card.role-dev { border-color: rgba(239,68,68,0.62) !important; }
+    .model-card.role-dev::before { background: linear-gradient(90deg, transparent, rgba(239,68,68,0.9), transparent) !important; }
+    .model-card.free { border-color: rgba(110,231,183,0.62) !important; }
+    .model-card.free::before { background: linear-gradient(90deg, transparent, rgba(110,231,183,0.9), transparent) !important; }
+    /* NEW drops: warm border + moving flame accent (beats the STARTER mint !important above) */
+    .model-card.free.card-fire { border-color: rgba(249,115,22,0.55) !important; }
+    .model-card.free.card-fire:hover { border-color: rgba(251,146,60,0.85) !important; }
+    .model-card.free.card-fire::before {
+      background: linear-gradient(90deg, rgba(251,191,36,0), rgba(251,191,36,0.9) 30%, rgba(239,68,68,0.95) 55%, rgba(249,115,22,0.9) 78%, rgba(251,191,36,0)) !important;
+    }
+    .model-card.role-pro .claude-badge,
+    .model-card.role-pro .kimi-badge,
+    .model-card.role-pro .qwen-badge,
+    .model-card.role-pro .grok-badge,
+    .model-card.role-pro .glm-badge,
+    .model-card.role-pro .deepseek-badge,
+    .model-card.role-pro .gpt-badge,
+    .model-card.role-pro .gemini-badge,
+    .model-card.role-pro .meta-badge,
+    .model-card.role-pro .tencent-badge,
+    .model-card.role-pro .ox-badge,
+    .model-card.role-pro .minimax-badge,
+    .model-card.role-pro .nvidia-badge,
+    .model-card.role-pro .atria-badge,
+    .model-card.role-pro .mimo-badge,
+    .model-card.role-pro .longcat-badge,
+    .model-card.role-pro .ling-badge,
+    .model-card.role-pro .laguna-badge,
+    .model-card.role-pro .solar-badge,
+    .model-card.role-pro .apodex-badge,
+    .model-card.role-pro .stepfun-badge,
+    .model-card.role-pro .inception-badge,
+    .model-card.role-ultra .claude-badge,
+    .model-card.role-ultra .kimi-badge,
+    .model-card.role-ultra .qwen-badge,
+    .model-card.role-ultra .grok-badge,
+    .model-card.role-ultra .glm-badge,
+    .model-card.role-ultra .deepseek-badge,
+    .model-card.role-ultra .gpt-badge,
+    .model-card.role-ultra .gemini-badge,
+    .model-card.role-ultra .meta-badge,
+    .model-card.role-ultra .tencent-badge,
+    .model-card.role-ultra .ox-badge,
+    .model-card.role-ultra .minimax-badge,
+    .model-card.role-ultra .nvidia-badge,
+    .model-card.role-ultra .atria-badge,
+    .model-card.role-ultra .mimo-badge,
+    .model-card.role-ultra .longcat-badge,
+    .model-card.role-ultra .ling-badge,
+    .model-card.role-ultra .laguna-badge,
+    .model-card.role-ultra .solar-badge,
+    .model-card.role-ultra .apodex-badge,
+    .model-card.role-ultra .stepfun-badge,
+    .model-card.role-ultra .inception-badge,
+    .model-card.role-supporter .claude-badge,
+    .model-card.role-supporter .kimi-badge,
+    .model-card.role-supporter .qwen-badge,
+    .model-card.role-supporter .grok-badge,
+    .model-card.role-supporter .glm-badge,
+    .model-card.role-supporter .deepseek-badge,
+    .model-card.role-supporter .gpt-badge,
+    .model-card.role-supporter .gemini-badge,
+    .model-card.role-supporter .meta-badge,
+    .model-card.role-supporter .tencent-badge,
+    .model-card.role-supporter .ox-badge,
+    .model-card.role-supporter .minimax-badge,
+    .model-card.role-supporter .nvidia-badge,
+    .model-card.role-supporter .atria-badge,
+    .model-card.role-supporter .mimo-badge,
+    .model-card.role-supporter .longcat-badge,
+    .model-card.role-supporter .ling-badge,
+    .model-card.role-supporter .laguna-badge,
+    .model-card.role-supporter .solar-badge,
+    .model-card.role-supporter .apodex-badge,
+    .model-card.role-supporter .stepfun-badge,
+    .model-card.role-supporter .inception-badge,
+    .model-card.role-dev .claude-badge,
+    .model-card.role-dev .kimi-badge,
+    .model-card.role-dev .qwen-badge,
+    .model-card.role-dev .grok-badge,
+    .model-card.role-dev .glm-badge,
+    .model-card.role-dev .deepseek-badge,
+    .model-card.role-dev .gpt-badge,
+    .model-card.role-dev .gemini-badge,
+    .model-card.role-dev .meta-badge,
+    .model-card.role-dev .tencent-badge,
+    .model-card.role-dev .ox-badge,
+    .model-card.role-dev .minimax-badge,
+    .model-card.role-dev .nvidia-badge,
+    .model-card.role-dev .atria-badge,
+    .model-card.role-dev .mimo-badge,
+    .model-card.role-dev .longcat-badge,
+    .model-card.role-dev .ling-badge,
+    .model-card.role-dev .laguna-badge,
+    .model-card.role-dev .solar-badge,
+    .model-card.role-dev .apodex-badge,
+    .model-card.role-dev .stepfun-badge,
+    .model-card.role-dev .inception-badge,
+    .model-card.free .claude-badge,
+    .model-card.free .kimi-badge,
+    .model-card.free .qwen-badge,
+    .model-card.free .grok-badge,
+    .model-card.free .glm-badge,
+    .model-card.free .deepseek-badge,
+    .model-card.free .gpt-badge,
+    .model-card.free .gemini-badge,
+    .model-card.free .meta-badge,
+    .model-card.free .tencent-badge,
+    .model-card.free .ox-badge,
+    .model-card.free .minimax-badge,
+    .model-card.free .nvidia-badge,
+    .model-card.free .atria-badge,
+    .model-card.free .mimo-badge,
+    .model-card.free .longcat-badge,
+    .model-card.free .ling-badge,
+    .model-card.free .laguna-badge,
+    .model-card.free .solar-badge,
+    .model-card.free .apodex-badge,
+    .model-card.free .stepfun-badge,
+    .model-card.free .inception-badge {
+      background: transparent !important;
+      border-color: currentColor !important;
+    }
+    .model-card.role-pro .claude-badge,
+    .model-card.role-pro .kimi-badge,
+    .model-card.role-pro .qwen-badge,
+    .model-card.role-pro .grok-badge,
+    .model-card.role-pro .glm-badge,
+    .model-card.role-pro .deepseek-badge,
+    .model-card.role-pro .gpt-badge,
+    .model-card.role-pro .gemini-badge,
+    .model-card.role-pro .meta-badge,
+    .model-card.role-pro .tencent-badge,
+    .model-card.role-pro .ox-badge,
+    .model-card.role-pro .minimax-badge,
+    .model-card.role-pro .nvidia-badge,
+    .model-card.role-pro .atria-badge,
+    .model-card.role-pro .mimo-badge,
+    .model-card.role-pro .longcat-badge,
+    .model-card.role-pro .ling-badge,
+    .model-card.role-pro .laguna-badge,
+    .model-card.role-pro .solar-badge,
+    .model-card.role-pro .apodex-badge,
+    .model-card.role-pro .stepfun-badge,
+    .model-card.role-pro .inception-badge { color: #93c5fd !important; }
+    .model-card.role-ultra .claude-badge,
+    .model-card.role-ultra .kimi-badge,
+    .model-card.role-ultra .qwen-badge,
+    .model-card.role-ultra .grok-badge,
+    .model-card.role-ultra .glm-badge,
+    .model-card.role-ultra .deepseek-badge,
+    .model-card.role-ultra .gpt-badge,
+    .model-card.role-ultra .gemini-badge,
+    .model-card.role-ultra .meta-badge,
+    .model-card.role-ultra .tencent-badge,
+    .model-card.role-ultra .ox-badge,
+    .model-card.role-ultra .minimax-badge,
+    .model-card.role-ultra .nvidia-badge,
+    .model-card.role-ultra .atria-badge,
+    .model-card.role-ultra .mimo-badge,
+    .model-card.role-ultra .longcat-badge,
+    .model-card.role-ultra .ling-badge,
+    .model-card.role-ultra .laguna-badge,
+    .model-card.role-ultra .solar-badge,
+    .model-card.role-ultra .apodex-badge,
+    .model-card.role-ultra .stepfun-badge,
+    .model-card.role-ultra .inception-badge { color: #67e8f9 !important; }
+    .model-card.role-supporter .claude-badge,
+    .model-card.role-supporter .kimi-badge,
+    .model-card.role-supporter .qwen-badge,
+    .model-card.role-supporter .grok-badge,
+    .model-card.role-supporter .glm-badge,
+    .model-card.role-supporter .deepseek-badge,
+    .model-card.role-supporter .gpt-badge,
+    .model-card.role-supporter .gemini-badge,
+    .model-card.role-supporter .meta-badge,
+    .model-card.role-supporter .tencent-badge,
+    .model-card.role-supporter .ox-badge,
+    .model-card.role-supporter .minimax-badge,
+    .model-card.role-supporter .nvidia-badge,
+    .model-card.role-supporter .atria-badge,
+    .model-card.role-supporter .mimo-badge,
+    .model-card.role-supporter .longcat-badge,
+    .model-card.role-supporter .ling-badge,
+    .model-card.role-supporter .laguna-badge,
+    .model-card.role-supporter .solar-badge,
+    .model-card.role-supporter .apodex-badge,
+    .model-card.role-supporter .stepfun-badge,
+    .model-card.role-supporter .inception-badge { color: #fde68a !important; }
+    .model-card.role-dev .claude-badge,
+    .model-card.role-dev .kimi-badge,
+    .model-card.role-dev .qwen-badge,
+    .model-card.role-dev .grok-badge,
+    .model-card.role-dev .glm-badge,
+    .model-card.role-dev .deepseek-badge,
+    .model-card.role-dev .gpt-badge,
+    .model-card.role-dev .gemini-badge,
+    .model-card.role-dev .meta-badge,
+    .model-card.role-dev .tencent-badge,
+    .model-card.role-dev .ox-badge,
+    .model-card.role-dev .minimax-badge,
+    .model-card.role-dev .nvidia-badge,
+    .model-card.role-dev .atria-badge,
+    .model-card.role-dev .mimo-badge,
+    .model-card.role-dev .longcat-badge,
+    .model-card.role-dev .ling-badge,
+    .model-card.role-dev .laguna-badge,
+    .model-card.role-dev .solar-badge,
+    .model-card.role-dev .apodex-badge,
+    .model-card.role-dev .stepfun-badge,
+    .model-card.role-dev .inception-badge { color: #fca5a5 !important; }
+    .model-card.free .claude-badge,
+    .model-card.free .kimi-badge,
+    .model-card.free .qwen-badge,
+    .model-card.free .grok-badge,
+    .model-card.free .glm-badge,
+    .model-card.free .deepseek-badge,
+    .model-card.free .gpt-badge,
+    .model-card.free .gemini-badge,
+    .model-card.free .meta-badge,
+    .model-card.free .tencent-badge,
+    .model-card.free .ox-badge,
+    .model-card.free .minimax-badge,
+    .model-card.free .nvidia-badge,
+    .model-card.free .atria-badge,
+    .model-card.free .mimo-badge,
+    .model-card.free .longcat-badge,
+    .model-card.free .ling-badge,
+    .model-card.free .laguna-badge,
+    .model-card.free .solar-badge,
+    .model-card.free .apodex-badge,
+    .model-card.free .stepfun-badge,
+    .model-card.free .inception-badge { color: #6ee7b7 !important; }
+    .model-card.role-pro .model-card-name,
+    .model-card.role-pro .model-card-id,
+    .model-card.role-pro.gemini-card .model-card-name,
+    .model-card.role-pro.gemini-card .model-card-id,
+    .model-card.privileged.role-pro .model-card-name,
+    .model-card.privileged.role-pro .model-card-id { color: #93c5fd !important; }
+    .model-card.role-ultra .model-card-name,
+    .model-card.role-ultra .model-card-id,
+    .model-card.role-ultra.gemini-card .model-card-name,
+    .model-card.role-ultra.gemini-card .model-card-id,
+    .model-card.privileged.role-ultra .model-card-name,
+    .model-card.privileged.role-ultra .model-card-id { color: #67e8f9 !important; }
+    .model-card.role-supporter .model-card-name,
+    .model-card.role-supporter .model-card-id,
+    .model-card.role-supporter.gemini-card .model-card-name,
+    .model-card.role-supporter.gemini-card .model-card-id,
+    .model-card.privileged.role-supporter .model-card-name,
+    .model-card.privileged.role-supporter .model-card-id { color: #fde68a !important; }
+    .model-card.role-dev .model-card-name,
+    .model-card.role-dev .model-card-id,
+    .model-card.role-dev.gemini-card .model-card-name,
+    .model-card.role-dev.gemini-card .model-card-id,
+    .model-card.privileged.role-dev .model-card-name,
+    .model-card.privileged.role-dev .model-card-id { color: #fca5a5 !important; }
+    .model-card.free .model-card-name,
+    .model-card.free .model-card-id,
+    .model-card.free.gemini-card .model-card-name,
+    .model-card.free.gemini-card .model-card-id { color: #6ee7b7 !important; }
+    .model-card.privileged.role-ultra.gemini-card,
+    .model-card.privileged.role-ultra.gemini-card:hover {
+      border-color: rgba(103,232,249,0.62) !important;
+      background: radial-gradient(120% 90% at 100% 0%, rgba(103,232,249,0.16), transparent 55%), rgba(15,23,42,0.75) !important;
+      box-shadow: none !important;
+    }
+    .model-card.privileged.role-pro.gemini-card,
+    .model-card.privileged.role-pro.gemini-card:hover {
+      border-color: rgba(147,197,253,0.62) !important;
+      background: radial-gradient(120% 90% at 100% 0%, rgba(147,197,253,0.16), transparent 55%), rgba(15,23,42,0.75) !important;
+      box-shadow: none !important;
+    }
+    .model-card.privileged.role-supporter.gemini-card,
+    .model-card.privileged.role-supporter.gemini-card:hover {
+      border-color: rgba(253,230,138,0.62) !important;
+      background: radial-gradient(120% 90% at 100% 0%, rgba(253,230,138,0.16), transparent 55%), rgba(15,23,42,0.75) !important;
+      box-shadow: none !important;
+    }
+    .model-card.privileged.role-dev.gemini-card,
+    .model-card.privileged.role-dev.gemini-card:hover {
+      border-color: rgba(239,68,68,0.62) !important;
+      background: radial-gradient(120% 90% at 100% 0%, rgba(239,68,68,0.16), transparent 55%), rgba(15,23,42,0.75) !important;
+      box-shadow: none !important;
+    }
+    .model-card.privileged.role-ultra.gemini-card .model-card-name,
+    .model-card.privileged.role-ultra.gemini-card .model-card-id { color: #67e8f9 !important; }
+    .model-card.privileged.role-pro.gemini-card .model-card-name,
+    .model-card.privileged.role-pro.gemini-card .model-card-id { color: #93c5fd !important; }
+    .model-card.privileged.role-supporter.gemini-card .model-card-name,
+    .model-card.privileged.role-supporter.gemini-card .model-card-id { color: #fde68a !important; }
+    .model-card.privileged.role-dev.gemini-card .model-card-name,
+    .model-card.privileged.role-dev.gemini-card .model-card-id { color: #fca5a5 !important; }
     .models-role-h {
       margin: 1.1rem 0 0.55rem;
       font-size: 0.72rem;
@@ -2680,11 +3454,55 @@
       text-transform: uppercase;
       color: #94a3b8;
     }
-    .models-role-h.dev { color: #d8b4fe; }
+    .models-role-h.dev { color: #ef4444; }
     .models-role-h.supporter { color: #fde68a; }
     .models-role-h.ultra { color: #67e8f9; }
-    .models-role-h.pro { color: #f9a8d4; }
-    .models-role-h.free { color: #7dd3fc; }
+    .models-role-h.pro { color: #93c5fd; }
+    .models-role-h.free { color: #6ee7b7; }
+    .models-role-h.other { color: #fbbf24; }
+    /* === PREMIUM (metered) card — pinned head of the Models page === */
+    .premium-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.24rem;
+      font-size: 0.55rem;
+      font-weight: 900;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      line-height: 1;
+      color: #2b1602;
+      background: linear-gradient(135deg, #fde68a 0%, #f59e0b 58%, #d97706 100%);
+      border-radius: 999px;
+      padding: 0.17rem 0.44rem 0.17rem 0.3rem;
+      box-shadow: 0 0 0 1px rgba(251,191,36,0.55);
+      white-space: nowrap;
+      flex: 0 0 auto;
+    }
+    .premium-chip svg { width: 9px; height: 9px; display: block; }
+    .model-card.premium-card {
+      border-color: rgba(245,158,11,0.55);
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(251,191,36,0.16), transparent 55%),
+        radial-gradient(100% 80% at 0% 100%, rgba(180,83,9,0.12), transparent 50%),
+        linear-gradient(180deg, rgba(33,23,10,0.82), rgba(15,23,42,0.62));
+      box-shadow: 0 0 0 1px rgba(245,158,11,0.12), 0 12px 30px rgba(0,0,0,0.18);
+      animation: none;
+    }
+    .model-card.premium-card:hover {
+      border-color: rgba(251,191,36,0.9);
+      box-shadow: 0 0 0 1px rgba(251,191,36,0.22), 0 14px 34px rgba(0,0,0,0.24);
+    }
+    .model-card.premium-card::before {
+      background: linear-gradient(90deg, transparent, rgba(251,191,36,0.9), transparent);
+      opacity: 1;
+    }
+    .model-card.premium-card .model-card-name { color: #fef3c7; }
+    .model-card.premium-card .model-card-id { color: #fbbf24; }
+    .model-card.premium-card .metered-badge {
+      color: #fde68a;
+      background: rgba(245,158,11,0.14);
+      border-color: rgba(245,158,11,0.4);
+    }
     @keyframes privilegedBadgePulse {
       0%, 100% { filter: brightness(1); transform: scale(1); box-shadow: 0 0 16px rgba(251,191,36,0.35); }
       50% { filter: brightness(1.1); transform: scale(1.03); box-shadow: 0 0 22px rgba(251,191,36,0.55); }
@@ -2821,7 +3639,7 @@
       .brand-mark { width: 34px; height: 34px; border-radius: 10px; font-size: 0.8rem; }
       nav {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(5, 1fr);
         padding: 0.35rem 0.4rem 0.5rem;
         gap: 0.25rem;
       }
@@ -2852,9 +3670,22 @@
         padding: 0.45rem 0.7rem;
         gap: 0.5rem;
       }
-      .tg-link { flex-shrink: 0; width: auto; min-width: 36px; height: 36px; padding: 0 0.6rem; }
-      .tg-link svg { width: 16px; height: 16px; }
-      .tg-link .tg-text { display: inline; font-size: 0.68rem; }
+      .header-socials {
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+      }
+      .social-btn, .tg-link {
+        flex-shrink: 0;
+        width: 34px;
+        min-width: 34px;
+        height: 34px;
+        padding: 0;
+        border-radius: 9px;
+      }
+      .social-btn svg, .tg-link svg { width: 15px; height: 15px; }
+      .social-btn.tg-link .tg-text, .tg-link .tg-text { display: none; }
       .nav-item {
         flex: none;
         min-width: 0;
@@ -2941,65 +3772,73 @@
     .sort-arrow { font-size: 0.65rem; margin-left: 2px; }
     .sort-arrow.inactive { opacity: 0.3; }
 
-    /* === PRICES === */
-    .prices-hero { display: none;
-          background:
-            radial-gradient(420px 180px at 100% 0%, rgba(124,58,237,0.22), transparent 60%),
-            radial-gradient(320px 160px at 0% 100%, rgba(37,99,235,0.16), transparent 55%),
-            linear-gradient(135deg, rgba(30,41,59,0.95) 0%, rgba(15,23,42,0.92) 55%, rgba(30,27,75,0.9) 100%);
-          border: 1px solid rgba(148,163,184,0.14);
-          border-radius: 18px;
-          padding: 1.5rem 1.75rem;
-          margin-bottom: 1.5rem;
-          position: relative;
-          overflow: hidden;
-          box-shadow: 0 12px 32px rgba(0,0,0,0.16);
-        }
-        .prices-hero::before {
-          content: '';
-          position: absolute;
-          top: -40px; right: -30px;
-          width: 160px; height: 160px;
-          background: radial-gradient(circle, rgba(168,85,247,0.25), transparent 70%);
-          pointer-events: none;
-        }
-        .prices-hero-title {
-          font-size: 1.2rem;
-          font-weight: 800;
-          letter-spacing: -0.02em;
-          color: #f8fafc;
-          margin-bottom: 0.4rem;
-        }
-        .prices-hero-sub {
-          font-size: 0.92rem;
-          color: #94a3b8;
-          line-height: 1.6;
-          max-width: 760px;
-        }
-        .prices-pills {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 0.5rem;
-          margin-top: 1.05rem;
-        }
-        .price-pill {
-          display: inline-flex;
-          align-items: center;
-          gap: 0.35rem;
-          padding: 0.4rem 0.8rem;
-          border-radius: 999px;
-          font-size: 0.78rem;
-          font-weight: 700;
-          border: 1px solid rgba(148,163,184,0.16);
-          background: rgba(15, 23, 42, 0.72);
-          color: #e2e8f0;
-        }
-        .price-pill.purple { border-color: rgba(124,58,237,0.45); color: #c4b5fd; background: rgba(124, 58, 237, 0.15); }
-        .price-pill.blue { border-color: rgba(37,99,235,0.45); color: #93c5fd; background: rgba(37, 99, 235, 0.15); }
-        .price-pill.green { border-color: rgba(22,163,74,0.45); color: #86efac; background: rgba(22, 163, 74, 0.15); }
-        .price-pill.yellow { border-color: rgba(202,138,4,0.45); color: #fde68a; background: rgba(202, 138, 4, 0.15); }
+    /* === PRICES HERO === */
+    .prices-hero {
+      background: linear-gradient(180deg, rgba(30,41,59,0.7) 0%, rgba(15,23,42,0.85) 100%);
+      border: 1px solid rgba(148,163,184,0.16);
+      border-radius: 18px;
+      padding: 1.5rem 1.65rem;
+      margin-bottom: 1.6rem;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+      position: relative;
+    }
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.28rem 0.7rem;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #93c5fd;
+      background: rgba(37,99,235,0.12);
+      border: 1px solid rgba(96,165,250,0.28);
+      margin-bottom: 0.75rem;
+      letter-spacing: 0.02em;
+    }
+    .hero-badge-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: #60a5fa;
+    }
+    .hero-title {
+      font-size: 1.5rem;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      line-height: 1.25;
+      color: #f8fafc;
+      margin-bottom: 0.45rem;
+    }
+    .hero-desc {
+      font-size: 0.88rem;
+      color: #94a3b8;
+      line-height: 1.55;
+      max-width: 720px;
+      margin-bottom: 1.1rem;
+    }
+    .hero-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 0.6rem;
+    }
+    .hero-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.32rem 0.68rem;
+      border-radius: 999px;
+      font-size: 0.74rem;
+      font-weight: 600;
+      color: #e2e8f0;
+      background: rgba(15,23,42,0.65);
+      border: 1px solid rgba(148,163,184,0.14);
+    }
+    .hero-chip svg {
+      flex-shrink: 0;
+    }
 
-        .pricing-grid {
+    .pricing-grid {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 1.1rem;
@@ -3378,9 +4217,14 @@
           .prices-note { max-width: 620px; }
         }
         @media (max-width: 768px) {
-          .prices-hero { padding: 1.15rem 1rem; border-radius: 16px; }
-          .prices-hero-title { font-size: 1.05rem; }
-          .prices-hero-sub { font-size: 0.82rem; line-height: 1.5; }
+          .prices-hero { padding: 1.15rem 1rem; border-radius: 16px; margin-bottom: 1.25rem; }
+          .hero-title { font-size: 1.22rem; }
+          .hero-desc { font-size: 0.82rem; line-height: 1.5; margin-bottom: 0.9rem; }
+          .hero-chips { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.45rem; }
+          .hero-chip { font-size: 0.68rem; padding: 0.35rem 0.5rem; justify-content: flex-start; white-space: nowrap; }
+          .nav-item.active::before { display: none; }
+          .tab-segmented { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap; }
+          .tab-seg-btn { font-size: 0.75rem; padding: 0.38rem 0.75rem; }
           .price-amount { font-size: 1.65rem; }
           .price-amount.contact { font-size: 1.3rem; }
           .pricing-grid { grid-template-columns: 1fr; max-width: none; gap: 0.95rem; }
@@ -3493,7 +4337,7 @@
     body.viewer-unlocked .viewer-bar { display: flex; }
     body.viewer-locked .gated-content { display: none !important; }
     body.viewer-unlocked .gated-content { display: block; }
-    body.viewer-locked #lb-loading, body.viewer-locked #live-loading, body.viewer-locked #usage-loading { display: none !important; }
+    body.viewer-locked #lb-loading, body.viewer-locked #live-loading { display: none !important; }
     </style>
 </head>
 <body>
@@ -3506,10 +4350,18 @@
             <img class="brand-word" src="/brand/wordmark.webp" width="124" height="20" alt="routers9">
           </a>
         </div>
-        <a href="https://t.me/routers9_id" target="_blank" rel="noopener" class="tg-link" title="Community">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
-          <span class="tg-text">Community</span>
-        </a>
+        <div class="header-socials" aria-label="Social media links">
+          <a href="https://t.me/routers9_id" target="_blank" rel="noopener" class="social-btn tg-link" title="Telegram Community">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+            <span class="tg-text">Community</span>
+          </a>
+          <a href="https://x.com/routers9id" target="_blank" rel="noopener" class="social-btn x-link" title="X (Twitter)" aria-label="X (Twitter)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M14.234 10.162 22.977 0h-2.072l-7.591 8.824L7.251 0H.258l9.168 13.343L.258 24H2.33l8.016-9.318L16.749 24h6.993zm-2.837 3.299-.929-1.329L3.076 1.56h3.182l5.965 8.532.929 1.329 7.754 11.09h-3.182z"/></svg>
+          </a>
+          <a href="https://www.threads.com/@routers9_id" target="_blank" rel="noopener" class="social-btn th-link" title="Threads" aria-label="Threads">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.263 11.097c-.03-3.486-1.92-5.586-5.111-5.586-2.13 0-3.922.963-4.863 2.499l2.062 1.438c.535-.843 1.272-1.543 2.628-1.543 1.528 0 2.318.85 2.544 2.431a15 15 0 0 0-2.236-.173c-4.125 0-6.068 1.867-6.068 4.336s1.943 3.99 4.804 3.99c3.139 0 5.013-2.115 5.781-4.735.798.361 1.348 1.204 1.348 2.47 0 3.387-3.907 5.232-7.22 5.232-4.885 0-8.077-3.207-8.077-8.424 0-6.392 4.223-10.487 9.9-10.487 3.808 0 5.69 1.671 6.97 3.914l2.108-1.475C21.44 2.078 18.331 0 13.663 0 6.227 0 1.168 5.277 1.168 12.934c0 7 4.953 11.066 10.856 11.066 4.878 0 9.809-2.846 9.809-7.716 0-2.545-1.46-4.231-3.569-5.187m-6.33 4.855c-1.077 0-2.026-.512-2.026-1.453 0-1.483 1.822-1.934 3.606-1.934.678 0 1.34.045 1.927.173-.422 1.927-1.671 3.215-3.508 3.214Z"/></svg>
+          </a>
+        </div>
         <p>AI MODEL UNLIMITED</p>
       </div>
       <nav>
@@ -3525,8 +4377,15 @@
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 16l4-8 4 4 6-10"/></svg>
           <span class="nav-label">Stats</span>
         </div>
+        <div class="nav-item" data-page="usage" onclick="switchPage('usage')">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          <span class="nav-label">Usage</span>
+        </div>
         <div class="members-menu" id="members-menu">
-          <button type="button" class="members-toggle" id="members-toggle" aria-haspopup="true" aria-expanded="false" onclick="toggleMembersMenu(event)">Members <span class="caret">▾</span></button>
+          <button type="button" class="members-toggle" id="members-toggle" aria-haspopup="true" aria-expanded="false" onclick="toggleMembersMenu(event)">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <span class="nav-label">Members <span class="caret">▾</span></span>
+          </button>
           <div class="members-dd" role="menu">
             <div class="nav-item" data-page="account" onclick="switchPage('account')">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -3539,10 +4398,6 @@
             <div class="nav-item" data-page="live" onclick="switchPage('live')">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.4"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.4"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg>
           <span class="nav-label">Live</span>
-        </div>
-            <div class="nav-item" data-page="usage" onclick="switchPage('usage')">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-          <span class="nav-label">Usage</span>
         </div>
           </div>
         </div>
@@ -3631,9 +4486,6 @@
             <p class="page-desc">Recent API requests and traffic trends</p>
           </div>
         </div>
-        <div class="gate" data-gate="usage"></div>
-        <div class="viewer-bar">Unlocked as <strong data-viewer-name>-</strong><button type="button" data-lock>Lock</button></div>
-        <div class="gated-content">
         <div class="chart-container">
           <div class="chart-header">
             <span class="chart-title">Requests & Tokens</span>
@@ -3656,7 +4508,6 @@
         </div>
         <div class="loading" id="usage-loading"><div class="skeleton-wrap"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div></div>
         <div id="usage-content" style="display:none"></div>
-        </div>
       </div>
 
       <!-- Stats 24h -->
@@ -3680,7 +4531,7 @@
         <div class="page-header">
           <div>
             <h2 class="page-title"><span class="grad">Available Models</span></h2>
-            <p class="page-desc">Click a card to copy model ID. Badge <strong style="color:#7dd3fc">Unlimited</strong> = does not deduct key token quota.</p>
+            <p class="page-desc">Click any card to copy model ID — 100% unlimited quota, rate-limit only.</p>
           </div>
         </div>
 
@@ -3688,7 +4539,7 @@
           <input
             id="models-search-input"
             type="search"
-            placeholder="Search by model name, provider (claude, grok, qwen, deepseek, nvidia...), or ID..."
+            placeholder="Search by model name, provider (claude, grok, qwen, deepseek, atria...), or ID..."
             autocomplete="off"
             spellcheck="false"
             oninput="filterPublicModels()"
@@ -3702,21 +4553,40 @@
 
       <!-- Prices -->
       <div class="page active" id="page-prices">
-        <div class="page-header">
-          <div>
-            <h2 class="page-title"><span class="grad">Prices</span></h2>
-            <p class="page-desc">Latest API package pricing</p>
+        <div class="prices-hero">
+          <div class="hero-badge">
+            <span class="hero-badge-dot"></span>
+            <span>OpenAI-Compatible API Gateway</span>
+          </div>
+          <div class="hero-title">One API Key for All Frontier AI</div>
+          <div class="hero-desc">Connect your apps and coding agents to frontier models from Google, Anthropic, DeepSeek, Qwen &amp; Meta through a unified, fast, and quota-efficient OpenAI-compatible endpoint.</div>
+          <div class="hero-chips">
+            <div class="hero-chip">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Drop-in OpenAI</span>
+            </div>
+            <div class="hero-chip">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Streaming &amp; Tools</span>
+            </div>
+            <div class="hero-chip">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>20+ Frontier Models</span>
+            </div>
+            <div class="hero-chip">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Cursor &amp; Tools Ready</span>
+            </div>
           </div>
         </div>
 
-        <p class="page-desc" style="margin-bottom:1.2rem">OpenAI-compatible API. Unlimited models on every plan.</p>
         <div class="pricing-grid">
           <div class="price-card">
             <div class="price-tier" style="color:#6ee7b7">Starter</div>
-            <div class="price-amount"><span class="price-cur">Rp</span>150.000<span class="price-alt"> · $10</span></div>
+            <div class="price-amount"><span class="price-cur">Rp</span>150.000</div>
             <div class="price-period">28-day key</div>
             <ul class="price-features">
-              <li><span class="price-check">✓</span><span>Unlimited models</span></li>
+              <li><span class="price-check">✓</span><span>STARTER models</span></li>
               <li><span class="price-check">✓</span><span>10 requests / minute</span></li>
             </ul>
             <a class="price-cta" href="https://t.me/routers9" target="_blank" rel="noopener">Order</a>
@@ -3724,7 +4594,7 @@
 
           <div class="price-card pro">
             <div class="price-tier" style="color:#93c5fd">Pro</div>
-            <div class="price-amount"><span class="price-cur">Rp</span>300.000<span class="price-alt"> · $20</span></div>
+            <div class="price-amount"><span class="price-cur">Rp</span>300.000</div>
             <div class="price-period">28-day key</div>
             <ul class="price-features">
               <li><span class="price-check">✓</span><span>All Pro models</span></li>
@@ -3736,7 +4606,7 @@
           <div class="price-card ultra">
             <div class="price-badge">Most Popular</div>
             <div class="price-tier" style="color:#67e8f9">Ultra</div>
-            <div class="price-amount"><span class="price-cur">Rp</span>500.000<span class="price-alt"> · $30</span></div>
+            <div class="price-amount"><span class="price-cur">Rp</span>500.000</div>
             <div class="price-period">28-day key</div>
             <ul class="price-features">
               <li><span class="price-check">✓</span><span>All Pro and Ultra models</span></li>
@@ -3748,7 +4618,7 @@
           <div class="price-card supporter">
             <div class="price-badge">Lifetime</div>
             <div class="price-tier" style="color:#fde68a">Supporter</div>
-            <div class="price-amount"><span class="price-cur">$</span>100</div>
+            <div class="price-amount"><span class="price-cur">Rp</span>2.000.000</div>
             <div class="price-period">Lifetime key · 2 slots left</div>
             <ul class="price-features">
               <li><span class="price-check">✓</span><span>All Pro, Ultra, and Supporter models</span></li>
@@ -3770,6 +4640,7 @@
               <button type="button" class="tab-seg-btn active" id="qs-curl-btn" onclick="switchQuickstartTab('curl')">cURL</button>
               <button type="button" class="tab-seg-btn" id="qs-python-btn" onclick="switchQuickstartTab('python')">Python</button>
               <button type="button" class="tab-seg-btn" id="qs-node-btn" onclick="switchQuickstartTab('node')">Node.js</button>
+              <button type="button" class="tab-seg-btn" id="qs-apps-btn" onclick="switchQuickstartTab('apps')">Cursor / Apps</button>
             </div>
           </div>
 
@@ -3815,13 +4686,37 @@ const response = await openai.chat.completions.create({
 });
 console.log(response.choices[0].message.content);</code></pre>
           </div>
+
+          <div id="qs-code-apps" class="quickstart-code" style="display:none">
+            <button type="button" class="quickstart-copy" onclick="copySnippetText(this, 'apps')">Copy</button>
+            <pre><code># 1. Setup in Cursor IDE / Cline / Roo Code / LibreChat / NextChat:
+Provider        : OpenAI Compatible
+Base URL        : https://routers9.web.id/v1
+API Key         : 9r-YOUR_API_KEY
+Default Model   : routers9/gemini-3.8-flash
+
+# 2. Setup via Terminal CLI / Claude Code / Aider (Env Vars):
+export OPENAI_BASE_URL="https://routers9.web.id/v1"
+export OPENAI_API_KEY="9r-YOUR_API_KEY"
+
+# Recommended Models:
+# - routers9/gemini-3.8-flash          (Fast, lightweight & unlimited)
+# - routers9/gemini-3.8-flash-high     (Reasoning & complex tasks)
+# - routers9/zai-org/glm-5.3-flash-vip (High performance coding)</code></pre>
+          </div>
         </div>
       </div>
 
       <footer class="pub-footer">
         <span>© 2026 Routers9</span>
         <span class="status-pill" id="status-pill">Operational</span>
-        <a href="https://t.me/routers9_id" target="_blank" rel="noopener">Community</a>
+        <div class="pub-footer-links">
+          <a href="https://t.me/routers9_id" target="_blank" rel="noopener">Telegram</a>
+          <span class="pub-footer-dot">·</span>
+          <a href="https://x.com/routers9id" target="_blank" rel="noopener">X</a>
+          <span class="pub-footer-dot">·</span>
+          <a href="https://www.threads.com/@routers9_id" target="_blank" rel="noopener">Threads</a>
+        </div>
       </footer>
     </main>
   </div>
@@ -3835,6 +4730,11 @@ console.log(response.choices[0].message.content);</code></pre>
 
     function switchPage(page) {
       currentPage = page;
+      try {
+        if (window.location.hash !== '#' + page) {
+          history.replaceState(null, '', '#' + page);
+        }
+      } catch (e) {}
       document.querySelectorAll('.nav-item[data-page]').forEach(el => el.classList.remove('active'));
       var tab = document.querySelector('.nav-item[data-page="' + page + '"]');
       if (tab) tab.classList.add('active');
@@ -3924,14 +4824,73 @@ console.log(response.choices[0].message.content);</code></pre>
       return new Date(ts).toLocaleString('en-US', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
     }
 
+    function formatFullDateTime(ts) {
+      if (!ts) return '';
+      const d = new Date(ts);
+      if (Number.isNaN(d.getTime())) return '';
+      return d.toLocaleString('id-ID', {
+        timeZone: 'Asia/Jakarta',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      }) + ' WIB';
+    }
+
+    function formatLastActive(ts) {
+      if (!ts) return '-';
+      const d = new Date(ts);
+      if (Number.isNaN(d.getTime())) return '-';
+
+      const dateFmt = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Jakarta',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+      const timeFmt = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Jakarta',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
+
+      const targetDateStr = dateFmt.format(d);
+      const todayDateStr = dateFmt.format(new Date());
+      const timeStr = timeFmt.format(d);
+
+      const [tY, tM, tD] = targetDateStr.split('-').map(Number);
+      const [nowY, nowM, nowD] = todayDateStr.split('-').map(Number);
+
+      const targetUtc = Date.UTC(tY, tM - 1, tD);
+      const todayUtc = Date.UTC(nowY, nowM - 1, nowD);
+      const diffDays = Math.round((todayUtc - targetUtc) / 86400000);
+
+      if (diffDays <= 0) {
+        return timeStr;
+      }
+      if (diffDays === 1) {
+        return 'Yesterday, ' + timeStr;
+      }
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const monthName = monthNames[tM - 1] || String(tM);
+      if (tY !== nowY) {
+        return tD + ' ' + monthName + ' ' + tY + ', ' + timeStr;
+      }
+      return tD + ' ' + monthName + ', ' + timeStr;
+    }
+
     function formatTokens(n) {
       return formatNum(Number(n) || 0);
     }
 
     var SUPPORTER_NAMES = {
-      'gilbert arias': 1, yuop: 1, 'attta rebelution': 1, 'aditya sandy': 1, dono: 1, dna: 1,
+      'attta rebelution': 1, 'aditya sandy': 1, dono: 1, dna: 1,
       'brother rogers': 1, 'ichigo kurosaki': 1, '#indopride': 1, blue: 1, mrians21: 1,
-      khd: 1, snapt: 1, bebascetak: 1, ramses: 1, binkhozin: 1, el: 1, tars: 1, 'en en': 1, 'company belanda': 1, petapagenit: 1, cucakrowo: 1, octav: 1, '0xfz': 1, nyguist: 1
+      khd: 1, snapt: 1, ramses: 1, binkhozin: 1, el: 1, 'company belanda': 1, petapagenit: 1, cucakrowo: 1, octav: 1, '0xfz': 1, nyguist: 1
     };
     function hasRole(accessRoles, role) {
       return Array.isArray(accessRoles) && accessRoles.indexOf(role) !== -1;
@@ -3941,6 +4900,7 @@ console.log(response.choices[0].message.content);</code></pre>
       return hasRole(accessRoles, 'dev');
     }
     function isSupporterName(name, accessRoles) {
+      if (isSuperAdminName(name, accessRoles)) return false;
       if (SUPPORTER_NAMES[(name || '').trim().toLowerCase()]) return true;
       return hasRole(accessRoles, 'supporter');
     }
@@ -3961,16 +4921,15 @@ console.log(response.choices[0].message.content);</code></pre>
       return '';
     }
 
-    // Crown-style SVG + DEV chip for Super Admin (developer special)
+    // Crown-style SVG + KING chip for Super Admin
     const SA_DEV_BADGE_HTML =
-      '<span class="sa-badge" title="Super Admin · Developer (unlimited)">' +
+      '<span class="sa-badge" title="Super Admin · KING (unlimited)">' +
       '<span class="sa-sparkle sa-sparkle-1"></span>' +
       '<span class="sa-sparkle sa-sparkle-2"></span>' +
       '<svg viewBox="0 0 24 24" fill="currentColor" fill-opacity="0.15" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-      '<path d="M2 4l3 0h2l3 3 3-3 3 3 3-3h2l3 0v2"/>' +
-      '<path d="M5 6l3 0v8a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6"/>' +
-      '<path d="M9 20h6"/>' +
-      '</svg><span class="sa-dev">DEV</span></span>';
+      '<path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/>' +
+      '<path d="M5 21h14"/>' +
+      '</svg><span class="sa-dev">KING</span></span>';
 
     // HeartHandshake-style SVG + SUPPORTER chip (donatur special)
     const SP_BADGE_HTML =
@@ -4008,8 +4967,10 @@ console.log(response.choices[0].message.content);</code></pre>
 
     function buyerNameHtml(name, quotaTokens, isUltra, accessRoles) {
       const display = escapeHtml(name || '-');
-      var html = '<span class="user-cell"><span>' + display + '</span>';
-      if (isSuperAdminName(name, accessRoles)) {
+      const isKing = isSuperAdminName(name, accessRoles);
+      const nameClass = isKing ? ' class="king-name"' : '';
+      var html = '<span class="user-cell"><span' + nameClass + '>' + display + '</span>';
+      if (isKing) {
         html += SA_DEV_BADGE_HTML;
       } else if (isSupporterName(name, accessRoles)) {
         html += SP_BADGE_HTML;
@@ -4024,7 +4985,13 @@ console.log(response.choices[0].message.content);</code></pre>
       return html + '</span>';
     }
 
-    var GATED = { account: 1, leaderboard: 1, live: 1, usage: 1 };
+    // Invalidate/clear any previously stored viewer session in localStorage
+    try {
+      localStorage.removeItem('routers9_viewer_key');
+      localStorage.removeItem('routers9_viewer_name');
+    } catch (e) {}
+
+    var GATED = { account: 1, leaderboard: 1, live: 1 };
     var viewerUnlocked = false;
     var viewerName = '';
     function gateHtml() {
@@ -4034,7 +5001,7 @@ console.log(response.choices[0].message.content);</code></pre>
         '<path d="M7 11V7a5 5 0 0 1 10 0v4"/>' +
         '<circle cx="12" cy="16.5" r="1.3" fill="currentColor" stroke="none"/></svg></div>' +
         '<h2>Members only</h2>' +
-        '<p>Enter your Routers9 API key to unlock My Account, Leaderboard, Live and Usage. Verified on the server. Access stays 7 days.</p>' +
+        '<p>Enter your Routers9 API key to unlock My Account, Leaderboard and Live. Verified on the server. Access stays 30 days.</p>' +
         '<form data-unlock-form="1">' +
         '<input type="password" name="api_key" placeholder="9r-" autocomplete="off" spellcheck="false" data-unlock-input>' +
         '<button class="btn" type="submit" data-unlock-btn>Unlock Panel</button>' +
@@ -4050,24 +5017,78 @@ console.log(response.choices[0].message.content);</code></pre>
       });
     }
     applyViewerState();
+
+    function formatSessionExpiry(iso) {
+      if (!iso) {
+        var savedExp = '';
+        try { savedExp = localStorage.getItem('routers9_viewer_expires_at') || ''; } catch (e) {}
+        iso = savedExp;
+      }
+      if (!iso) return { remain: '30d left', full: '-' };
+      var target = new Date(iso).getTime();
+      var now = Date.now();
+      var diff = target - now;
+      if (diff <= 0) return { remain: 'Expired', full: 'Session expired', expired: true };
+      var days = Math.floor(diff / (24 * 3600 * 1000));
+      var hours = Math.floor((diff % (24 * 3600 * 1000)) / (3600 * 1000));
+      var mins = Math.floor((diff % (3600 * 1000)) / (60 * 1000));
+      var remain = '';
+      if (days > 0) remain = days + 'd ' + hours + 'h left';
+      else if (hours > 0) remain = hours + 'h ' + mins + 'm left';
+      else remain = mins + 'm left';
+      var full = new Date(iso).toLocaleString('en-US', {
+        timeZone: 'Asia/Jakarta',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }) + ' WIB';
+      return { remain: remain, full: full, expired: false };
+    }
+
     async function refreshViewerStatus() {
       try {
         var res = await fetch('/public/unlock/status', { cache: 'no-store' });
-        var data = await res.json();
-        viewerUnlocked = !!(data && data.unlocked);
-        viewerName = (data && data.name) || '';
+        var data = await res.json().catch(function () { return {}; });
+        if (data && data.unlocked) {
+          viewerUnlocked = true;
+          viewerName = data.name || '';
+          if (data.session_expires_at) {
+            try { localStorage.setItem('routers9_viewer_expires_at', data.session_expires_at); } catch (e) {}
+          }
+        } else {
+          viewerUnlocked = false;
+          viewerName = '';
+          try { localStorage.removeItem('routers9_viewer_expires_at'); } catch (e) {}
+        }
       } catch (e) {
         viewerUnlocked = false;
         viewerName = '';
       }
       applyViewerState();
+      if (GATED[currentPage] && viewerUnlocked) {
+        if (currentPage === 'account') {
+          var root = document.getElementById('account-root');
+          if (root && (!root.innerHTML || root.innerHTML.trim() === '')) loadAccount();
+        } else if (currentPage === 'leaderboard') {
+          var lbC = document.getElementById('lb-content');
+          if (lbC && (!lbC.innerHTML || lbC.innerHTML.trim() === '')) loadLeaderboard();
+        } else if (currentPage === 'live') {
+          var liveC = document.getElementById('live-content');
+          if (liveC && (!liveC.innerHTML || liveC.innerHTML.trim() === '')) loadLive();
+        }
+      }
       return viewerUnlocked;
     }
+
     async function fetchAPI(path) {
-      const res = await fetch(path, { cache: 'no-store' });
+      var res = await fetch(path, { cache: 'no-store' });
       if (res.status === 401) {
         viewerUnlocked = false;
         viewerName = '';
+        try { localStorage.removeItem('routers9_viewer_expires_at'); } catch (e) {}
         applyViewerState();
         throw new Error('unlock_required');
       }
@@ -4077,6 +5098,25 @@ console.log(response.choices[0].message.content);</code></pre>
 
     // Brand detection: probe BOTH model id and display name
     // (e.g. "Kimi K3" display exists but id is routers9/qd/kmodel_latest — no "kimi" in id)
+    // Latest drops: flame accent + NEW chip on the card.
+    // Badge NEW dimatikan total (2026-11-12). Uncomment id di bawah untuk menyalakan lagi.
+    var NEW_DROP_IDS = {
+      // 'routers9/glm-5.3-flash': 1,
+      // 'routers9/deepseek-v4.1-flash-1017-new': 1,
+      // 'routers9/mimo-2.6-flash': 1,
+      // 'routers9/mimo-2.6-pro': 1,
+      // 'routers9/qwen-3.8-flash': 1,
+      // 'routers9/minimax-m3.1-flash': 1,
+      // 'routers9/gpt-6-luna': 1,
+      // 'routers9/stealth/crouton-alpha': 1,
+      // 'routers9/glyph-cluster': 1,
+      // 'routers9/deepai-cyber': 1
+    };
+    function isNewDrop(id) {
+      return Object.prototype.hasOwnProperty.call(NEW_DROP_IDS, String(id == null ? '' : id).toLowerCase());
+    }
+    var NEW_CHIP_HTML = '<span class="new-chip" title="Baru ditambahkan"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.6 2c.4 3.3-2.6 4.5-2.6 7 0 1.4.9 2.3 2 2.3 1.2 0 2-1 2-2.4 0-.5-.1-1-.3-1.5 2 1.5 3.3 3.7 3.3 6.1 0 3.5-2.9 6.5-6.5 6.5S4 17 4 13.5C4 8.9 8.4 6.4 12.6 2z"/></svg>NEW</span>';
+    var PREMIUM_CHIP_HTML = '<span class="premium-chip" title="Premium model — uses token quota"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 16 3 5l5.5 4L12 3l3.5 6L21 5l-2 11H5zm0 2h14v2H5v-2z"/></svg>PREMIUM</span>';
     function modelBrand(id, name) {
       const probe = (String(id == null ? '' : id) + ' ' + String(name == null ? '' : name)).toLowerCase();
       if (probe.indexOf('claude') !== -1) return 'claude';
@@ -4088,10 +5128,19 @@ console.log(response.choices[0].message.content);</code></pre>
       if (probe.indexOf('gpt') !== -1) return 'gpt';
       if (probe.indexOf('gemini') !== -1) return 'gemini';
       if (probe.indexOf('muse') !== -1 || probe.indexOf('meta') !== -1) return 'meta';
-      if (probe.indexOf('ox-alpha') !== -1 || probe.indexOf('stealth') !== -1) return 'ox';
+      if (probe.indexOf('ox-alpha') !== -1 || probe.indexOf('stealth') !== -1 || probe.indexOf('fledge') !== -1 || probe.indexOf('space-bunny') !== -1 || probe.indexOf('space bunny') !== -1 || probe.indexOf('exo') !== -1) return 'ox';
       if (probe.indexOf('tencent') !== -1 || probe.indexOf('hunyuan') !== -1 || probe.indexOf('hy3') !== -1 || probe.indexOf('hy4') !== -1) return 'tencent';
       if (probe.indexOf('minimax') !== -1) return 'minimax';
       if (probe.indexOf('nvidia') !== -1 || probe.indexOf('nemotron') !== -1) return 'nvidia';
+      if (probe.indexOf('atria') !== -1) return 'atria';
+      if (probe.indexOf('mimo') !== -1) return 'mimo';
+      if (probe.indexOf('longcat') !== -1) return 'longcat';
+      if (probe.indexOf('ling') !== -1) return 'ling';
+      if (probe.indexOf('apodex') !== -1) return 'apodex';
+      if (probe.indexOf('stepfun') !== -1 || probe.indexOf('step-') !== -1 || probe.indexOf('step ') !== -1) return 'stepfun';
+      if (probe.indexOf('laguna') !== -1 || probe.indexOf('poolside') !== -1) return 'laguna';
+      if (probe.indexOf('mercury') !== -1 || probe.indexOf('inception') !== -1) return 'inception';
+      if (probe.indexOf('solar') !== -1) return 'solar';
       return '';
     }
     function isClaudeModel(id, name) { return modelBrand(id, name) === 'claude'; }
@@ -4104,6 +5153,7 @@ console.log(response.choices[0].message.content);</code></pre>
 
     // Maps model_id → display_name (populated from /public/models on initial load)
     let modelNameMap = {};
+    let modelMetaMap = {};
     let modelNameMapPromise = null;
     async function loadModelNameMap() {
       if (modelNameMapPromise) return modelNameMapPromise;
@@ -4112,18 +5162,42 @@ console.log(response.choices[0].message.content);</code></pre>
           const data = await fetchAPI('/public/models');
           const models = (data && data.models) || [];
           const map = {};
-          models.forEach(function(m) { if (m && m.id && m.display_name) map[m.id] = m.display_name; });
+          const meta = {};
+          models.forEach(function(m) {
+            if (!m || !m.id) return;
+            if (m.display_name) map[m.id] = m.display_name;
+            meta[m.id] = { quota_exempt: !!m.quota_exempt, access_roles: m.access_roles || [] };
+          });
           modelNameMap = map;
+          modelMetaMap = meta;
         } catch (e) { /* fallback to raw ids */ }
       })();
       return modelNameMapPromise;
     }
 
+    function modelTier(id) {
+      var row = modelMetaMap[id];
+      if (!row) return '';
+      var roles = row.access_roles || [];
+      var pickOrder = ['pro', 'ultra', 'supporter', 'dev'];
+      for (var i = 0; i < pickOrder.length; i++) {
+        if (roles.indexOf(pickOrder[i]) !== -1) {
+          return pickOrder[i] === 'dev' ? 'king' : pickOrder[i];
+        }
+      }
+      if (row.quota_exempt) return 'starter';
+      return 'premium';
+    }
+
     function modelTagHtml(id) {
       const display = escapeHtml(id ? (modelNameMap[id] || id) : '-');
       const brand = modelBrand(id, id ? (modelNameMap[id] || id) : '');
-      var cls = brand ? ('model-tag ' + brand) : 'model-tag';
-      return '<span class="' + cls + '">' + display + '</span>';
+      const tier = modelTier(id);
+      var cls = 'model-tag' + (brand ? ' ' + brand : '') + (tier ? ' tier-' + tier : '');
+      var crown = tier === 'premium'
+        ? '<svg class="premium-crown" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 16 3 5l5.5 4L12 3l3.5 6L21 5l-2 11H5zm0 2h14v2H5v-2z"/></svg>'
+        : '';
+      return '<span class="' + cls + '">' + crown + display + '</span>';
     }
 
     function timeAgo(ts) {
@@ -4195,11 +5269,11 @@ console.log(response.choices[0].message.content);</code></pre>
 
 
     function planLabel(key) {
-      var roles = key.access_roles || [];
-      if (roles.indexOf('dev') !== -1) return 'Super Admin';
-      if (roles.indexOf('supporter') !== -1) return 'Supporter';
-      if (key.is_ultra === true || key.is_ultra === 't') return 'Ultra';
-      if (roles.indexOf('pro') !== -1) return 'Pro';
+      if (isSuperAdminName(key.buyer_name, key.access_roles)) return 'KING';
+      if (isSupporterName(key.buyer_name, key.access_roles)) return 'Supporter';
+      if (isHelperName(key.buyer_name, key.access_roles)) return 'Helper';
+      if (key.is_ultra === true || key.is_ultra === 't' || isUltraRow(key.buyer_name, key.quota_tokens, key.is_ultra, key.access_roles)) return 'Ultra';
+      if (isProRow(key.access_roles)) return 'Pro';
       return key.package_id ? String(key.package_id) : 'Starter';
     }
     async function loadAccount() {
@@ -4228,8 +5302,9 @@ console.log(response.choices[0].message.content);</code></pre>
 
         // Badge & Identity
         var userName = key.buyer_name || 'Member';
+        var isKingUser = isSuperAdminName(userName, key.access_roles);
         var userBadgeHtml = '';
-        if (isSuperAdminName(userName, key.access_roles)) userBadgeHtml = SA_DEV_BADGE_HTML;
+        if (isKingUser) userBadgeHtml = SA_DEV_BADGE_HTML;
         else if (isSupporterName(userName, key.access_roles)) userBadgeHtml = SP_BADGE_HTML;
         else if (isHelperName(userName, key.access_roles)) userBadgeHtml = HP_BADGE_HTML;
         else if (isUltraRow(userName, quota, key.is_ultra, key.access_roles)) userBadgeHtml = UL_BADGE_HTML;
@@ -4241,6 +5316,15 @@ console.log(response.choices[0].message.content);</code></pre>
         var statusBadgeHtml = isPaused
           ? '<span class="account-status-badge paused"><span class="account-status-dot"></span>Paused</span>'
           : '<span class="account-status-badge"><span class="account-status-dot"></span>Active</span>';
+
+        var sess = data.session || {};
+        var sessInfo = formatSessionExpiry(sess.expires_at);
+        if (sessInfo.expired) {
+          lockViewer();
+          return;
+        }
+        var sessionBadgeHtml = '<span class="account-session-badge" title="Auto log out: ' + escapeHtml(sessInfo.full) + '">' +
+          '<span class="account-session-dot"></span>Session: ' + escapeHtml(sessInfo.remain) + '</span>';
 
         var rows = models.slice(0, 20).map(function (m) {
           return '<tr><td>' + escapeHtml(modelNameMap[m.model_id || m.id] || m.model_id || m.id || '-') + '</td><td>' + fullNum(m.requests) + '</td><td>' + formatTokens(m.tokens) + '</td><td>' + timeAgo(m.last_request_at) + '</td></tr>';
@@ -4267,7 +5351,7 @@ console.log(response.choices[0].message.content);</code></pre>
               '</div>' +
               '<div>' +
                 '<div class="account-user-name">' +
-                  '<span>' + escapeHtml(userName) + '</span>' +
+                  '<span' + (isKingUser ? ' class="king-name"' : '') + '>' + escapeHtml(userName) + '</span>' +
                   userBadgeHtml +
                 '</div>' +
                 '<div class="account-user-meta">' +
@@ -4276,7 +5360,7 @@ console.log(response.choices[0].message.content);</code></pre>
                     '<span>' + keyPrefix + '</span>' +
                   '</span>' +
                   '<span>•</span>' +
-                  '<span>' + planName + ' Plan</span>' +
+                  '<span' + (isKingUser ? ' style="color:#ef4444;font-weight:700;"' : '') + '>' + planName + ' Plan</span>' +
                   '<span>•</span>' +
                   '<span>' + escapeHtml(rpm) + '</span>' +
                 '</div>' +
@@ -4284,6 +5368,7 @@ console.log(response.choices[0].message.content);</code></pre>
             '</div>' +
             '<div class="account-hero-right">' +
               statusBadgeHtml +
+              sessionBadgeHtml +
               '<button type="button" class="account-lock-btn" onclick="lockViewer()">' +
                 '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>' +
                 '<span>Lock Session</span>' +
@@ -4309,9 +5394,10 @@ console.log(response.choices[0].message.content);</code></pre>
                   (key.daily_reset ? 'Daily quota resets every midnight' : 'Total package balance') +
                 '</div>' +
               '</div>' +
-              '<div class="bento-sub-stat">' +
+              '<div class="bento-sub-stat cols-3">' +
                 '<div><div class="bento-sub-item-val">' + escapeHtml(String(expiry)) + '</div><div class="bento-sub-item-lbl">Key Validity</div></div>' +
                 '<div><div class="bento-sub-item-val">' + escapeHtml(rpm) + '</div><div class="bento-sub-item-lbl">Speed Limit</div></div>' +
+                '<div><div class="bento-sub-item-val" style="color:#7dd3fc" title="' + escapeHtml(sessInfo.full) + '">' + escapeHtml(sessInfo.remain) + '</div><div class="bento-sub-item-lbl" title="' + escapeHtml(sessInfo.full) + '">Session Expiry</div></div>' +
               '</div>' +
             '</div>' +
 
@@ -4559,7 +5645,7 @@ console.log(response.choices[0].message.content);</code></pre>
         const daysClass = row.remaining_days !== null && row.remaining_days !== undefined
           ? (row.remaining_days <= 3 ? 'badge-red' : row.remaining_days <= 7 ? 'badge-yellow' : 'badge-green')
           : 'badge-blue';
-        html += '<tr' + topRowClass + '><td class="rank' + rankClass + '">' + rankLabel + '</td><td>' + buyerNameHtml(row.buyer_name, row.quota_tokens, row.is_ultra, row.access_roles) + '</td><td>' + formatNum(row.total_requests) + '</td><td>' + formatQuotaCell(row) + '</td><td><span class="badge ' + daysClass + '">' + daysText + '</span></td><td>' + formatTime(row.last_request_at) + '</td></tr>';
+        html += '<tr' + topRowClass + '><td class="rank' + rankClass + '">' + rankLabel + '</td><td>' + buyerNameHtml(row.buyer_name, row.quota_tokens, row.is_ultra, row.access_roles) + '</td><td>' + formatNum(row.total_requests) + '</td><td>' + formatQuotaCell(row) + '</td><td><span class="badge ' + daysClass + '">' + daysText + '</span></td><td title="' + formatFullDateTime(row.last_request_at) + '">' + formatLastActive(row.last_request_at) + '</td></tr>';
       });
       html += '</tbody></table></div>';
       if (inactiveRows.length > 0) {
@@ -4663,8 +5749,10 @@ console.log(response.choices[0].message.content);</code></pre>
 
     // Chart
     async function loadChart(range) {
-      document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
-      event?.target?.classList.add('active');
+      document.querySelectorAll('.range-btn').forEach(b => {
+        if (b.textContent.trim() === range) b.classList.add('active');
+        else b.classList.remove('active');
+      });
 
       try {
         const data = await fetchAPI('/public/usage/chart?range=' + range);
@@ -4868,12 +5956,45 @@ console.log(response.choices[0].message.content);</code></pre>
         (buckets[g] || buckets.other).push(m);
       });
 
+      function starterSortPriority(m) {
+        var id = (m.id || '').toLowerCase();
+        var name = (m.display_name || '').toLowerCase();
+        // Pinned head of the STARTER list.
+        if (id === 'routers9/stealth/crouton-alpha' || name.indexOf('crouton') !== -1) return -9;
+        if (id.indexOf('deepseek') !== -1 || name.indexOf('deepseek') !== -1) return -8;
+        if (id.indexOf('gemini') !== -1 || name.indexOf('gemini') !== -1) return -7;
+        if (id.indexOf('mercury') !== -1 || name.indexOf('mercury') !== -1) return -6;
+        if (id === 'routers9/grok-4.7-xhigh') return -5;
+        if (id === 'routers9/reflection/beam') return -4;
+        if (id === 'routers9/longcat-2.5-preview') return -3;
+        if (id === 'routers9/ornith/ornith-1.5-122b') return -1;
+        if (id === 'routers9/stepfun/step-5-preview') return 0;
+        if (id.indexOf('muse') !== -1 || name.indexOf('muse') !== -1) return 1;
+        if (id.indexOf('space-bunny') !== -1 || id.indexOf('space_bunny') !== -1 || name.indexOf('space bunny') !== -1 || id.indexOf('stealth') !== -1 || id.indexOf('pixel-canary') !== -1) return 3;
+        if (id.indexOf('mimo') !== -1 || name.indexOf('mimo') !== -1) return 4;
+        if (id.indexOf('atria') !== -1 || name.indexOf('atria') !== -1) return 5;
+        return 100;
+      }
+
+      if (buckets.free && buckets.free.length) {
+        buckets.free.sort(function(a, b) {
+          // Kartu ber-logo NEW selalu di depan, lalu urutan pin yang sudah ada.
+          var na = isNewDrop(a.id) ? 1 : 0;
+          var nb = isNewDrop(b.id) ? 1 : 0;
+          if (na !== nb) return nb - na;
+          var pa = starterSortPriority(a);
+          var pb = starterSortPriority(b);
+          if (pa !== pb) return pa - pb;
+          return (a.display_name || a.id).localeCompare(b.display_name || b.id);
+        });
+      }
+
       var roleMeta = {
-        dev: { label: 'Dev', cls: 'dev' },
+        dev: { label: 'KING', cls: 'dev' },
         supporter: { label: 'Supporter', cls: 'supporter' },
         ultra: { label: 'Ultra', cls: 'ultra' },
         pro: { label: 'Pro', cls: 'pro' },
-        free: { label: 'Unlimited', cls: 'free' },
+        free: { label: 'STARTER', cls: 'free' },
         other: { label: 'Metered', cls: 'other' }
       };
 
@@ -4891,7 +6012,16 @@ console.log(response.choices[0].message.content);</code></pre>
           tencent: cardBrand === 'tencent' ? '<span class="tencent-badge" title="Tencent model">Tencent</span>' : '',
           ox: cardBrand === 'ox' ? '<span class="ox-badge" title="Stealth model">Stealth</span>' : '',
           minimax: cardBrand === 'minimax' ? '<span class="minimax-badge" title="MiniMax model">MiniMax</span>' : '',
-          nvidia: cardBrand === 'nvidia' ? '<span class="nvidia-badge" title="NVIDIA model">NVIDIA</span>' : ''
+          nvidia: cardBrand === 'nvidia' ? '<span class="nvidia-badge" title="NVIDIA model">NVIDIA</span>' : '',
+          atria: cardBrand === 'atria' ? '<span class="atria-badge" title="Atria model">ATRIA</span>' : '',
+          mimo: cardBrand === 'mimo' ? '<span class="mimo-badge" title="MiMo model">MiMo</span>' : '',
+          longcat: cardBrand === 'longcat' ? '<span class="longcat-badge" title="Meituan model">Meituan</span>' : '',
+          ling: cardBrand === 'ling' ? '<span class="ling-badge" title="InclusionAI model">InclusionAI</span>' : '',
+          laguna: cardBrand === 'laguna' ? '<span class="laguna-badge" title="Poolside model">Poolside</span>' : '',
+          solar: cardBrand === 'solar' ? '<span class="solar-badge" title="Upstage model">Upstage</span>' : '',
+          apodex: cardBrand === 'apodex' ? '<span class="apodex-badge" title="Apodex model">Apodex</span>' : '',
+          stepfun: cardBrand === 'stepfun' ? '<span class="stepfun-badge" title="StepFun model">StepFun</span>' : '',
+          inception: cardBrand === 'inception' ? '<span class="inception-badge" title="Inception Labs model">Inception</span>' : ''
         };
       }
 
@@ -4899,33 +6029,34 @@ console.log(response.choices[0].message.content);</code></pre>
         var name = m.display_name || m.id;
         var isPriv = group === 'dev' || group === 'supporter' || group === 'ultra' || group === 'pro';
         var isFree = group === 'free';
+        var isPremium = group === 'other';
         var badge;
         if (isPriv) {
           var extra = (Array.isArray(m.access_roles) && m.access_roles.length > 1) ? '+' : '';
-          badge = '<span class="privileged-badge role-' + group + '" title="Role: ' + group + '">' + roleMeta[group].label + extra + '</span>';
+          badge = '<span class="privileged-badge role-' + group + '" title="Role: ' + (roleMeta[group] ? roleMeta[group].label : group) + '">' + roleMeta[group].label + extra + '</span>';
         } else if (isFree) {
-          badge = '<span class="free-badge" title="Does not deduct key token quota"><span aria-hidden="true">∞</span>Unlimited</span>';
+          badge = '<span class="free-badge" title="Included in Starter tier"><span aria-hidden="true">∞</span>STARTER</span>';
         } else {
           badge = '<span class="metered-badge">Metered</span>';
         }
         var cardBrand = modelBrand(m.id, name);
+        var isNewDropCard = isNewDrop(m.id);
         var b = brandBits(cardBrand);
-        var extraBrand = cardBrand === 'claude' ? ' claude-card' : cardBrand === 'kimi' ? ' kimi-card' : cardBrand === 'qwen' ? ' qwen-card' : cardBrand === 'grok' ? ' grok-card' : cardBrand === 'glm' ? ' glm-card' : cardBrand === 'deepseek' ? ' deepseek-card' : cardBrand === 'gpt' ? ' gpt-card' : cardBrand === 'gemini' ? ' gemini-card' : cardBrand === 'meta' ? ' meta-card' : cardBrand === 'tencent' ? ' tencent-card' : cardBrand === 'ox' ? ' ox-card' : cardBrand === 'minimax' ? ' minimax-card' : cardBrand === 'nvidia' ? ' nvidia-card' : '';
-        var cardClass = (isPriv ? ' privileged role-' + group : (isFree ? ' free' : '')) + extraBrand;
-        var meta = isPriv
+        var extraBrand = cardBrand === 'claude' ? ' claude-card' : cardBrand === 'kimi' ? ' kimi-card' : cardBrand === 'qwen' ? ' qwen-card' : cardBrand === 'grok' ? ' grok-card' : cardBrand === 'glm' ? ' glm-card' : cardBrand === 'deepseek' ? ' deepseek-card' : cardBrand === 'gpt' ? ' gpt-card' : cardBrand === 'gemini' ? ' gemini-card' : cardBrand === 'meta' ? ' meta-card' : cardBrand === 'tencent' ? ' tencent-card' : cardBrand === 'ox' ? ' ox-card' : cardBrand === 'minimax' ? ' minimax-card' : cardBrand === 'nvidia' ? ' nvidia-card' : cardBrand === 'atria' ? ' atria-card' : cardBrand === 'mimo' ? ' mimo-card' : cardBrand === 'longcat' ? ' longcat-card' : cardBrand === 'ling' ? ' ling-card' : cardBrand === 'laguna' ? ' laguna-card' : cardBrand === 'solar' ? ' solar-card' : cardBrand === 'apodex' ? ' apodex-card' : cardBrand === 'stepfun' ? ' stepfun-card' : cardBrand === 'inception' ? ' inception-card' : '';
+        var cardClass = (isPriv ? ' privileged role-' + group : (isFree ? ' free' : '')) + extraBrand + (isPremium ? ' premium-card' : '') + (isNewDropCard ? ' card-fire' : '');
+        var meta = isPriv || isFree
           ? ''
-          : (isFree
-            ? '<span style="font-size:0.72rem;color:#7dd3fc">Free tokens · RPM still applies</span>'
-            : '<span style="font-size:0.72rem;color:#94a3b8">Uses key token quota</span>');
+          : '<span style="font-size:0.72rem;color:#94a3b8">Uses key token quota</span>';
         return '<div class="model-card' + cardClass + '" data-id="' + escapeHtml(m.id) + '" role="button" tabindex="0" title="Copy ' + escapeHtml(m.id) + '">' +
           '<span class="model-copied-pill" aria-hidden="true"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Copied!</span>' +
-          '<div class="model-card-top"><div class="model-card-name">' + escapeHtml(name) + '</div>' + b.claude + b.kimi + b.qwen + b.grok + b.glm + b.deepseek + b.gpt + b.gemini + b.meta + b.tencent + b.ox + b.minimax + b.nvidia + '</div>' +
+          '<div class="model-card-top"><div class="model-card-name">' + escapeHtml(name) + (isPremium ? PREMIUM_CHIP_HTML : '') + (isNewDropCard ? NEW_CHIP_HTML : '') + '</div>' + b.claude + b.kimi + b.qwen + b.grok + b.glm + b.deepseek + b.gpt + b.gemini + b.meta + b.tencent + b.ox + b.minimax + b.nvidia + b.atria + b.mimo + b.longcat + b.ling + b.laguna + b.solar + b.apodex + b.stepfun + b.inception + '</div>' +
           '<div class="model-card-id">' + escapeHtml(m.id) + '</div>' +
-          '<div class="model-card-meta">' + badge + meta + '</div></div>';
+          '<div class="model-card-meta">' + badge + meta + '</div>' +
+          (isNewDropCard ? '<span class="fire-fx" aria-hidden="true"><i class="fire-line"></i></span>' : '') + '</div>';
       }
 
       var html = '';
-      var sectionOrder = ['dev', 'supporter', 'ultra', 'pro', 'free', 'other'];
+      var sectionOrder = ['other', 'dev', 'supporter', 'ultra', 'pro', 'free'];
       sectionOrder.forEach(function(g) {
         var list = buckets[g] || [];
         if (!list.length) return;
@@ -5007,19 +6138,13 @@ console.log(response.choices[0].message.content);</code></pre>
     }
 
     function switchQuickstartTab(lang) {
-      var curlBtn = document.getElementById('qs-curl-btn');
-      var pyBtn = document.getElementById('qs-python-btn');
-      var nodeBtn = document.getElementById('qs-node-btn');
-      var curlCode = document.getElementById('qs-code-curl');
-      var pyCode = document.getElementById('qs-code-python');
-      var nodeCode = document.getElementById('qs-code-node');
-      if (!curlBtn || !pyBtn || !nodeBtn || !curlCode || !pyCode || !nodeCode) return;
-      curlBtn.classList.toggle('active', lang === 'curl');
-      pyBtn.classList.toggle('active', lang === 'python');
-      nodeBtn.classList.toggle('active', lang === 'node');
-      curlCode.style.display = lang === 'curl' ? 'block' : 'none';
-      pyCode.style.display = lang === 'python' ? 'block' : 'none';
-      nodeCode.style.display = lang === 'node' ? 'block' : 'none';
+      var langs = ['curl', 'python', 'node', 'apps'];
+      langs.forEach(function(l) {
+        var btn = document.getElementById('qs-' + l + '-btn');
+        var code = document.getElementById('qs-code-' + l);
+        if (btn) btn.classList.toggle('active', l === lang);
+        if (code) code.style.display = (l === lang) ? 'block' : 'none';
+      });
     }
 
     function copySnippetText(btn, lang) {
@@ -5054,6 +6179,11 @@ console.log(response.choices[0].message.content);</code></pre>
     }
 
     function lockViewer() {
+      try {
+        localStorage.removeItem('routers9_viewer_key');
+        localStorage.removeItem('routers9_viewer_name');
+        localStorage.removeItem('routers9_viewer_expires_at');
+      } catch (e) {}
       fetch('/public/lock', { method: 'POST' }).catch(function () {});
       viewerUnlocked = false;
       viewerName = '';
@@ -5122,6 +6252,9 @@ console.log(response.choices[0].message.content);</code></pre>
           input.value = '';
           viewerUnlocked = true;
           viewerName = pack.data.name || '';
+          if (pack.data.session_expires_at) {
+            try { localStorage.setItem('routers9_viewer_expires_at', pack.data.session_expires_at); } catch (e) {}
+          }
           applyViewerState();
           msg.className = 'msg ok';
           msg.textContent = 'Unlocked';
@@ -5141,15 +6274,19 @@ console.log(response.choices[0].message.content);</code></pre>
     document.addEventListener('click', function (ev) {
       if (!ev.target || !ev.target.closest) return;
       if (!ev.target.closest('[data-lock]')) return;
-      fetch('/public/lock', { method: 'POST' }).catch(function () {});
-      viewerUnlocked = false;
-      viewerName = '';
-      if (liveInterval) { clearInterval(liveInterval); liveInterval = null; }
-      if (lbInterval) { clearInterval(lbInterval); lbInterval = null; }
-      if (accountInterval) { clearInterval(accountInterval); accountInterval = null; }
-      applyViewerState();
+      lockViewer();
     });
     // Initial load
+    var hashPage = (window.location.hash || '').replace(/^#/, '').toLowerCase();
+    if (hashPage && document.getElementById('page-' + hashPage)) {
+      switchPage(hashPage);
+    }
+    window.addEventListener('hashchange', function () {
+      var p = (window.location.hash || '').replace(/^#/, '').toLowerCase();
+      if (p && document.getElementById('page-' + p) && p !== currentPage) {
+        switchPage(p);
+      }
+    });
     refreshViewerStatus().then(function () {});
   </script>
 </body>

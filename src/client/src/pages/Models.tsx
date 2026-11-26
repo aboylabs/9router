@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Infinity as InfinityIcon, Power, Search, ShieldCheck, Trash2, Box } from "lucide-react";
+import { Activity, Infinity as InfinityIcon, Power, Search, ShieldCheck, Trash2, Box } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { PageHeader } from "../components/PageHeader";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty } from "../components/ui/Table";
@@ -12,10 +12,11 @@ import type { Model, ModelAccessRole } from "../hooks/useDashboard";
 interface ModelsPageProps {
   models: Model[];
   onRefresh: () => void;
+  onProbe?: (running: boolean) => void;
 }
 
 const ROLE_META: Record<ModelAccessRole, { label: string }> = {
-  dev: { label: "Dev" },
+  dev: { label: "KING" },
   supporter: { label: "Supporter" },
   ultra: { label: "Ultra" },
   pro: { label: "Pro" },
@@ -40,7 +41,7 @@ function roleBadges(roles: ModelAccessRole[]) {
   const order: ModelAccessRole[] = ["pro", "ultra", "supporter", "dev"];
   const picked = order.find((r) => roles.includes(r)) ?? roles[0];
   const extra = roles.length > 1 ? "+" : "";
-  const variant = picked === "ultra" ? "success" : picked === "supporter" ? "warning" : "info";
+  const variant = picked === "ultra" ? "success" : picked === "supporter" ? "warning" : picked === "dev" ? "danger" : "info";
   return (
     <span title={roles.map((r) => ROLE_META[r].label).join(", ")}>
       <Badge variant={variant}>
@@ -50,12 +51,16 @@ function roleBadges(roles: ModelAccessRole[]) {
   );
 }
 
-export function Models({ models, onRefresh }: ModelsPageProps) {
+type ProbeState = { state: "testing" | "ok" | "dead"; ms?: number; detail?: string };
+
+export function Models({ models, onRefresh, onProbe }: ModelsPageProps) {
   const { toast } = useToast();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [accessModel, setAccessModel] = useState<Model | null>(null);
   const [accessOpen, setAccessOpen] = useState(false);
+  const [probe, setProbe] = useState<Record<string, ProbeState>>({});
+  const [probing, setProbing] = useState(false);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -109,6 +114,126 @@ export function Models({ models, onRefresh }: ModelsPageProps) {
     await patchModel(model, { access_roles: roles });
   }
 
+  const [probeProgress, setProbeProgress] = useState<{ done: number; total: number } | null>(null);
+
+  async function testSingleModel(id: string) {
+    if (probe[id]?.state === "testing") return;
+    onProbe?.(true);
+    setProbe((prev) => ({ ...prev, [id]: { state: "testing" } }));
+    try {
+      const data = await api<{
+        results: { id: string; ok: boolean; ms: number; detail: string }[];
+      }>("/admin/models/probe", {
+        method: "POST",
+        body: JSON.stringify({ ids: [id] }),
+      });
+      const r = data.results?.[0];
+      if (r) {
+        setProbe((prev) => ({
+          ...prev,
+          [id]: { state: r.ok ? "ok" : "dead", ms: r.ms, detail: r.detail },
+        }));
+        const secs = (r.ms / 1000).toFixed(1) + "s";
+        toast(
+          r.ok ? `${id}: Live (${secs})` : `${id}: Mati (${r.detail || secs})`,
+          r.ok ? "success" : "error"
+        );
+      } else {
+        setProbe((prev) => ({ ...prev, [id]: { state: "dead", detail: "no response" } }));
+      }
+    } catch (err: any) {
+      setProbe((prev) => ({ ...prev, [id]: { state: "dead", detail: err?.message } }));
+      toast(err?.message || "Gagal mengetes model", "error");
+    } finally {
+      onProbe?.(false);
+    }
+  }
+
+  async function testAllModels() {
+    const ids = filtered.map((m) => m.id);
+    if (!ids.length || probing) return;
+    const ok = window.confirm(
+      "Tes chat sungguhan ke " + ids.length + " model yang sedang tampil?\n\n" +
+        "Tiap model dipanggil secara paralel (4 worker). Hasil tiap model ter-update langsung secara live."
+    );
+    if (!ok) return;
+
+    onProbe?.(true);
+    setProbing(true);
+    setProbeProgress({ done: 0, total: ids.length });
+
+    const initial: Record<string, ProbeState> = {};
+    ids.forEach((id) => { initial[id] = { state: "testing" }; });
+    setProbe((prev) => ({ ...prev, ...initial }));
+
+    let okCount = 0;
+    let deadCount = 0;
+    let done = 0;
+    const queue = [...ids];
+
+    async function worker() {
+      while (queue.length > 0) {
+        const id = queue.shift();
+        if (!id) break;
+        try {
+          const data = await api<{
+            results: { id: string; ok: boolean; ms: number; detail: string }[];
+          }>("/admin/models/probe", {
+            method: "POST",
+            body: JSON.stringify({ ids: [id] }),
+          });
+          const r = data.results?.[0];
+          if (r) {
+            if (r.ok) okCount++;
+            else deadCount++;
+            setProbe((prev) => ({
+              ...prev,
+              [id]: { state: r.ok ? "ok" : "dead", ms: r.ms, detail: r.detail },
+            }));
+          } else {
+            deadCount++;
+            setProbe((prev) => ({ ...prev, [id]: { state: "dead", detail: "no result" } }));
+          }
+        } catch (err: any) {
+          deadCount++;
+          setProbe((prev) => ({ ...prev, [id]: { state: "dead", detail: err?.message } }));
+        } finally {
+          done++;
+          setProbeProgress({ done, total: ids.length });
+        }
+      }
+    }
+
+    try {
+      const concurrency = 4;
+      const workers = Array.from({ length: Math.min(concurrency, ids.length) }, () => worker());
+      await Promise.all(workers);
+      toast(
+        deadCount
+          ? `Tes selesai: ${okCount} aktif, ${deadCount} gagal`
+          : `Tes selesai: ${okCount} model aktif`,
+        deadCount ? "error" : "success"
+      );
+    } catch (err: any) {
+      toast(err?.message || "Gagal mengetes model", "error");
+    } finally {
+      onProbe?.(false);
+      setProbing(false);
+      setProbeProgress(null);
+    }
+  }
+
+  function probeBadge(id: string) {
+    const p = probe[id];
+    if (!p) return null;
+    if (p.state === "testing") return <Badge variant="default">Testing</Badge>;
+    const secs = p.ms != null ? (p.ms / 1000).toFixed(1) + "s" : "";
+    if (p.state === "ok") {
+      return <span title={p.detail || ""}><Badge variant="success">Live {secs}</Badge></span>;
+    }
+    return <span title={p.detail || ""}><Badge variant="danger">Mati {secs}</Badge></span>;
+  }
+
   async function deleteModel(model: Model) {
     const ok = window.confirm(
       `Hapus model "${model.display_name}" (${model.id})?\n\n` +
@@ -136,6 +261,16 @@ export function Models({ models, onRefresh }: ModelsPageProps) {
         icon={<Box className="h-5 w-5 text-text-muted" />}
         title="Models"
         subtitle={`${filtered.length} models · Access sets who can call each one`}
+        actions={
+          <Button variant="secondary" size="sm" disabled={probing || filtered.length === 0} onClick={testAllModels}>
+            <Activity className={`h-3.5 w-3.5 ${probing ? "animate-spin" : ""}`} />
+            {probing && probeProgress
+              ? `Testing (${probeProgress.done}/${probeProgress.total})...`
+              : probing
+                ? "Testing..."
+                : "Test all"}
+          </Button>
+        }
       />
 
       <div className="relative max-w-md">
@@ -165,6 +300,7 @@ export function Models({ models, onRefresh }: ModelsPageProps) {
                   <div className="flex items-center gap-1 shrink-0">
                     {model.quota_exempt && <Badge variant="info">Free</Badge>}
                     <Badge variant={model.active ? "success" : "default"}>{model.active ? "Active" : "Off"}</Badge>
+                    {probeBadge(model.id)}
                   </div>
                 </div>
                 <div className="text-sm font-medium text-text-primary">{model.display_name}</div>
@@ -175,6 +311,16 @@ export function Models({ models, onRefresh }: ModelsPageProps) {
                 )}
                 <div>{roleBadges(roles)}</div>
                 <div className="flex items-center gap-2 pt-1 flex-wrap">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={busy || probe[model.id]?.state === "testing" || probing}
+                    title="Tes chat ke model ini"
+                    onClick={() => testSingleModel(model.id)}
+                  >
+                    <Activity className={`h-3.5 w-3.5 ${probe[model.id]?.state === "testing" ? "animate-spin text-accent" : ""}`} />
+                    Test
+                  </Button>
                   <Button
                     variant="secondary"
                     size="sm"
@@ -256,10 +402,22 @@ export function Models({ models, onRefresh }: ModelsPageProps) {
                       </TableCell>
                       <TableCell>{roleBadges(roles)}</TableCell>
                       <TableCell>
-                        <Badge variant={model.active ? "success" : "default"}>{model.active ? "Active" : "Inactive"}</Badge>
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <Badge variant={model.active ? "success" : "default"}>{model.active ? "Active" : "Inactive"}</Badge>
+                          {probeBadge(model.id)}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            disabled={busy || probe[model.id]?.state === "testing" || probing}
+                            title="Tes chat ke model ini"
+                            onClick={() => testSingleModel(model.id)}
+                          >
+                            <Activity className={`h-3.5 w-3.5 ${probe[model.id]?.state === "testing" ? "animate-spin text-accent" : ""}`} />
+                          </Button>
                           <Button
                             variant="secondary"
                             size="sm"

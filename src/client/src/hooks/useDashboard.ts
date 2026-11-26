@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
 
 export type ModelAccessRole = "dev" | "supporter" | "ultra" | "pro";
@@ -84,6 +84,7 @@ export function useDashboard() {
   const [chartData, setChartData] = useState<ChartPoint[]>([]);
   const [chartRange, setChartRange] = useState<string>("7d");
   const [loading, setLoading] = useState(true);
+  const pauseRef = useRef(false);
 
   const refreshChart = useCallback(async (range: string) => {
     try {
@@ -95,6 +96,7 @@ export function useDashboard() {
   }, []);
 
   const refresh = useCallback(async () => {
+    if (pauseRef.current) return;
     try {
       const [overviewData, modelData, keyData, usageData] = await Promise.all([
         api<Overview>("/admin/overview"),
@@ -106,7 +108,6 @@ export function useDashboard() {
       setModels(modelData.models);
       setKeys(keyData.keys);
       setUsage(usageData.events);
-      await refreshChart(chartRange);
     } catch (err) {
       console.error("Failed to refresh dashboard data:", err);
     } finally {
@@ -120,5 +121,9 @@ export function useDashboard() {
     return () => clearInterval(interval);
   }, [refresh]);
 
-  return { models, keys, usage, overview, chartData, chartRange, setChartRange, refreshChart, loading, refresh };
+  const setPaused = useCallback((paused: boolean) => {
+    pauseRef.current = paused;
+  }, []);
+
+  return { models, keys, usage, overview, chartData, chartRange, setChartRange, refreshChart, loading, refresh, setPaused };
 }

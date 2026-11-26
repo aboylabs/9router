@@ -16,9 +16,9 @@ const ALL_ROLES: ModelAccessRole[] = ["dev", "supporter", "ultra", "pro"];
 
 const ROLE_INFO: Record<ModelAccessRole, { label: string; desc: string; accent: string }> = {
   dev: {
-    label: "Dev (Super Admin)",
+    label: "KING (Super Admin)",
     desc: "Key milik buyer Super Admin",
-    accent: "text-purple-500",
+    accent: "text-red-500",
   },
   supporter: {
     label: "Supporter",

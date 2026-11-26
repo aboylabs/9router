@@ -39,3 +39,7 @@ probe_*.mts
 # Cache
 .cache/
 
+
+# Local backups
+*.bak
+*.bak_*

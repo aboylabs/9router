@@ -12,7 +12,9 @@ import { HelperBadge } from "../components/HelperBadge";
 import { UltraBadge } from "../components/UltraBadge";
 import {
   formatDateShort,
+  formatLastActive,
   formatTokens,
+  buyerNameClassName,
   isSuperAdminName,
   isSupporterName,
   isHelperName,
@@ -132,7 +134,7 @@ export function Live() {
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
-                    <span className="font-medium text-sm truncate text-text-primary">
+                    <span className={`font-medium text-sm truncate ${buyerNameClassName(entry.buyer_name, entry.quota_tokens, entry.is_ultra, entry.access_roles)}`}>
                       {entry.buyer_name}
                     </span>
                     {isSuperAdminName(entry.buyer_name, entry.access_roles) ? <SuperAdminBadge /> : null}
@@ -151,7 +153,7 @@ export function Live() {
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-text-muted">Tokens: <span className="text-text-primary font-medium">{formatTokens(entry.total_tokens)}</span></span>
-                  <span className="text-text-muted">Last: {formatDateShort(entry.last_request_at)}</span>
+                  <span className="text-text-muted">Last: {formatLastActive(entry.last_request_at)}</span>
                 </div>
                 <div className="flex items-start justify-between gap-3 text-xs pt-0.5">
                   <div className="flex items-center gap-1.5 min-w-0">

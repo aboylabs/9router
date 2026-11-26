@@ -10,19 +10,20 @@ import { FixedWindowRateLimiter } from "./rate-limiter.js";
 const publicRateLimiter = new FixedWindowRateLimiter(60_000);
 const PUBLIC_RPM = 120;
 
-// --- Viewer gate (Leaderboard / Live / Usage require a valid API key once) ---
+// --- Viewer gate (Account / Leaderboard / Live require a valid API key once) ---
 // Unlock is strictly throttled: a valid key grants panel access, so an unthrottled
 // endpoint would double as a key-guessing oracle.
 const unlockRateLimiter = new FixedWindowRateLimiter(60_000);
 const UNLOCK_ATTEMPTS_PER_MIN = 5;
 const VIEWER_COOKIE = "9router_viewer";
-const VIEWER_TTL_SECONDS = 7 * 24 * 60 * 60;
-const viewerSecret = new TextEncoder().encode(config.JWT_SECRET);
+const VIEWER_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
+const VIEWER_SECRET_SALT = "revoke_all_20260926";
+const viewerSecret = new TextEncoder().encode(config.JWT_SECRET + ":viewer:" + VIEWER_SECRET_SALT);
 
-type ViewerSession = { kh: string; kid: string; name: string };
+type ViewerSession = { kh: string; kid: string; name: string; exp?: number; iat?: number };
 
-function viewerKeyFingerprint(apiKey: string): string {
-  return crypto.createHash("sha256").update(`viewer:${apiKey}`).digest("hex").slice(0, 32);
+function viewerKeyFingerprint(key: string): string {
+  return crypto.createHash("sha256").update(`viewer:${key}`).digest("hex").slice(0, 32);
 }
 
 async function readViewer(request: FastifyRequest): Promise<ViewerSession | null> {
@@ -34,7 +35,13 @@ async function readViewer(request: FastifyRequest): Promise<ViewerSession | null
     // Cookies minted before the Account page existed have no `kid`; treat them as
     // valid viewers (kid stays empty) so nobody gets logged out by the upgrade.
     if (!payload.kh) return null;
-    return { kh: payload.kh, kid: String(payload.kid ?? ""), name: String(payload.name ?? "") };
+    return {
+      kh: payload.kh,
+      kid: String(payload.kid ?? ""),
+      name: String(payload.name ?? ""),
+      exp: typeof payload.exp === "number" ? payload.exp : undefined,
+      iat: typeof payload.iat === "number" ? payload.iat : undefined
+    };
   } catch {
     return null;
   }
@@ -164,13 +171,21 @@ export async function registerPublicRoutes(app: FastifyInstance) {
       maxAge: VIEWER_TTL_SECONDS
     });
 
-    return { unlocked: true, name: buyerName };
+    return {
+      unlocked: true,
+      name: buyerName,
+      session_expires_at: new Date(Date.now() + VIEWER_TTL_SECONDS * 1000).toISOString()
+    };
   });
 
   // --- Viewer status (cheap, no DB hit) ---
   app.get("/public/unlock/status", async (request) => {
     const viewer = await readViewer(request);
-    return { unlocked: !!viewer, name: viewer?.name ?? null };
+    return {
+      unlocked: !!viewer,
+      name: viewer?.name ?? null,
+      session_expires_at: viewer?.exp ? new Date(viewer.exp * 1000).toISOString() : null
+    };
   });
 
   // --- Viewer lock (clear cookie) ---
@@ -319,7 +334,11 @@ export async function registerPublicRoutes(app: FastifyInstance) {
         completion_tokens: Number(r.completion_tokens ?? 0),
         total_tokens: Number(r.total_tokens ?? 0),
         latency_ms: r.latency_ms
-      }))
+      })),
+      session: {
+        expires_at: viewer.exp ? new Date(viewer.exp * 1000).toISOString() : null,
+        remaining_seconds: viewer.exp ? Math.max(0, Math.floor(viewer.exp - Date.now() / 1000)) : null
+      }
     };
   });
 
@@ -469,7 +488,6 @@ export async function registerPublicRoutes(app: FastifyInstance) {
   // --- Public Usage (read-only, limited, no key material) ---
   app.get("/public/usage", async (request, reply) => {
     if (!enforcePublicRateLimit(request, reply)) return;
-    if (!(await requireViewer(request, reply))) return;
 
     const result = await query(
       `SELECT ue.created_at, ue.endpoint, ue.model_id, ue.status_code, ue.success,
@@ -495,7 +513,6 @@ export async function registerPublicRoutes(app: FastifyInstance) {
   // --- Public Usage Chart ---
   app.get("/public/usage/chart", async (request, reply) => {
     if (!enforcePublicRateLimit(request, reply)) return;
-    if (!(await requireViewer(request, reply))) return;
 
     const range = (request.query as any)?.range || "7d";
 

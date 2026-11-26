@@ -45,7 +45,7 @@ const loginRateLimiter = {
     return { allowed: true, remaining: limit - existing.count, resetAt: existing.resetAt };
   }
 };
-import { clearUpstreamCache, fetchUpstreamModels, getUpstreams } from "./upstream.js";
+import { clearUpstreamCache, fetchUpstreamModels, getUpstreams, probeModel } from "./upstream.js";
 import {
   MODEL_ACCESS_ROLES,
   normalizeAccessRoles,
@@ -58,6 +58,30 @@ import {
   CREATE_KEY_PACKAGES_BY_ID,
   DEFAULT_CREATE_KEY_PACKAGE_ID
 } from "../shared/package-catalog.js";
+
+/** In-memory aggregate cache for expensive admin queries (overview, leaderboard) */
+type AdminCacheEntry = { value: unknown; expires: number; inflight?: Promise<unknown> };
+const adminAggregateCache = new Map<string, AdminCacheEntry>();
+
+async function cachedAdminAggregate<T>(key: string, ttlMs: number, loader: () => Promise<T>): Promise<T> {
+  const now = Date.now();
+  const hit = adminAggregateCache.get(key);
+  if (hit && hit.expires > now) return hit.value as T;
+  if (hit?.inflight) return hit.inflight as Promise<T>;
+
+  const inflight = loader()
+    .then((value) => {
+      adminAggregateCache.set(key, { value, expires: Date.now() + ttlMs });
+      return value;
+    })
+    .catch((err) => {
+      adminAggregateCache.delete(key);
+      throw err;
+    });
+
+  adminAggregateCache.set(key, { value: hit?.value, expires: 0, inflight });
+  return inflight as Promise<T>;
+}
 
 /** Get current time in Indonesia (WIB/GMT+7) as ISO string */
 function nowMYT(): Date {
@@ -732,24 +756,26 @@ export async function registerAdminRoutes(app: FastifyInstance) {
   });
 
   app.get("/admin/overview", async () => {
-    const [buyers, keys, usage, totalKeys] = await Promise.all([
-      query<{ count: string }>(`select count(*) from buyers`),
-      query<{ count: string }>(`select count(*) from api_keys where deleted_at is null and revoked_at is null and is_hidden = false`),
-      query<{ requests: string; tokens: string; cost: string }>(
-        `select count(*) as requests, coalesce(sum(total_tokens), 0) as tokens, coalesce(sum(cost_estimate), 0) as cost
-         from usage_events WHERE status_code != 400`
-      ),
-      query<{ count: string }>(`select count(*) from api_keys where is_hidden = false`)
-    ]);
+    return await cachedAdminAggregate("admin_overview", 30_000, async () => {
+      const [buyers, keys, usage, totalKeys] = await Promise.all([
+        query<{ count: string }>(`select count(*) from buyers`),
+        query<{ count: string }>(`select count(*) from api_keys where deleted_at is null and revoked_at is null and is_hidden = false`),
+        query<{ requests: string; tokens: string; cost: string }>(
+          `select count(*) as requests, coalesce(sum(total_tokens), 0) as tokens, coalesce(sum(cost_estimate), 0) as cost
+           from usage_events WHERE status_code != 400`
+        ),
+        query<{ count: string }>(`select count(*) from api_keys where is_hidden = false`)
+      ]);
 
-    return {
-      buyers: Number(buyers.rows[0].count),
-      activeKeys: Number(keys.rows[0].count),
-      totalKeys: Number(totalKeys.rows[0].count),
-      requests: Number(usage.rows[0].requests),
-      tokens: Number(usage.rows[0].tokens),
-      costEstimate: Number(usage.rows[0].cost)
-    };
+      return {
+        buyers: Number(buyers.rows[0].count),
+        activeKeys: Number(keys.rows[0].count),
+        totalKeys: Number(totalKeys.rows[0].count),
+        requests: Number(usage.rows[0].requests),
+        tokens: Number(usage.rows[0].tokens),
+        costEstimate: Number(usage.rows[0].cost)
+      };
+    });
   });
 
   app.get("/admin/buyers", async () => {
@@ -777,6 +803,44 @@ export async function registerAdminRoutes(app: FastifyInstance) {
        order by m.display_name asc`
     );
     return { models: result.rows };
+  });
+
+  // Registered before /admin/models/* so "probe" is never parsed as a model id.
+  // Chat-probes the pinned upstream only (no failover, 45s cap). Admin-only via
+  // the preHandler above. Does not write usage_events or touch buyer quota.
+  app.post("/admin/models/probe", async (request, reply) => {
+    const parsed = z
+      .object({ ids: z.array(z.string().min(1).max(128)).min(1).max(60) })
+      .safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "Invalid probe payload" });
+
+    const rows = await query<{ id: string; upstream_id: string | null; upstream_model: string }>(
+      `SELECT id, upstream_id, upstream_model FROM models WHERE id = ANY($1::text[])`,
+      [parsed.data.ids]
+    );
+    const byId = new Map(rows.rows.map((r) => [r.id, r]));
+
+    const ids = parsed.data.ids;
+    const results: { id: string; ok: boolean; status: number; ms: number; detail: string }[] = new Array(ids.length);
+    let cursor = 0;
+    const concurrency = 5;
+    async function worker() {
+      while (cursor < ids.length) {
+        const idx = cursor++;
+        const id = ids[idx];
+        const row = byId.get(id);
+        if (!row) {
+          results[idx] = { id, ok: false, status: 404, ms: 0, detail: "not in catalog" };
+          continue;
+        }
+        const probed = await probeModel(row.upstream_id, row.upstream_model);
+        results[idx] = { id, ...probed };
+      }
+    }
+    const workers = Array.from({ length: Math.min(concurrency, ids.length) }, () => worker());
+    await Promise.all(workers);
+    const dead = results.filter((r) => !r.ok).length;
+    return { tested: results.length, ok: results.length - dead, dead, results };
   });
 
   app.post("/admin/models", async (request, reply) => {
@@ -1408,6 +1472,7 @@ export async function registerAdminRoutes(app: FastifyInstance) {
         OR COALESCE(rl.model_id, '') ILIKE $${idx}
         OR COALESCE(rl.ip_address, '') ILIKE $${idx}
         OR COALESCE(rl.user_prompt, '') ILIKE $${idx}
+        OR COALESCE(rl.ai_response, '') ILIKE $${idx}
       )`);
       params.push(needle);
       idx += 1;
@@ -1422,6 +1487,7 @@ export async function registerAdminRoutes(app: FastifyInstance) {
       `SELECT rl.id, rl.created_at, rl.model_id, rl.status_code, rl.success,
               rl.prompt_tokens, rl.completion_tokens, rl.total_tokens, rl.latency_ms,
               rl.error_code, rl.ip_address, rl.user_prompt, rl.prompt_truncated,
+              rl.ai_response, rl.response_truncated,
               b.name AS buyer_name, k.key_prefix, k.quota_tokens, k.is_ultra, k.access_roles
          FROM request_logs rl
          LEFT JOIN buyers b ON b.id = rl.buyer_id
@@ -1497,34 +1563,292 @@ export async function registerAdminRoutes(app: FastifyInstance) {
 
   // --- Leaderboard ---
   app.get("/admin/leaderboard", async () => {
-    const result = await query(
-      `SELECT 
-        b.id as buyer_id,
-        b.name as buyer_name,
-        b.email as buyer_email,
-        k.id as key_id,
-        k.label as key_label,
-        k.key_prefix,
-        k.expires_at,
-        k.created_at as key_created_at,
-        k.quota_tokens,
-        k.is_ultra,
-        k.access_roles,
-        COUNT(ue.id)::int as total_requests,
-        COALESCE(SUM(ue.total_tokens), 0)::bigint as total_tokens,
-        COALESCE(SUM(ue.prompt_tokens), 0)::bigint as prompt_tokens,
-        COALESCE(SUM(ue.completion_tokens), 0)::bigint as completion_tokens,
-        MAX(ue.created_at) as last_request_at
-      FROM usage_events ue
-      JOIN api_keys k ON k.id = ue.api_key_id
-      JOIN buyers b ON b.id = k.buyer_id
-      WHERE k.is_hidden = false
-      GROUP BY b.id, b.name, b.email, k.id, k.label, k.key_prefix, k.expires_at, k.created_at, k.quota_tokens, k.is_ultra, k.access_roles
-      HAVING COUNT(ue.id) > 0
-      ORDER BY total_requests DESC
-      LIMIT 100`
+    return await cachedAdminAggregate("admin_leaderboard", 30_000, async () => {
+      const res = await query<{ rows: any; role_summaries: any }>(
+        `WITH key_agg AS (
+          SELECT 
+            ue.api_key_id,
+            ue.model_id,
+            count(*)::int as req_count,
+            sum(ue.total_tokens)::bigint as total_tokens,
+            sum(ue.prompt_tokens)::bigint as prompt_tokens,
+            sum(ue.completion_tokens)::bigint as completion_tokens,
+            max(ue.created_at) as last_request_at
+          FROM usage_events ue
+          WHERE ue.api_key_id IS NOT NULL
+          GROUP BY ue.api_key_id, ue.model_id
+        ),
+        keys_with_role AS (
+          SELECT 
+            k.id as key_id,
+            b.id as buyer_id,
+            b.name as buyer_name,
+            b.email as buyer_email,
+            k.label as key_label,
+            k.key_prefix,
+            k.expires_at,
+            k.created_at as key_created_at,
+            k.quota_tokens,
+            k.is_ultra,
+            k.access_roles,
+            CASE 
+              WHEN 'dev' = ANY(k.access_roles) THEN 'dev'
+              WHEN 'supporter' = ANY(k.access_roles) THEN 'supporter'
+              WHEN 'ultra' = ANY(k.access_roles) THEN 'ultra'
+              WHEN 'pro' = ANY(k.access_roles) THEN 'pro'
+              ELSE 'free'
+            END as role
+          FROM api_keys k
+          JOIN buyers b ON b.id = k.buyer_id
+          WHERE k.is_hidden = false
+        ),
+        base_joined AS (
+          SELECT 
+            k.role,
+            k.buyer_id,
+            k.buyer_name,
+            k.buyer_email,
+            k.key_label,
+            k.key_prefix,
+            k.expires_at,
+            k.key_created_at,
+            k.quota_tokens,
+            k.is_ultra,
+            k.access_roles,
+            k.key_id,
+            a.model_id,
+            a.req_count,
+            a.prompt_tokens,
+            a.completion_tokens,
+            a.total_tokens,
+            a.last_request_at
+          FROM keys_with_role k
+          JOIN key_agg a ON a.api_key_id = k.key_id
+        ),
+        leaderboard_rows AS (
+          SELECT 
+            buyer_id,
+            buyer_name,
+            buyer_email,
+            key_id,
+            key_label,
+            key_prefix,
+            expires_at,
+            key_created_at,
+            quota_tokens,
+            is_ultra,
+            access_roles,
+            sum(req_count)::int as total_requests,
+            sum(total_tokens)::bigint as total_tokens,
+            sum(prompt_tokens)::bigint as prompt_tokens,
+            sum(completion_tokens)::bigint as completion_tokens,
+            max(last_request_at) as last_request_at
+          FROM base_joined
+          GROUP BY buyer_id, buyer_name, buyer_email, key_id, key_label, key_prefix, expires_at, key_created_at, quota_tokens, is_ultra, access_roles
+          ORDER BY total_requests DESC
+          LIMIT 100
+        ),
+        model_agg AS (
+          SELECT 
+            bj.role,
+            bj.model_id,
+            COALESCE(m.display_name, bj.model_id) as model_name,
+            sum(bj.req_count)::int as req_count,
+            sum(bj.total_tokens)::bigint as tokens,
+            ROW_NUMBER() OVER(PARTITION BY bj.role ORDER BY sum(bj.req_count) DESC) as rn
+          FROM base_joined bj
+          LEFT JOIN models m ON m.id = bj.model_id
+          GROUP BY bj.role, bj.model_id, m.display_name
+        ),
+        user_agg AS (
+          SELECT 
+            role,
+            buyer_name,
+            key_prefix,
+            key_id,
+            sum(req_count)::int as req_count,
+            sum(total_tokens)::bigint as tokens,
+            ROW_NUMBER() OVER(PARTITION BY role ORDER BY sum(total_tokens) DESC) as rn
+          FROM base_joined
+          GROUP BY role, buyer_name, key_prefix, key_id
+        ),
+        role_totals AS (
+          SELECT 
+            role,
+            sum(req_count)::int as total_requests,
+            sum(total_tokens)::bigint as total_tokens
+          FROM base_joined
+          GROUP BY role
+        ),
+        summaries AS (
+          SELECT 
+            rt.role,
+            rt.total_requests,
+            rt.total_tokens,
+            m.model_name as top_model_name,
+            m.model_id as top_model_id,
+            m.req_count as top_model_requests,
+            m.tokens as top_model_tokens,
+            u.buyer_name as top_user_name,
+            u.key_prefix as top_user_key_prefix,
+            u.key_id as top_user_key_id,
+            u.req_count as top_user_requests,
+            u.tokens as top_user_tokens
+          FROM role_totals rt
+          LEFT JOIN model_agg m ON m.role = rt.role AND m.rn = 1
+          LEFT JOIN user_agg u ON u.role = rt.role AND u.rn = 1
+          ORDER BY rt.total_tokens DESC
+        )
+        SELECT 
+          (SELECT json_agg(lr) FROM leaderboard_rows lr) as rows,
+          (SELECT json_agg(s) FROM summaries s) as role_summaries;`
+      );
+      const row = res.rows[0];
+      return { 
+        rows: row?.rows ?? [], 
+        role_summaries: row?.role_summaries ?? [] 
+      };
+    });
+  });
+
+  // --- Key Telemetry / User Detail (My Account style) ---
+  app.get("/admin/keys/:keyId/telemetry", async (request, reply) => {
+    const params = z.object({ keyId: z.string().uuid() }).safeParse(request.params);
+    if (!params.success) return reply.code(400).send({ error: "Invalid key id" });
+
+    const keyRes = await query<any>(
+      `SELECT k.id, k.label, k.key_prefix, k.created_at, k.expires_at, k.revoked_at,
+              k.quota_tokens::text as quota_tokens, k.quota_requests::text as quota_requests,
+              k.used_tokens::text as used_tokens, k.used_requests::text as used_requests,
+              k.daily_reset, k.daily_quota_tokens::text as daily_quota_tokens,
+              k.package_id, k.rate_limit_rpm, k.is_ultra, k.access_roles,
+              b.id as buyer_id, b.name as buyer_name, b.email as buyer_email,
+              CASE
+                WHEN k.expires_at IS NULL THEN NULL
+                ELSE GREATEST(0, EXTRACT(EPOCH FROM (k.expires_at - NOW())) / 86400)::int
+              END as remaining_days
+       FROM api_keys k
+       LEFT JOIN buyers b ON b.id = k.buyer_id
+       WHERE k.id = $1 AND k.deleted_at IS NULL
+       LIMIT 1`,
+      [params.data.keyId]
     );
-    return { rows: result.rows };
+    const k = keyRes.rows[0];
+    if (!k) return reply.code(404).send({ error: "API key not found" });
+
+    const [totals, perModel, today, recent] = await Promise.all([
+      query<any>(
+        `SELECT COUNT(*)::bigint as requests,
+                COALESCE(SUM(total_tokens), 0)::bigint as tokens,
+                COALESCE(SUM(prompt_tokens), 0)::bigint as prompt_tokens,
+                COALESCE(SUM(completion_tokens), 0)::bigint as completion_tokens,
+                COUNT(*) FILTER (WHERE success = true)::bigint as ok_requests,
+                ROUND(AVG(latency_ms))::int as avg_latency_ms,
+                MIN(created_at) as first_request_at,
+                MAX(created_at) as last_request_at
+         FROM usage_events
+         WHERE api_key_id = $1 AND status_code != 400`,
+        [params.data.keyId]
+      ),
+      query<any>(
+        `SELECT ue.model_id,
+                COALESCE(m.display_name, ue.model_id) as display_name,
+                COUNT(*)::int as requests,
+                COALESCE(SUM(ue.total_tokens), 0)::bigint as tokens,
+                COALESCE(SUM(ue.prompt_tokens), 0)::bigint as prompt_tokens,
+                COALESCE(SUM(ue.completion_tokens), 0)::bigint as completion_tokens,
+                ROUND(AVG(ue.latency_ms))::int as avg_latency_ms,
+                MAX(ue.created_at) as last_request_at
+         FROM usage_events ue
+         LEFT JOIN models m ON m.id = ue.model_id
+         WHERE ue.api_key_id = $1 AND ue.status_code != 400 AND ue.model_id IS NOT NULL
+         GROUP BY ue.model_id, m.display_name
+         ORDER BY tokens DESC`,
+        [params.data.keyId]
+      ),
+      query<any>(
+        `SELECT COUNT(*)::bigint as requests,
+                COALESCE(SUM(total_tokens), 0)::bigint as tokens
+         FROM usage_events
+         WHERE api_key_id = $1 AND status_code != 400
+           AND created_at >= date_trunc('day', NOW() AT TIME ZONE 'Asia/Jakarta') AT TIME ZONE 'Asia/Jakarta'`,
+        [params.data.keyId]
+      ),
+      query<any>(
+        `SELECT ue.created_at, ue.model_id,
+                COALESCE(m.display_name, ue.model_id) as display_name,
+                ue.status_code, ue.success,
+                ue.prompt_tokens::text as prompt_tokens,
+                ue.completion_tokens::text as completion_tokens,
+                ue.total_tokens::text as total_tokens,
+                ue.latency_ms
+         FROM usage_events ue
+         LEFT JOIN models m ON m.id = ue.model_id
+         WHERE ue.api_key_id = $1
+         ORDER BY ue.created_at DESC
+         LIMIT 30`,
+        [params.data.keyId]
+      )
+    ]);
+
+    const t = totals.rows[0] ?? {};
+    return {
+      key: {
+        id: k.id,
+        label: k.label,
+        key_prefix: k.key_prefix,
+        buyer_id: k.buyer_id,
+        buyer_name: k.buyer_name ?? "",
+        buyer_email: k.buyer_email ?? "",
+        package_id: k.package_id,
+        is_ultra: k.is_ultra,
+        access_roles: k.access_roles ?? [],
+        rate_limit_rpm: k.rate_limit_rpm,
+        created_at: k.created_at,
+        expires_at: k.expires_at,
+        revoked_at: k.revoked_at,
+        remaining_days: k.remaining_days,
+        daily_reset: k.daily_reset,
+        daily_quota_tokens: k.daily_quota_tokens === null ? null : Number(k.daily_quota_tokens),
+        quota_tokens: k.quota_tokens === null ? null : Number(k.quota_tokens),
+        quota_requests: k.quota_requests === null ? null : Number(k.quota_requests),
+        used_tokens: Number(k.used_tokens ?? 0),
+        used_requests: Number(k.used_requests ?? 0)
+      },
+      totals: {
+        requests: Number(t.requests ?? 0),
+        ok_requests: Number(t.ok_requests ?? 0),
+        tokens: Number(t.tokens ?? 0),
+        prompt_tokens: Number(t.prompt_tokens ?? 0),
+        completion_tokens: Number(t.completion_tokens ?? 0),
+        avg_latency_ms: t.avg_latency_ms === null ? null : Number(t.avg_latency_ms ?? 0),
+        first_request_at: t.first_request_at ?? null,
+        last_request_at: t.last_request_at ?? null,
+        today_requests: Number(today.rows[0]?.requests ?? 0),
+        today_tokens: Number(today.rows[0]?.tokens ?? 0)
+      },
+      models: perModel.rows.map((r: any) => ({
+        model_id: r.model_id,
+        display_name: r.display_name,
+        requests: Number(r.requests ?? 0),
+        tokens: Number(r.tokens ?? 0),
+        prompt_tokens: Number(r.prompt_tokens ?? 0),
+        completion_tokens: Number(r.completion_tokens ?? 0),
+        avg_latency_ms: r.avg_latency_ms === null ? null : Number(r.avg_latency_ms ?? 0),
+        last_request_at: r.last_request_at ?? null
+      })),
+      recent: recent.rows.map((r: any) => ({
+        created_at: r.created_at,
+        model_id: r.model_id,
+        display_name: r.display_name,
+        status_code: r.status_code,
+        success: r.success,
+        prompt_tokens: Number(r.prompt_tokens ?? 0),
+        completion_tokens: Number(r.completion_tokens ?? 0),
+        total_tokens: Number(r.total_tokens ?? 0),
+        latency_ms: r.latency_ms
+      }))
+    };
   });
 
   // --- Profile ---

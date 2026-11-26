@@ -6,7 +6,13 @@ import { bearerToken } from "./security.js";
 import { apiKeyIsUsable, checkTokenQuota, findApiKey, modelForKey, publicModelsForKey, recordUsage } from "./repositories.js";
 import { callUpstream, streamUpstream } from "./upstream.js";
 import { costEstimate, estimateUsage, usageFromResponse } from "./usage.js";
-import { extractLastUserPrompt } from "./request-log.js";
+import {
+  REQUEST_LOG_RESPONSE_MAX,
+  ResponseSnapshot,
+  extractLastUserPrompt,
+  extractNonStreamResponse,
+  sanitizePrompt
+} from "./request-log.js";
 
 const chatCompletionSchema = z.object({
   model: z.string().min(1),
@@ -195,6 +201,8 @@ export async function registerProxyRoutes(app: FastifyInstance) {
             ipAddress,
             userPrompt: promptSnap.text,
             promptTruncated: promptSnap.truncated,
+            aiResponse: null,
+            responseTruncated: false,
             countTowardTokenQuota
           }).catch((err) => {
             request.log.error({ err, buyerId: apiKey.buyer_id, apiKeyId: apiKey.id }, "Failed to record usage");
@@ -219,6 +227,8 @@ export async function registerProxyRoutes(app: FastifyInstance) {
       const decoder = new TextDecoder();
       let buffer = "";
       let upstreamUsage: MeteredUsage | null = null;
+      let aiResponseBuffer = "";
+      let aiResponseTruncated = false;
 
       function parseSseChunk(text: string) {
         buffer += text;
@@ -231,6 +241,12 @@ export async function registerProxyRoutes(app: FastifyInstance) {
           if (!data || data === "[DONE]") continue;
           try {
             const parsed = JSON.parse(data) as {
+              choices?: Array<{
+                delta?: {
+                  content?: unknown;
+                };
+                text?: unknown;
+              }>;
               usage?: {
                 prompt_tokens?: number;
                 completion_tokens?: number;
@@ -244,6 +260,26 @@ export async function registerProxyRoutes(app: FastifyInstance) {
                 totalTokens: Number(parsed.usage.total_tokens ?? 0),
                 estimated: false
               };
+            }
+            const firstChoice = parsed.choices?.[0];
+            if (firstChoice) {
+              const deltaContent = firstChoice.delta?.content;
+              const chunkText = typeof deltaContent === "string"
+                ? deltaContent
+                : (typeof firstChoice.text === "string" ? firstChoice.text : "");
+              if (chunkText) {
+                const remaining = REQUEST_LOG_RESPONSE_MAX - aiResponseBuffer.length;
+                if (remaining > 0) {
+                  if (chunkText.length > remaining) {
+                    aiResponseBuffer += chunkText.slice(0, remaining);
+                    aiResponseTruncated = true;
+                  } else {
+                    aiResponseBuffer += chunkText;
+                  }
+                } else {
+                  aiResponseTruncated = true;
+                }
+              }
             }
           } catch {
             // partial/non-JSON SSE payloads
@@ -286,6 +322,11 @@ export async function registerProxyRoutes(app: FastifyInstance) {
           inputCostPerMillion: access.input_cost_per_million,
           outputCostPerMillion: access.output_cost_per_million
         });
+        const cleanedResponse = sanitizePrompt(aiResponseBuffer);
+        const aiResponseSnap: ResponseSnapshot = {
+          text: cleanedResponse || null,
+          truncated: aiResponseTruncated
+        };
         if (!apiKey.is_hidden) {
           recordUsage({
             buyerId: apiKey.buyer_id,
@@ -306,6 +347,8 @@ export async function registerProxyRoutes(app: FastifyInstance) {
             ipAddress,
             userPrompt: promptSnap.text,
             promptTruncated: promptSnap.truncated,
+            aiResponse: aiResponseSnap.text,
+            responseTruncated: aiResponseSnap.truncated,
             countTowardTokenQuota
           }).catch((err) => {
             request.log.error({ err, buyerId: apiKey.buyer_id, apiKeyId: apiKey.id }, "Failed to record usage");
@@ -342,6 +385,10 @@ export async function registerProxyRoutes(app: FastifyInstance) {
       outputCostPerMillion: access.output_cost_per_million
     });
 
+    const responseSnap = success
+      ? extractNonStreamResponse(upstream.body)
+      : { text: null, truncated: false };
+
     if (!apiKey.is_hidden) {
       recordUsage({
         buyerId: apiKey.buyer_id,
@@ -362,6 +409,8 @@ export async function registerProxyRoutes(app: FastifyInstance) {
         ipAddress,
         userPrompt: promptSnap.text,
         promptTruncated: promptSnap.truncated,
+        aiResponse: responseSnap.text,
+        responseTruncated: responseSnap.truncated,
         countTowardTokenQuota
       }).catch((err) => {
         request.log.error({ err, buyerId: apiKey.buyer_id, apiKeyId: apiKey.id }, "Failed to record usage");

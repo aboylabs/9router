@@ -76,6 +76,7 @@ export function CreateKeyModal({ open, onOpenChange, onSuccess }: CreateKeyModal
   const rpmValid = !isNaN(rpmNum) && rpmNum >= 1 && rpmNum <= 500;
 
   const AVAILABLE_ROLES: { id: string; label: string; color: string }[] = [
+    { id: "dev", label: "KING", color: "red" },
     { id: "supporter", label: "Supporter", color: "amber" },
     { id: "ultra", label: "Ultra", color: "cyan" },
     { id: "pro", label: "Pro", color: "blue" },
@@ -89,11 +90,13 @@ export function CreateKeyModal({ open, onOpenChange, onSuccess }: CreateKeyModal
   };
 
   const roleColorClasses: Record<string, string> = {
+    red: "border-red-400/50 bg-red-500/15 text-red-700 dark:text-red-300",
     amber: "border-amber-400/50 bg-amber-500/15 text-amber-700 dark:text-amber-300",
     cyan: "border-cyan-400/50 bg-cyan-500/15 text-cyan-700 dark:text-cyan-300",
     blue: "border-blue-400/50 bg-blue-500/15 text-blue-700 dark:text-blue-300",
   };
   const roleColorClassesOff: Record<string, string> = {
+    red: "border-border bg-surface text-text-muted hover:border-red-400/40",
     amber: "border-border bg-surface text-text-muted hover:border-amber-400/40",
     cyan: "border-border bg-surface text-text-muted hover:border-cyan-400/40",
     blue: "border-border bg-surface text-text-muted hover:border-blue-400/40",

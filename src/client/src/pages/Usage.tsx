@@ -162,7 +162,7 @@ export function Usage({ usage }: UsagePageProps) {
               </div>
               <div className="flex items-center justify-between text-xs text-text-muted gap-2">
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <span className={`truncate font-medium ${buyerNameClassName(event.buyer_name, event.quota_tokens, event.is_ultra)}`}>
+                  <span className={`truncate font-medium ${buyerNameClassName(event.buyer_name, event.quota_tokens, event.is_ultra, event.access_roles)}`}>
                     {event.buyer_name || "-"}
                   </span>
                   {isSuperAdminName(event.buyer_name, event.access_roles) ? <SuperAdminBadge /> : null}
@@ -201,7 +201,7 @@ export function Usage({ usage }: UsagePageProps) {
                 <TableCell>{formatDateShort(event.created_at)}</TableCell>
                 <TableCell className="font-medium">
                   <div className="flex items-center gap-1.5">
-                    <span className={buyerNameClassName(event.buyer_name, event.quota_tokens, event.is_ultra)}>
+                    <span className={buyerNameClassName(event.buyer_name, event.quota_tokens, event.is_ultra, event.access_roles)}>
                       {event.buyer_name || "-"}
                     </span>
                     {isSuperAdminName(event.buyer_name, event.access_roles) ? <SuperAdminBadge /> : null}

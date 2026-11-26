@@ -40,6 +40,8 @@ type RequestLog = {
   ip_address: string | null;
   user_prompt: string | null;
   prompt_truncated: boolean;
+  ai_response?: string | null;
+  response_truncated?: boolean;
 };
 
 type StatusFilter = "all" | "ok" | "fail";
@@ -73,16 +75,41 @@ function BuyerMarks({ name, quota, ultra, accessRoles }: { name: string | null; 
 }
 
 function PromptBlock({ event }: { event: RequestLog }) {
-  if (!event.user_prompt) {
-    return <p className="text-xs text-text-muted italic">No prompt captured (empty / non-text / before this feature).</p>;
+  const hasPrompt = Boolean(event.user_prompt);
+  const hasResponse = Boolean(event.ai_response);
+
+  if (!hasPrompt && !hasResponse) {
+    return <p className="text-xs text-text-muted italic">No prompt or AI response captured (empty / error / before this feature).</p>;
   }
+
   return (
-    <div className="space-y-1.5">
-      <pre className="text-xs text-text-primary whitespace-pre-wrap break-words font-mono leading-relaxed max-h-48 overflow-y-auto">
-        {event.user_prompt}
-      </pre>
-      {event.prompt_truncated ? (
-        <p className="text-[11px] text-amber-500">Truncated at 1KB — only the last user message is stored.</p>
+    <div className="space-y-2.5">
+      {hasPrompt ? (
+        <div>
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted mb-1 flex items-center gap-1.5">
+            <span>User Prompt</span>
+            {event.prompt_truncated ? (
+              <span className="text-[10px] font-normal text-amber-500">(Truncated at 1KB)</span>
+            ) : null}
+          </div>
+          <pre className="text-xs text-text-primary whitespace-pre-wrap break-words font-mono leading-relaxed max-h-48 overflow-y-auto rounded bg-surface/60 p-2 border border-border/40">
+            {event.user_prompt}
+          </pre>
+        </div>
+      ) : null}
+
+      {hasResponse ? (
+        <div>
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400/90 mb-1 flex items-center gap-1.5">
+            <span>AI Response</span>
+            {event.response_truncated ? (
+              <span className="text-[10px] font-normal text-amber-500">(Truncated at 1KB)</span>
+            ) : null}
+          </div>
+          <pre className="text-xs text-emerald-300 whitespace-pre-wrap break-words font-mono leading-relaxed max-h-48 overflow-y-auto rounded bg-surface/60 p-2 border border-border/40">
+            {event.ai_response}
+          </pre>
+        </div>
       ) : null}
     </div>
   );
@@ -244,7 +271,7 @@ export function Requests() {
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <span className={`truncate font-medium text-sm ${buyerNameClassName(event.buyer_name, event.quota_tokens, event.is_ultra)}`}>
+                      <span className={`truncate font-medium text-sm ${buyerNameClassName(event.buyer_name, event.quota_tokens, event.is_ultra, event.access_roles)}`}>
                         {event.buyer_name || "-"}
                       </span>
                       <BuyerMarks name={event.buyer_name} quota={event.quota_tokens} ultra={event.is_ultra} accessRoles={event.access_roles} />
@@ -262,7 +289,7 @@ export function Requests() {
                     onClick={() => setOpenId(open ? null : event.id)}
                     className="text-xs text-primary-500 font-medium cursor-pointer"
                   >
-                    {open ? "Hide prompt" : "Show prompt"}
+                    {open ? "Hide details" : "Show prompt & response"}
                   </button>
                   {open ? <PromptBlock event={event} /> : null}
                 </div>
@@ -281,7 +308,7 @@ export function Requests() {
                   <th className="px-2 py-2.5 text-left text-[11px] font-semibold text-text-muted uppercase tracking-wider">IP</th>
                   <th className="px-2 py-2.5 text-left text-[11px] font-semibold text-text-muted uppercase tracking-wider">Status</th>
                   <th className="px-2 py-2.5 text-left text-[11px] font-semibold text-text-muted uppercase tracking-wider">Tokens</th>
-                  <th className="px-2 py-2.5 text-left text-[11px] font-semibold text-text-muted uppercase tracking-wider min-w-[280px]">Prompt</th>
+                  <th className="px-2 py-2.5 text-left text-[11px] font-semibold text-text-muted uppercase tracking-wider min-w-[280px]">Prompt &amp; Response</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -295,7 +322,7 @@ export function Requests() {
                       <td className="px-2 py-2.5 text-text-secondary whitespace-nowrap align-top">{formatDateShort(event.created_at)}</td>
                       <td className="px-2 py-2.5 align-top">
                         <div className="flex items-center gap-1.5">
-                          <span className={`font-medium ${buyerNameClassName(event.buyer_name, event.quota_tokens, event.is_ultra)}`}>
+                          <span className={`font-medium ${buyerNameClassName(event.buyer_name, event.quota_tokens, event.is_ultra, event.access_roles)}`}>
                             {event.buyer_name || "-"}
                           </span>
                           <BuyerMarks name={event.buyer_name} quota={event.quota_tokens} ultra={event.is_ultra} accessRoles={event.access_roles} />
@@ -338,6 +365,11 @@ export function Requests() {
                           ) : (
                             <span className="text-xs text-text-muted italic">no prompt</span>
                           )}
+                          {event.ai_response ? (
+                            <div className="text-[11px] text-emerald-400/80 line-clamp-1 break-all mt-0.5 font-mono">
+                              ↳ {event.ai_response}
+                            </div>
+                          ) : null}
                         </button>
                         {open ? (
                           <div className="mt-2 rounded-md border border-border bg-surface-secondary/60 p-2">

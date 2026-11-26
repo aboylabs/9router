@@ -127,6 +127,8 @@ CREATE TABLE IF NOT EXISTS request_logs (
   ip_address VARCHAR(45),
   user_prompt TEXT,
   prompt_truncated BOOLEAN NOT NULL DEFAULT FALSE,
+  ai_response TEXT,
+  response_truncated BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_request_logs_created ON request_logs(created_at DESC);

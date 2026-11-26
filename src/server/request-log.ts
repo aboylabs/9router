@@ -1,10 +1,16 @@
 import { query } from "./db.js";
 
 export const REQUEST_LOG_PROMPT_MAX = 1024;
+export const REQUEST_LOG_RESPONSE_MAX = 1024;
 export const REQUEST_LOG_RETENTION_DAYS = 7;
 const PRUNE_INTERVAL_MS = 60 * 60 * 1000;
 
 export type PromptSnapshot = {
+  text: string | null;
+  truncated: boolean;
+};
+
+export type ResponseSnapshot = {
   text: string | null;
   truncated: boolean;
 };
@@ -55,7 +61,31 @@ function flattenMessageContent(content: unknown): string {
   return "";
 }
 
-function sanitizePrompt(text: string): string {
+export function extractNonStreamResponse(body: unknown): ResponseSnapshot {
+  if (!body || typeof body !== "object") return { text: null, truncated: false };
+  const choices = (body as { choices?: unknown }).choices;
+  if (!Array.isArray(choices) || choices.length === 0) {
+    return { text: null, truncated: false };
+  }
+  const first = choices[0];
+  if (!first || typeof first !== "object") return { text: null, truncated: false };
+
+  let raw = "";
+  if ("message" in first && first.message && typeof first.message === "object") {
+    raw = flattenMessageContent((first.message as { content?: unknown }).content);
+  } else if ("text" in first && typeof (first as { text?: unknown }).text === "string") {
+    raw = (first as { text: string }).text;
+  }
+
+  const cleaned = sanitizePrompt(raw);
+  if (!cleaned) return { text: null, truncated: false };
+  if (cleaned.length <= REQUEST_LOG_RESPONSE_MAX) {
+    return { text: cleaned, truncated: false };
+  }
+  return { text: cleaned.slice(0, REQUEST_LOG_RESPONSE_MAX), truncated: true };
+}
+
+export function sanitizePrompt(text: string): string {
   let out = "";
   for (let i = 0; i < text.length; i++) {
     const code = text.charCodeAt(i);
